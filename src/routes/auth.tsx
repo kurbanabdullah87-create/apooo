@@ -1,6 +1,6 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import { ArrowRight, Check, HardHat, Loader2, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
+import { ArrowRight, BarChart3, Check, HardHat, Loader2, LockKeyhole, Mail, ShieldCheck, Sparkles, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -140,56 +140,80 @@ function AuthPage() {
   }
 
   return (
-    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-background px-4 py-8 sm:px-6">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-gradient-to-b from-primary/10 to-transparent" />
-      <section className="relative w-full max-w-md rounded-3xl border bg-card p-6 shadow-xl shadow-black/10 sm:p-8">
-        <div className="mb-7 flex items-center gap-3">
-          <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm"><HardHat className="size-6" /></div>
-          <div><p className="text-xl font-bold tracking-tight">Saha</p><p className="text-sm text-muted-foreground">Operasyon ve finans</p></div>
-          <div className="ml-auto flex items-center gap-1.5 rounded-full border bg-background px-2.5 py-1 text-[11px] font-medium text-muted-foreground"><ShieldCheck className="size-3.5 text-emerald-600"/>Güvenli oturum</div>
-        </div>
-
-        {confirmationSent ? (
-          <div className="space-y-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-5 text-center">
-            <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600"><Check className="size-6"/></div>
-            <h1 className="text-xl font-bold">E-postanı doğrula</h1>
-            <p className="text-sm leading-relaxed text-muted-foreground">Hesabı etkinleştirmek için <strong className="break-all text-foreground">{email.trim()}</strong> adresine gönderilen bağlantıyı aç.</p>
-            <Button variant="outline" className="w-full" onClick={() => { setConfirmationSent(false); setMode("login"); }}>Giriş ekranına dön</Button>
+    <main className="relative isolate min-h-dvh overflow-hidden bg-[#080a0e] text-foreground">
+      <div aria-hidden="true" className="pointer-events-none absolute -left-48 -top-56 size-[34rem] rounded-full bg-primary/10 blur-[110px]" />
+      <div aria-hidden="true" className="pointer-events-none absolute -bottom-64 right-0 size-[36rem] rounded-full bg-sky-500/[0.07] blur-[130px]" />
+      <div className="relative mx-auto grid min-h-dvh w-full max-w-[1440px] lg:grid-cols-[minmax(0,1.05fr)_minmax(460px,0.95fr)]">
+        <aside className="relative hidden flex-col justify-between overflow-hidden px-12 py-12 lg:flex xl:px-20">
+          <div aria-hidden="true" className="absolute inset-10 rounded-[3rem] border border-white/[0.035]" />
+          <div className="relative flex items-center gap-3">
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20"><HardHat className="size-6" /></div>
+            <div><p className="text-xl font-bold tracking-tight">Saha</p><p className="text-xs text-muted-foreground">Operasyon ve finans yönetimi</p></div>
           </div>
-        ) : (
-          <>
-            <div className="mb-6"><p className="text-sm font-semibold text-primary">{resetMode ? "Hesap kurtarma" : mode === "login" ? "Hesabına eriş" : "Yeni hesabını oluştur"}</p><h1 className="mt-1 text-2xl font-bold tracking-tight">{resetMode ? "Şifreni yenile" : mode === "login" ? "Tekrar hoş geldin" : "Saha'ya katıl"}</h1><p className="mt-1 text-sm text-muted-foreground">{resetMode ? "Kayıtlı e-posta adresine güvenli bir bağlantı göndereceğiz." : mode === "login" ? "Bilgilerini girerek güvenli şekilde devam et." : "Hesap bilgilerin yalnızca sana ait olacak."}</p></div>
+          <div className="relative max-w-xl py-12">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/[0.07] px-3 py-1.5 text-xs font-medium text-primary"><Sparkles className="size-3.5"/>Sahadaki işin için tek merkez</div>
+            <h2 className="font-display text-5xl font-bold leading-[1.08] tracking-tight xl:text-6xl">İşini yönet.<br/><span className="bg-gradient-to-r from-primary to-cyan-200 bg-clip-text text-transparent">Günün sende kalsın.</span></h2>
+            <p className="mt-6 max-w-lg text-base leading-7 text-muted-foreground">Müşterilerini, işleri, tahsilatları ve giderlerini düzenli bir yerde takip et. Nerede olursan ol, kontrol elinde olsun.</p>
+            <div className="mt-10 grid max-w-lg grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4 backdrop-blur"><div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><UsersRound className="size-4.5"/></div><p className="mt-4 text-sm font-semibold">Müşteri takibi</p><p className="mt-1 text-xs text-muted-foreground">Kayıtlar, işler ve cari hareketler</p></div>
+              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4 backdrop-blur"><div className="flex size-9 items-center justify-center rounded-xl bg-sky-400/10 text-sky-300"><BarChart3 className="size-4.5"/></div><p className="mt-4 text-sm font-semibold">Finans özeti</p><p className="mt-1 text-xs text-muted-foreground">Tahsilat, gider ve kişisel kayıtlar</p></div>
+            </div>
+          </div>
+          <div className="relative flex items-center gap-2 text-xs text-muted-foreground"><ShieldCheck className="size-4 text-emerald-400"/>Güvenli oturum · Kayıtların hesabına özel</div>
+        </aside>
 
-            {!resetMode && <div className="grid grid-cols-2 gap-2">
-              <Button type="button" variant="outline" className="h-11 rounded-xl" onClick={() => void continueWith("google")} disabled={busy}><GoogleMark/>Google ile devam et</Button>
-              <Button type="button" variant="outline" className="h-11 rounded-xl" onClick={() => void continueWith("apple")} disabled={busy}><AppleMark/>Apple ile devam et</Button>
-            </div>}
-            {!resetMode && <div className="my-5 flex items-center gap-3"><span className="h-px flex-1 bg-border"/><span className="text-xs text-muted-foreground">veya e-posta ile</span><span className="h-px flex-1 bg-border"/></div>}
+        <div className="flex min-h-dvh items-center justify-center px-4 py-8 sm:px-8 lg:px-10">
+          <section className="relative w-full max-w-[480px] rounded-[2rem] border border-white/[0.09] bg-[#101318]/95 p-6 shadow-[0_32px_100px_-35px_rgba(0,0,0,0.85)] backdrop-blur-xl sm:p-9">
+            <div aria-hidden="true" className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent" />
+            <div className="mb-8 flex items-center justify-between gap-3 lg:hidden">
+              <div className="flex items-center gap-3"><div className="flex size-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/15"><HardHat className="size-5" /></div><div><p className="text-lg font-bold">Saha</p><p className="text-xs text-muted-foreground">Operasyon ve finans</p></div></div>
+              <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-2.5 py-1.5 text-[10px] font-medium text-emerald-300"><ShieldCheck className="size-3.5"/>Güvenli oturum</span>
+            </div>
+            <div className="mb-8 hidden items-center justify-end lg:flex"><span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-2.5 py-1.5 text-[10px] font-medium text-emerald-300"><ShieldCheck className="size-3.5"/>Güvenli oturum</span></div>
 
-            <form onSubmit={(event) => void submit(event)} className="space-y-4">
-              {!resetMode && mode === "signup" && <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label htmlFor="first-name">Ad</Label><Input id="first-name" autoComplete="given-name" maxLength={80} value={firstName} onChange={(e) => setFirstName(e.target.value)} required className="h-11 rounded-xl"/></div>
-                <div className="space-y-2"><Label htmlFor="last-name">Soyad</Label><Input id="last-name" autoComplete="family-name" maxLength={80} value={lastName} onChange={(e) => setLastName(e.target.value)} required className="h-11 rounded-xl"/></div>
-              </div>}
-              <div className="space-y-2"><Label htmlFor="email">{legacy && mode === "login" && !resetMode ? "Eski kullanıcı adı" : "E-posta adresi"}</Label><div className="relative"><Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/><Input id="email" type={mode === "signup" || resetMode ? "email" : "text"} inputMode={legacy && !resetMode ? "text" : "email"} autoCapitalize="none" autoComplete={mode === "login" ? "username" : "email"} placeholder={legacy && mode === "login" && !resetMode ? "eski kullanıcı adın" : "adiniz@gmail.com"} maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} required className="h-11 rounded-xl pl-10"/></div></div>
-              {!resetMode && <div className="space-y-2"><div className="flex items-center justify-between"><Label htmlFor="password">Şifre</Label>{mode === "signup" && <span className="text-[11px] text-muted-foreground">En az 12 karakter</span>}</div><div className="relative"><LockKeyhole className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/><Input id="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "signup" ? 12 : undefined} value={password} onChange={(e) => setPassword(e.target.value)} required className="h-11 rounded-xl pl-10"/></div></div>}
-              {!resetMode && mode === "login" && !legacy && <button type="button" onClick={() => setResetMode(true)} className="-mt-1 text-left text-xs font-medium text-primary hover:underline">Şifremi unuttum</button>}
-              {!resetMode && <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border bg-background px-3 py-2.5 text-sm"><input type="checkbox" className="size-4 accent-primary" checked={remember} onChange={(e) => setRemember(e.target.checked)}/><span>Beni hatırla</span><span className="ml-auto text-xs text-muted-foreground">{remember ? "Bu cihazda açık kalır" : "Bu sekmede açık kalır"}</span></label>}
-              <Button type="submit" className="h-11 w-full rounded-xl text-base" disabled={busy}>{busy ? <Loader2 className="animate-spin"/> : <>{resetMode ? "Yenileme bağlantısı gönder" : mode === "login" ? "Giriş yap" : "Hesap oluştur"}<ArrowRight/></>}</Button>
-            </form>
+            {confirmationSent ? (
+              <div className="space-y-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-5 text-center">
+                <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400"><Check className="size-6"/></div>
+                <h1 className="text-xl font-bold">E-postanı doğrula</h1>
+                <p className="text-sm leading-relaxed text-muted-foreground">Hesabı etkinleştirmek için <strong className="break-all text-foreground">{email.trim()}</strong> adresine gönderilen bağlantıyı aç.</p>
+                <Button variant="outline" className="w-full" onClick={() => { setConfirmationSent(false); setMode("login"); }}>Giriş ekranına dön</Button>
+              </div>
+            ) : (
+              <>
+                <div className="mb-7"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{resetMode ? "Hesap kurtarma" : mode === "login" ? "Hesabına güvenle eriş" : "Yeni bir başlangıç"}</p><h1 className="mt-2 font-display text-3xl font-bold tracking-tight sm:text-[2.1rem]">{resetMode ? "Şifreni yenile" : mode === "login" ? "Tekrar hoş geldin" : "Saha'ya katıl"}</h1><p className="mt-2 text-sm leading-6 text-muted-foreground">{resetMode ? "Kayıtlı e-posta adresine güvenli bir bağlantı göndereceğiz." : mode === "login" ? "İşlerine kaldığın yerden devam et." : "Hesabını oluşturup işlerini tek yerden yönet."}</p></div>
 
-            {resetMode ? <button type="button" onClick={() => setResetMode(false)} className="mt-4 w-full text-center text-sm font-medium text-primary hover:underline">Giriş ekranına dön</button> : <>
-              {mode === "login" && <button type="button" onClick={() => setLegacy((value) => !value)} className="mt-4 w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">{legacy ? "E-posta ile girişe dön" : "Eski kullanıcı adıyla açılmış hesabım var"}</button>}
-              <div className="mt-6 border-t pt-5 text-center"><span className="text-sm text-muted-foreground">{mode === "login" ? "İlk kez mi kullanıyorsun?" : "Zaten hesabın var mı?"}</span><button type="button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setLegacy(false); setResetMode(false); setPassword(""); }} className="ml-1.5 text-sm font-semibold text-primary hover:underline">{mode === "login" ? "Hesap oluştur" : "Giriş yap"}</button></div>
-              <p className="mt-5 text-center text-xs leading-relaxed text-muted-foreground">Şifreni bu uygulama dışında kimseyle paylaşma. Google ve Apple girişi sağlayıcıların güvenli doğrulama ekranlarında gerçekleşir.</p>
-              <nav aria-label="Yasal bilgiler" className="mt-5 flex justify-center gap-4 border-t pt-4 text-xs text-muted-foreground">
-                <Link to="/gizlilik" className="underline-offset-4 hover:text-foreground hover:underline">Gizlilik ve KVKK</Link>
-                <Link to="/kullanim-sartlari" className="underline-offset-4 hover:text-foreground hover:underline">Kullanım şartları</Link>
-              </nav>
-            </>}
-          </>
-        )}
-      </section>
+                {!resetMode && <div className="grid grid-cols-2 gap-2.5">
+                  <Button type="button" variant="outline" className="h-12 rounded-xl border-white/10 bg-white/[0.035] text-sm hover:bg-white/[0.07]" onClick={() => void continueWith("google")} disabled={busy}><GoogleMark/>Google ile devam et</Button>
+                  <Button type="button" variant="outline" className="h-12 rounded-xl border-white/10 bg-white/[0.035] text-sm hover:bg-white/[0.07]" onClick={() => void continueWith("apple")} disabled={busy}><AppleMark/>Apple ile devam et</Button>
+                </div>}
+                {!resetMode && <div className="my-6 flex items-center gap-3"><span className="h-px flex-1 bg-white/10"/><span className="text-[11px] font-medium text-muted-foreground">veya e-posta ile</span><span className="h-px flex-1 bg-white/10"/></div>}
+
+                <form onSubmit={(event) => void submit(event)} className="space-y-4">
+                  {!resetMode && mode === "signup" && <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2"><Label htmlFor="first-name">Ad</Label><Input id="first-name" autoComplete="given-name" maxLength={80} value={firstName} onChange={(e) => setFirstName(e.target.value)} required className="h-12 rounded-xl border-white/10 bg-black/20 focus-visible:ring-primary/40"/></div>
+                    <div className="space-y-2"><Label htmlFor="last-name">Soyad</Label><Input id="last-name" autoComplete="family-name" maxLength={80} value={lastName} onChange={(e) => setLastName(e.target.value)} required className="h-12 rounded-xl border-white/10 bg-black/20 focus-visible:ring-primary/40"/></div>
+                  </div>}
+                  <div className="space-y-2"><Label htmlFor="email">{legacy && mode === "login" && !resetMode ? "Eski kullanıcı adı" : "E-posta adresi"}</Label><div className="relative"><Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/><Input id="email" type={mode === "signup" || resetMode ? "email" : "text"} inputMode={legacy && !resetMode ? "text" : "email"} autoCapitalize="none" autoComplete={mode === "login" ? "username" : "email"} placeholder={legacy && mode === "login" && !resetMode ? "eski kullanıcı adın" : "adiniz@gmail.com"} maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} required className="h-12 rounded-xl border-white/10 bg-black/20 pl-11 focus-visible:ring-primary/40"/></div></div>
+                  {!resetMode && <div className="space-y-2"><div className="flex items-center justify-between"><Label htmlFor="password">Şifre</Label>{mode === "signup" && <span className="text-[11px] text-muted-foreground">En az 12 karakter</span>}</div><div className="relative"><LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/><Input id="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "signup" ? 12 : undefined} value={password} onChange={(e) => setPassword(e.target.value)} required className="h-12 rounded-xl border-white/10 bg-black/20 pl-11 focus-visible:ring-primary/40"/></div></div>}
+                  {!resetMode && mode === "login" && !legacy && <button type="button" onClick={() => setResetMode(true)} className="-mt-1 text-left text-xs font-medium text-primary hover:underline">Şifremi unuttum</button>}
+                  {!resetMode && <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.025] px-3.5 py-3 text-sm"><input type="checkbox" className="size-4 accent-primary" checked={remember} onChange={(e) => setRemember(e.target.checked)}/><span>Beni hatırla</span><span className="ml-auto text-[11px] text-muted-foreground">{remember ? "Bu cihazda açık kalır" : "Bu sekmede açık kalır"}</span></label>}
+                  <Button type="submit" className="h-12 w-full rounded-xl bg-primary text-base font-semibold shadow-lg shadow-primary/10 transition hover:brightness-105" disabled={busy}>{busy ? <Loader2 className="animate-spin"/> : <>{resetMode ? "Yenileme bağlantısı gönder" : mode === "login" ? "Giriş yap" : "Hesap oluştur"}<ArrowRight/></>}</Button>
+                </form>
+
+                {resetMode ? <button type="button" onClick={() => setResetMode(false)} className="mt-4 w-full text-center text-sm font-medium text-primary hover:underline">Giriş ekranına dön</button> : <>
+                  {mode === "login" && <button type="button" onClick={() => setLegacy((value) => !value)} className="mt-4 w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">{legacy ? "E-posta ile girişe dön" : "Eski kullanıcı adıyla açılmış hesabım var"}</button>}
+                  <div className="mt-7 border-t border-white/[0.08] pt-5 text-center"><span className="text-sm text-muted-foreground">{mode === "login" ? "İlk kez mi kullanıyorsun?" : "Zaten hesabın var mı?"}</span><button type="button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setLegacy(false); setResetMode(false); setPassword(""); }} className="ml-1.5 text-sm font-semibold text-primary hover:underline">{mode === "login" ? "Hesap oluştur" : "Giriş yap"}</button></div>
+                  <p className="mt-5 text-center text-xs leading-relaxed text-muted-foreground">Şifreni bu uygulama dışında kimseyle paylaşma. Google ve Apple girişi kendi sağlayıcı ekranlarında gerçekleşir.</p>
+                  <nav aria-label="Yasal bilgiler" className="mt-5 flex justify-center gap-4 border-t border-white/[0.08] pt-4 text-xs text-muted-foreground">
+                    <Link to="/gizlilik" className="underline-offset-4 hover:text-foreground hover:underline">Gizlilik ve KVKK</Link>
+                    <Link to="/kullanim-sartlari" className="underline-offset-4 hover:text-foreground hover:underline">Kullanım şartları</Link>
+                  </nav>
+                </>}
+              </>
+            )}
+          </section>
+        </div>
+      </div>
     </main>
   );
 }
