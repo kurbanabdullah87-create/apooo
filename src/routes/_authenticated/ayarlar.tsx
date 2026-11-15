@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Save, UserPlus, LogOut, Fingerprint, LockKeyhole, Award } from "lucide-react";
+import { Save, UserPlus, LogOut, Fingerprint, LockKeyhole, Award, Link2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +36,7 @@ function Settings() {
   const [pin, setPin] = useState("");
   const [team, setTeam] = useState({ username: "", password: "", name: "" });
   const [busy, setBusy] = useState(false);
+  const [linkBusy, setLinkBusy] = useState(false);
   const [count, setCount] = useState(0);
   useEffect(() => {
     if (settings.data?.[0]) setForm(settings.data[0].payload);
@@ -183,6 +184,26 @@ function Settings() {
         </>
       )}
       <section className="space-y-3 border-t pt-5">
+        <h2 className="font-semibold">Giriş yöntemlerini bağla</h2>
+        <p className="text-sm text-muted-foreground">Eski hesabınla giriş yaptıktan sonra Google veya Apple hesabını buradan bağlayabilirsin. Bağladığında mevcut kayıtların aynı hesapta kalır.</p>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" disabled={linkBusy} onClick={async () => {
+            setLinkBusy(true);
+            const { error } = await supabase.auth.linkIdentity({ provider: "google", options: { redirectTo: `${window.location.origin}/auth/callback`, queryParams: { prompt: "select_account" } } });
+            if (error) { toast.error("Google hesabı bağlanamadı. Supabase sağlayıcı ve hesap bağlama ayarlarını kontrol edin."); setLinkBusy(false); }
+          }}>
+            {linkBusy ? <Loader2 className="animate-spin"/> : <Link2/>}Google hesabını bağla
+          </Button>
+          <Button variant="outline" disabled={linkBusy} onClick={async () => {
+            setLinkBusy(true);
+            const { error } = await supabase.auth.linkIdentity({ provider: "apple", options: { redirectTo: `${window.location.origin}/auth/callback`, scopes: "email name" } });
+            if (error) { toast.error("Apple hesabı bağlanamadı. Supabase sağlayıcı ve hesap bağlama ayarlarını kontrol edin."); setLinkBusy(false); }
+          }}>
+            {linkBusy ? <Loader2 className="animate-spin"/> : <Link2/>}Apple hesabını bağla
+          </Button>
+        </div>
+      </section>
+      <section className="space-y-3 border-t pt-5">
         <h2 className="font-semibold">Cihaz kilidi</h2>
         <Label htmlFor="pin">4 haneli PIN</Label>
         <Input
@@ -239,7 +260,7 @@ function Settings() {
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Cihaz kilidi mevcut oturumu korur; yeni cihazda kullanıcı adı ve şifre gerekir.
+          Cihaz kilidi bu cihazdaki oturuma ek koruma sağlar; başka cihazlarda hesabınla yeniden doğrulama gerekir.
         </p>
       </section>
       <section className="space-y-2 border-t pt-5">
