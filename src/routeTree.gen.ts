@@ -14,6 +14,8 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AuthResetPasswordRouteImport } from './routes/auth.reset-password'
+import { Route as GizlilikRouteImport } from './routes/gizlilik'
+import { Route as KullanimSartlariRouteImport } from './routes/kullanim-sartlari'
 import { Route as AuthenticatedAyarlarRouteImport } from './routes/_authenticated/ayarlar'
 import { Route as AuthenticatedEkipmanRouteImport } from './routes/_authenticated/ekipman'
 import { Route as AuthenticatedGiderlerRouteImport } from './routes/_authenticated/giderler'
@@ -49,6 +51,16 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
 const AuthResetPasswordRoute = AuthResetPasswordRouteImport.update({
   id: '/auth/reset-password',
   path: '/auth/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GizlilikRoute = GizlilikRouteImport.update({
+  id: '/gizlilik',
+  path: '/gizlilik',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KullanimSartlariRoute = KullanimSartlariRouteImport.update({
+  id: '/kullanim-sartlari',
+  path: '/kullanim-sartlari',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAyarlarRoute = AuthenticatedAyarlarRouteImport.update({
@@ -119,6 +131,8 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/gizlilik': typeof GizlilikRoute
+  '/kullanim-sartlari': typeof KullanimSartlariRoute
   '/ayarlar': typeof AuthenticatedAyarlarRoute
   '/ekipman': typeof AuthenticatedEkipmanRoute
   '/giderler': typeof AuthenticatedGiderlerRoute
@@ -134,6 +148,8 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/gizlilik': typeof GizlilikRoute
+  '/kullanim-sartlari': typeof KullanimSartlariRoute
   '/ayarlar': typeof AuthenticatedAyarlarRoute
   '/ekipman': typeof AuthenticatedEkipmanRoute
   '/giderler': typeof AuthenticatedGiderlerRoute
@@ -151,6 +167,8 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/gizlilik': typeof GizlilikRoute
+  '/kullanim-sartlari': typeof KullanimSartlariRoute
   '/_authenticated/ayarlar': typeof AuthenticatedAyarlarRoute
   '/_authenticated/ekipman': typeof AuthenticatedEkipmanRoute
   '/_authenticated/giderler': typeof AuthenticatedGiderlerRoute
@@ -168,6 +186,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/auth/callback'
     | '/auth/reset-password'
+    | '/gizlilik'
+    | '/kullanim-sartlari'
     | '/ayarlar'
     | '/ekipman'
     | '/giderler'
@@ -183,6 +203,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/auth/callback'
     | '/auth/reset-password'
+    | '/gizlilik'
+    | '/kullanim-sartlari'
     | '/ayarlar'
     | '/ekipman'
     | '/giderler'
@@ -199,6 +221,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/auth/callback'
     | '/auth/reset-password'
+    | '/gizlilik'
+    | '/kullanim-sartlari'
     | '/_authenticated/ayarlar'
     | '/_authenticated/ekipman'
     | '/_authenticated/giderler'
@@ -216,6 +240,8 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   AuthResetPasswordRoute: typeof AuthResetPasswordRoute
+  GizlilikRoute: typeof GizlilikRoute
+  KullanimSartlariRoute: typeof KullanimSartlariRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -253,6 +279,20 @@ declare module '@tanstack/react-router' {
       path: '/auth/reset-password'
       fullPath: '/auth/reset-password'
       preLoaderRoute: typeof AuthResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gizlilik': {
+      id: '/gizlilik'
+      path: '/gizlilik'
+      fullPath: '/gizlilik'
+      preLoaderRoute: typeof GizlilikRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/kullanim-sartlari': {
+      id: '/kullanim-sartlari'
+      path: '/kullanim-sartlari'
+      fullPath: '/kullanim-sartlari'
+      preLoaderRoute: typeof KullanimSartlariRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/ayarlar': {
@@ -381,6 +421,8 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   AuthResetPasswordRoute: AuthResetPasswordRoute,
+  GizlilikRoute: GizlilikRoute,
+  KullanimSartlariRoute: KullanimSartlariRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

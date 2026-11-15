@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { ArrowRight, Check, HardHat, Loader2, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
@@ -182,6 +182,10 @@ function AuthPage() {
               {mode === "login" && <button type="button" onClick={() => setLegacy((value) => !value)} className="mt-4 w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">{legacy ? "E-posta ile girişe dön" : "Eski kullanıcı adıyla açılmış hesabım var"}</button>}
               <div className="mt-6 border-t pt-5 text-center"><span className="text-sm text-muted-foreground">{mode === "login" ? "İlk kez mi kullanıyorsun?" : "Zaten hesabın var mı?"}</span><button type="button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setLegacy(false); setResetMode(false); setPassword(""); }} className="ml-1.5 text-sm font-semibold text-primary hover:underline">{mode === "login" ? "Hesap oluştur" : "Giriş yap"}</button></div>
               <p className="mt-5 text-center text-xs leading-relaxed text-muted-foreground">Şifreni bu uygulama dışında kimseyle paylaşma. Google ve Apple girişi sağlayıcıların güvenli doğrulama ekranlarında gerçekleşir.</p>
+              <nav aria-label="Yasal bilgiler" className="mt-5 flex justify-center gap-4 border-t pt-4 text-xs text-muted-foreground">
+                <Link to="/gizlilik" className="underline-offset-4 hover:text-foreground hover:underline">Gizlilik ve KVKK</Link>
+                <Link to="/kullanim-sartlari" className="underline-offset-4 hover:text-foreground hover:underline">Kullanım şartları</Link>
+              </nav>
             </>}
           </>
         )}
