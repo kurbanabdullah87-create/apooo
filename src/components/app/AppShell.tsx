@@ -64,7 +64,7 @@ export function AppShell() {
           className="flex h-11 min-w-0 flex-1 justify-start gap-3 px-3 text-sm text-muted-foreground"
         >
           <Search className="size-4" /><span className="truncate">Saha · Ara</span>
-        </Button>{isUsta&&<Button asChild variant="ghost" size="icon" title="Randevular"><Link to="/randevu"><CalendarClock/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Hava Durumu"><Link to="/hava"><Cloud/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Banka"><Link to="/banka"><Landmark/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Giderler"><Link to="/giderler"><Receipt/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Ayarlar"><Link to="/ayarlar"><Settings/></Link></Button></div>
+        </Button>{isUsta&&<Button asChild variant="ghost" size="icon" title="Randevular"><Link to="/randevu"><CalendarClock/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Hava Durumu"><Link to="/hava"><Cloud/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Hesap hareketleri"><Link to="/banka"><Landmark/></Link></Button>{isUsta&&<Button asChild variant="ghost" size="icon" title="Giderler"><Link to="/giderler"><Receipt/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Ayarlar"><Link to="/ayarlar"><Settings/></Link></Button></div>
       </header>
 
       <main
@@ -94,7 +94,7 @@ export function AppShell() {
           <div className="flex justify-center py-20">
             <Loader2 className="size-6 animate-spin text-muted-foreground" />
           </div>
-        ) : !isUsta && !["/ayarlar", "/isler", "/yevmiye"].includes(path) ? (
+        ) : !isUsta && !["/ayarlar", "/isler", "/yevmiye", "/banka"].includes(path) ? (
           <div className="rounded-2xl border bg-card p-6 text-center">
             <h2 className="text-lg font-semibold">Çırak hesabı</h2>
             <p className="mt-2 text-sm text-muted-foreground">

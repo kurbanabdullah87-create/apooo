@@ -14,6 +14,120 @@ export type Database = {
   }
   public: {
     Tables: {
+      bank_accounts: {
+        Row: {
+          created_at: string
+          id: string
+          bank_name: string
+          account_name: string
+          iban: string | null
+          account_no: string | null
+          type: string
+          balance: number
+          currency: string
+          color: string | null
+          credit_limit: number | null
+          interest_rate: number | null
+          archived: boolean
+          owner_id: string
+          team_id: string
+        }
+        Insert: {
+          bank_name?: string
+          account_name?: string
+          iban?: string | null
+          account_no?: string | null
+          type?: string
+          balance?: number
+          currency?: string
+          color?: string | null
+          credit_limit?: number | null
+          interest_rate?: number | null
+          archived?: boolean
+          created_at?: string
+          id?: string
+          owner_id?: string
+          team_id?: string
+        }
+        Update: {
+          bank_name?: string
+          account_name?: string
+          iban?: string | null
+          account_no?: string | null
+          type?: string
+          balance?: number
+          currency?: string
+          color?: string | null
+          credit_limit?: number | null
+          interest_rate?: number | null
+          archived?: boolean
+          created_at?: string
+          id?: string
+          owner_id?: string
+          team_id?: string
+        }
+        Relationships: []
+      }
+      bank_transactions: {
+        Row: {
+          account_id: string
+          amount: number
+          archived: boolean
+          balance_after: number
+          counterparty: string
+          created_at: string
+          date: string
+          description: string
+          direction: string
+          id: string
+          owner_id: string
+          reference: string
+          source: string | null
+          source_ref: string | null
+          status: string
+          team_id: string
+          type: string
+        }
+        Insert: {
+          account_id: string
+          amount: number
+          archived?: boolean
+          balance_after?: number
+          counterparty?: string
+          created_at?: string
+          date?: string
+          description: string
+          direction?: string
+          id?: string
+          owner_id?: string
+          reference?: string
+          source?: string | null
+          source_ref?: string | null
+          status?: string
+          team_id?: string
+          type?: string
+        }
+        Update: {
+          account_id?: string
+          amount?: number
+          archived?: boolean
+          balance_after?: number
+          counterparty?: string
+          created_at?: string
+          date?: string
+          description?: string
+          direction?: string
+          id?: string
+          owner_id?: string
+          reference?: string
+          source?: string | null
+          source_ref?: string | null
+          status?: string
+          team_id?: string
+          type?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           address: string | null
