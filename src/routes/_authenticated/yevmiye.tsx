@@ -21,6 +21,12 @@ export const Route = createFileRoute("/_authenticated/yevmiye")({
   component: Payroll,
 });
 
+type WorkdayFraction = 1 | 0.5 | 0.25;
+const WORKDAY_FRACTIONS: readonly WorkdayFraction[] = [1, 0.5, 0.25];
+const isWorkdayFraction = (days: number): days is WorkdayFraction => WORKDAY_FRACTIONS.some((value) => value === days);
+const workdayLabel = (days: WorkdayFraction) => days === 1 ? "Tam gün" : days === 0.5 ? "Yarım gün" : "Çeyrek gün";
+const workdayTone = (days: WorkdayFraction) => days === 1 ? "bg-emerald-600 text-white hover:bg-emerald-700" : days === 0.5 ? "bg-sky-600 text-white hover:bg-sky-700" : "bg-amber-500 text-slate-950 hover:bg-amber-400";
+
 function Payroll() {
   const pay = useRecords("payroll");
   const advances = useRecords("advance");
@@ -184,21 +190,33 @@ function Payroll() {
         {Array.from({ length: count }, (_, i) => {
           const d = `${month}-${String(i + 1).padStart(2, "0")}`;
           const worked = rows.filter((r) => r.payload.date === d);
+          const dayTypes = [...new Set(worked.map((r) => Number(r.payload.days)))].filter(isWorkdayFraction);
+          const buttonTone = dayTypes.length > 1 ? "bg-violet-700 text-white hover:bg-violet-800" : dayTypes.length === 1 ? workdayTone(dayTypes[0]) : "bg-secondary text-secondary-foreground";
+          const dayDescription = dayTypes.length ? dayTypes.map(workdayLabel).join(" ve ") : "Kayıt yok";
           return (
             <Button
               key={d}
-              variant={worked.length ? "default" : "secondary"}
-              className="h-12 px-0 flex-col gap-0"
+              variant="secondary"
+              aria-label={`${i + 1} ${dayDescription}`}
+              title={`${i + 1}: ${dayDescription}`}
+              className={`h-14 px-0 flex-col gap-0 ${buttonTone}`}
               disabled={!me.data?.isUsta}
               onClick={() => add("payroll", d)}
             >
               {i + 1}
-              <span className="text-[10px]">
-                {worked.length ? worked.reduce((s, r) => s + Number(r.payload.days), 0) + " g" : ""}
+              <span className="flex h-2 items-center gap-0.5" aria-hidden="true">
+                {dayTypes.map((days) => <span key={days} className={`size-1.5 rounded-full ${days === 1 ? "bg-emerald-200" : days === 0.5 ? "bg-sky-200" : "bg-amber-200"}`} />)}
               </span>
             </Button>
           );
         })}
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border bg-card px-3 py-2 text-xs text-muted-foreground" aria-label="Yevmiye takvimi renk açıklaması">
+        <span className="font-medium text-foreground">Gün türü</span>
+        <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-emerald-600" />Tam gün</span>
+        <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-sky-600" />Yarım gün</span>
+        <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-amber-500" />Çeyrek gün</span>
+        <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-violet-700" />Birden fazla tür</span>
       </div>
       {me.data?.isUsta && (
         <div className="flex gap-2">
