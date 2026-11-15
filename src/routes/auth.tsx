@@ -117,16 +117,24 @@ function AuthPage() {
     setBusy(true);
     setRememberMe(remember);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
+          skipBrowserRedirect: true,
           ...(provider === "google" ? { queryParams: { prompt: "select_account" } } : { scopes: "email name" }),
         },
       });
       if (error) throw error;
-    } catch {
-      toast.error(`${provider === "google" ? "Google" : "Apple"} girişi hazır değil. Sağlayıcı Supabase panelinde etkinleştirilmeli.`);
+      if (!data.url) throw new Error("oauth_redirect_missing");
+      window.location.assign(data.url);
+    } catch (error) {
+      const message = error instanceof Error ? error.message.toLocaleLowerCase("en-US") : "";
+      if (/unsupported provider|provider is not enabled|validation_failed/.test(message)) {
+        toast.error(`${provider === "google" ? "Google" : "Apple"} girişi Supabase'te etkin değil. Sağlayıcıyı açıp OAuth Client ID ve Client Secret eklemek gerekiyor.`);
+      } else {
+        toast.error(`${provider === "google" ? "Google" : "Apple"} ile giriş başlatılamadı. Lütfen ayarları ve yönlendirme adresini kontrol edin.`);
+      }
       setBusy(false);
     }
   }
