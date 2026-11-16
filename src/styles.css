@@ -99,6 +99,10 @@
   }
   body {
     background-color: var(--color-background);
+    background-image:
+      radial-gradient(ellipse at 12% -8%, color-mix(in oklch, var(--primary) 8%, transparent), transparent 36rem),
+      radial-gradient(ellipse at 100% 18%, color-mix(in oklch, var(--chart-3) 5%, transparent), transparent 32rem);
+    background-attachment: fixed;
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-tap-highlight-color: transparent;
@@ -107,6 +111,33 @@
   h1, h2, h3 {
     font-family: var(--font-display);
     letter-spacing: 0;
+  }
+  button, a, input, select, textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer utilities {
+  .surface-elevated {
+    border: 1px solid color-mix(in oklch, var(--border) 82%, transparent);
+    background: linear-gradient(145deg, color-mix(in oklch, var(--card) 98%, white 2%), var(--card));
+    box-shadow: 0 12px 32px -24px rgb(0 0 0 / 0.7), inset 0 1px 0 rgb(255 255 255 / 0.025);
+  }
+}
+
+@layer base {
+  main .border.bg-card {
+    border-color: color-mix(in oklch, var(--border) 82%, var(--primary) 18%);
+    box-shadow: 0 12px 30px -24px rgb(0 0 0 / 0.8), inset 0 1px 0 rgb(255 255 255 / 0.025);
+  }
+  main input:not([type="checkbox"]):not([type="radio"]), main select, main textarea {
+    border-radius: 0.9rem;
+    transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+  }
+  main input:focus-visible, main select:focus-visible, main textarea:focus-visible {
+    border-color: color-mix(in oklch, var(--primary) 72%, var(--border));
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary) 18%, transparent);
+    outline: none;
   }
 }
 

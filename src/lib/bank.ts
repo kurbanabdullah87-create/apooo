@@ -1,3 +1,4 @@
+import { get, set, del } from "idb-keyval";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -7,76 +8,260 @@ export type BankDirection = "incoming" | "outgoing";
 export interface BankMovement {
   id: string;
   owner_id: string;
+  account_id: string;
   direction: BankDirection;
   amount: number;
   date: string;
   counterparty: string;
   description: string;
+  type?: string;
+  reference?: string;
+  status?: string;
+  balance_after?: number;
+  source?: string | null;
   created_at: string;
 }
 export type BankMovementInput = Pick<BankMovement, "direction" | "amount" | "date" | "counterparty" | "description">;
+export interface BankAccountOption {
+  id: string;
+  bank_name: string;
+  account_name: string;
+  currency: string;
+  account_kind?: "personal" | "business";
+}
+type BankVault = { accounts: BankAccountOption[]; transactions: BankMovement[] };
+type EncryptedVault = { version: 1; salt: string; iv: string; ciphertext: string };
 
-/** Resolve the active identity before showing cached query data; this avoids cross-account flashes on shared devices. */
+const PBKDF2_ITERATIONS = 600_000;
+const vaultKey = (ownerId: string) => `saha-bank-vault-v1:${ownerId}`;
+const keyCache = new Map<string, CryptoKey>();
+const utf8 = new TextEncoder();
+const decoder = new TextDecoder();
+const vaultAad = (ownerId: string) => utf8.encode(`saha-bank-vault-v1:${ownerId}`);
+const bytesToBase64 = (bytes: Uint8Array) => btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(""));
+const base64ToBytes = (value: string) => Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
+
+async function deriveKey(passphrase: string, salt: Uint8Array) {
+  const material = await crypto.subtle.importKey("raw", utf8.encode(passphrase), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" }, material, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+}
+
+async function encryptVault(ownerId: string, passphrase: string, vault: BankVault) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveKey(passphrase, salt);
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: vaultAad(ownerId) }, key, utf8.encode(JSON.stringify(vault)));
+  keyCache.set(ownerId, key);
+  return { version: 1, salt: bytesToBase64(salt), iv: bytesToBase64(iv), ciphertext: bytesToBase64(new Uint8Array(ciphertext)) } satisfies EncryptedVault;
+}
+
+async function decryptVault(ownerId: string, passphrase: string, encrypted: EncryptedVault): Promise<BankVault> {
+  if (encrypted.version !== 1) throw new Error("Kasa biçimi desteklenmiyor.");
+  const key = await deriveKey(passphrase, base64ToBytes(encrypted.salt));
+  const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: base64ToBytes(encrypted.iv), additionalData: vaultAad(ownerId) }, key, base64ToBytes(encrypted.ciphertext));
+  const parsed = JSON.parse(decoder.decode(plaintext)) as BankVault;
+  if (!Array.isArray(parsed.accounts) || !Array.isArray(parsed.transactions)) throw new Error("Kasa verisi doğrulanamadı.");
+  keyCache.set(ownerId, key);
+  return parsed;
+}
+
+async function readVault(ownerId: string): Promise<BankVault> {
+  const encrypted = await get<EncryptedVault>(vaultKey(ownerId));
+  const key = keyCache.get(ownerId);
+  if (!encrypted || !key) throw new Error("Kişisel kasanın kilidini aç.");
+  try {
+    const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: base64ToBytes(encrypted.iv), additionalData: vaultAad(ownerId) }, key, base64ToBytes(encrypted.ciphertext));
+    return JSON.parse(decoder.decode(plaintext)) as BankVault;
+  } catch {
+    keyCache.delete(ownerId);
+    throw new Error("Kasa kilitlendi. Parolanla yeniden aç.");
+  }
+}
+
+async function writeVault(ownerId: string, vault: BankVault) {
+  const key = keyCache.get(ownerId);
+  if (!key) throw new Error("Kişisel kasanın kilidini aç.");
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: vaultAad(ownerId) }, key, utf8.encode(JSON.stringify(vault)));
+  const previous = await get<EncryptedVault>(vaultKey(ownerId));
+  if (!previous) throw new Error("Şifreli kasa bulunamadı.");
+  await set(vaultKey(ownerId), { ...previous, iv: bytesToBase64(iv), ciphertext: bytesToBase64(new Uint8Array(ciphertext)) });
+}
+
+/** Resolve the signed-in identity without requesting financial data from the server. */
 export function useBankOwnerId() {
   const [ownerId, setOwnerId] = useState<string | null | undefined>(undefined);
   useEffect(() => {
     let active = true;
     void supabase.auth.getUser().then(({ data }) => { if (active) setOwnerId(data.user?.id ?? null); });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => setOwnerId(session?.user.id ?? null));
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      const nextOwnerId = session?.user.id ?? null;
+      if (ownerId && ownerId !== nextOwnerId) keyCache.delete(ownerId);
+      setOwnerId(nextOwnerId);
+    });
     return () => { active = false; listener.subscription.unsubscribe(); };
-  }, []);
+  }, [ownerId]);
   return ownerId;
 }
 
-export function useBankMovements(ownerId: string | null | undefined) {
+export function useBankVault(ownerId: string | null | undefined) {
+  const [exists, setExists] = useState<boolean | null>(null);
+  const [unlocked, setUnlocked] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let active = true;
+    setExists(null);
+    setUnlocked(false);
+    if (ownerId) void get<EncryptedVault>(vaultKey(ownerId)).then((saved) => { if (active) setExists(Boolean(saved)); });
+    else setExists(false);
+    return () => { active = false; };
+  }, [ownerId]);
+
+  useEffect(() => {
+    if (!ownerId || !unlocked) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const lockNow = () => {
+      clearTimeout(timer);
+      keyCache.delete(ownerId);
+      setUnlocked(false);
+    };
+    const resetTimer = () => {
+      clearTimeout(timer);
+      timer = setTimeout(lockNow, 5 * 60 * 1000);
+    };
+    const handleVisibility = () => document.visibilityState === "hidden" ? lockNow() : resetTimer();
+    const activityEvents: Array<keyof WindowEventMap> = ["pointerdown", "keydown", "touchstart"];
+    activityEvents.forEach((event) => window.addEventListener(event, resetTimer, { passive: true }));
+    document.addEventListener("visibilitychange", handleVisibility);
+    resetTimer();
+    return () => {
+      clearTimeout(timer);
+      activityEvents.forEach((event) => window.removeEventListener(event, resetTimer));
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [ownerId, unlocked]);
+
+  async function create(passphrase: string) {
+    if (!ownerId) throw new Error("Oturum gerekli.");
+    if (passphrase.length < 14) throw new Error("Kasa parolası en az 14 karakter olmalı.");
+    setBusy(true);
+    try {
+      const encrypted = await encryptVault(ownerId, passphrase, { accounts: [{ id: crypto.randomUUID(), bank_name: "Elle kayıt", account_name: "Kişisel hesap", currency: "TRY" }], transactions: [] });
+      await set(vaultKey(ownerId), encrypted);
+      setExists(true);
+      setUnlocked(true);
+    } finally { setBusy(false); }
+  }
+
+  async function unlock(passphrase: string) {
+    if (!ownerId) throw new Error("Oturum gerekli.");
+    const saved = await get<EncryptedVault>(vaultKey(ownerId));
+    if (!saved) throw new Error("Bu cihazda kasa bulunamadı.");
+    setBusy(true);
+    try { await decryptVault(ownerId, passphrase, saved); setUnlocked(true); }
+    catch { keyCache.delete(ownerId); throw new Error("Parola yanlış veya kasa verisi açılamadı."); }
+    finally { setBusy(false); }
+  }
+
+  function lock() {
+    if (ownerId) keyCache.delete(ownerId);
+    setUnlocked(false);
+  }
+
+  async function erase() {
+    if (ownerId) keyCache.delete(ownerId);
+    if (ownerId) await del(vaultKey(ownerId));
+    setExists(false);
+    setUnlocked(false);
+  }
+  return { exists, unlocked, busy, create, unlock, lock, erase };
+}
+
+/** One-time user-triggered migration: encrypt legacy cloud rows locally, verify write, then delete plaintext cloud rows. */
+export async function migrateLegacyBankData(ownerId: string) {
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || auth.user?.id !== ownerId) throw new Error("Oturum değişti. Lütfen yeniden giriş yap.");
+  const { data: cloudAccounts, error: accountError } = await supabase.from("bank_accounts").select("*").eq("owner_id", ownerId);
+  if (accountError) throw new Error("Eski hesap kayıtları okunamadı; bulut kayıtları değiştirilmedi.");
+  const { data: cloudRows, error: movementError } = await supabase.from("bank_transactions").select("*").eq("owner_id", ownerId);
+  if (movementError) throw new Error("Eski hareketler okunamadı; bulut kayıtları değiştirilmedi.");
+  const vault = await readVault(ownerId);
+  const accountIds = new Map<string, string>();
+  for (const account of cloudAccounts ?? []) {
+    const localAccountId = crypto.randomUUID();
+    accountIds.set(account.id, localAccountId);
+    vault.accounts.push({ id: localAccountId, bank_name: account.bank_name || "Banka", account_name: account.account_name || "Kişisel hesap", currency: account.currency || "TRY", account_kind: account.account_kind === "business" ? "business" : "personal" });
+  }
+  for (const row of cloudRows ?? []) {
+    const localAccountId = accountIds.get(row.account_id);
+    if (!localAccountId) throw new Error("Bir hareketin hesabı eşleşmedi; bulut kayıtları değiştirilmedi.");
+    vault.transactions.push({
+      id: crypto.randomUUID(), owner_id: ownerId, account_id: localAccountId,
+      direction: row.direction === "in" || row.direction === "incoming" ? "incoming" : "outgoing",
+      amount: Number(row.amount), date: row.date, counterparty: row.counterparty || "", description: row.description || "",
+        ...(row.type ? { type: row.type } : {}),
+        ...(row.reference ? { reference: row.reference } : {}),
+        ...(row.status ? { status: row.status } : {}),
+        ...(Number(row.balance_after) ? { balance_after: Number(row.balance_after) } : {}),
+        source: row.source, created_at: row.created_at,
+    });
+  }
+  await writeVault(ownerId, vault);
+  const verified = await readVault(ownerId);
+  if (verified.transactions.length < (cloudRows?.length ?? 0)) throw new Error("Şifreli kopya doğrulanamadı; bulut kayıtları silinmedi.");
+  const { error: deleteTransactionsError } = await supabase.from("bank_transactions").delete().eq("owner_id", ownerId);
+  if (deleteTransactionsError) throw new Error("Şifreli kopya oluşturuldu ancak buluttaki eski hareketler silinemedi. Kişisel kasada kopya var; bulut kayıtlarını ayrıca temizlemek gerekiyor.");
+  const { error: deleteAccountsError } = await supabase.from("bank_accounts").delete().eq("owner_id", ownerId);
+  if (deleteAccountsError) throw new Error("Hareketler buluttan silindi, ancak eski hesap kaydı silinemedi. Hesap kaydını Supabase tablosundan ayrıca temizlemek gerekiyor.");
+  return { accountCount: cloudAccounts?.length ?? 0, movementCount: cloudRows?.length ?? 0 };
+}
+
+/** Delete previously archived plaintext PDFs after the user explicitly requests cloud cleanup. */
+export async function deleteLegacyBankDocuments(ownerId: string) {
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || auth.user?.id !== ownerId) throw new Error("Oturum değişti. Lütfen yeniden giriş yap.");
+  const { data: documents, error } = await supabase.from("bank_documents").select("id, object_path").eq("owner_id", ownerId);
+  if (error) throw new Error("Buluttaki banka PDF listesi alınamadı.");
+  const paths = (documents ?? []).map((doc) => doc.object_path);
+  for (let offset = 0; offset < paths.length; offset += 100) {
+    const { error: storageError } = await supabase.storage.from("bank-private").remove(paths.slice(offset, offset + 100));
+    if (storageError) throw new Error("Bazı PDF dosyaları bulut depolamadan silinemedi.");
+  }
+  const { error: rowsError } = await supabase.from("bank_documents").delete().eq("owner_id", ownerId);
+  if (rowsError) throw new Error("PDF dosyaları silindi ancak belge kayıtları temizlenemedi.");
+  return paths.length;
+}
+
+export function useBankAccounts(ownerId: string | null | undefined, unlocked: boolean) {
   return useQuery({
-    queryKey: ["bank-movements", ownerId],
-    enabled: Boolean(ownerId),
-    staleTime: 0,
+    queryKey: ["bank-accounts", ownerId, unlocked], enabled: Boolean(ownerId && unlocked), staleTime: 0,
+    queryFn: async () => (ownerId ? (await readVault(ownerId)).accounts : []) as BankAccountOption[],
+  });
+}
+
+export function useBankMovements(ownerId: string | null | undefined, accountId: string | null | undefined, unlocked: boolean) {
+  return useQuery({
+    queryKey: ["bank-movements", ownerId, accountId, unlocked], enabled: Boolean(ownerId && accountId && unlocked), staleTime: 0,
     queryFn: async () => {
-      if (!ownerId) return [];
-      const { data: auth, error: authError } = await supabase.auth.getUser();
-      if (authError || auth.user?.id !== ownerId) throw new Error("Oturum değişti. Lütfen yeniden deneyin.");
-      const { data, error } = await supabase.from("bank_transactions").select("*").eq("owner_id", ownerId).eq("archived", false).order("date", { ascending: false }).order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []).map((row) => ({
-        ...row,
-        amount: Number(row.amount),
-        direction: row.direction === "in" || row.direction === "incoming" ? "incoming" : "outgoing",
-      })) as BankMovement[];
+      if (!ownerId || !accountId) return [];
+      const vault = await readVault(ownerId);
+      return vault.transactions.filter((row) => row.account_id === accountId).sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at));
     },
   });
 }
 
-export function useAddBankMovement(ownerId: string | null | undefined) {
+export function useAddBankMovement(ownerId: string | null | undefined, accountId: string | null | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: BankMovementInput) => {
       if (!ownerId) throw new Error("Oturum gerekli");
-      const { data: auth, error: authError } = await supabase.auth.getUser();
-      if (authError || auth.user?.id !== ownerId) throw new Error("Oturum değişti. Lütfen yeniden deneyin.");
-      const { data: accounts, error: accountsError } = await supabase.from("bank_accounts").select("id").eq("owner_id", ownerId).eq("archived", false).order("created_at", { ascending: true }).limit(1);
-      if (accountsError) throw accountsError;
-      let accountId = accounts?.[0]?.id;
-      if (!accountId) {
-        const { data: account, error } = await supabase.from("bank_accounts").insert({ owner_id: ownerId, bank_name: "Elle kayıt", account_name: "Kişisel hesap", iban: "", account_no: "" }).select("id").single();
-        if (error) throw error;
-        accountId = account.id;
-      }
-      const { error } = await supabase.from("bank_transactions").insert({
-        owner_id: ownerId,
-        account_id: accountId,
-        date: input.date,
-        description: input.description,
-        counterparty: input.counterparty,
-        amount: input.amount,
-        direction: input.direction === "incoming" ? "in" : "out",
-        type: "diger",
-        source: "manual",
-      });
-      if (error) throw error;
+      const vault = await readVault(ownerId);
+      const account = accountId ? vault.accounts.find((candidate) => candidate.id === accountId) : vault.accounts[0];
+      if (!account) throw new Error("Önce kişisel hesap kasasını oluşturup kilidini aç.");
+      vault.transactions.unshift({ id: crypto.randomUUID(), owner_id: ownerId, account_id: account.id, direction: input.direction, amount: input.amount, date: input.date, counterparty: input.counterparty, description: input.description, type: "diger", status: "completed", source: "manual", created_at: new Date().toISOString() });
+      await writeVault(ownerId, vault);
     },
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["bank-movements", ownerId] }); toast.success("Hareket kaydedildi"); },
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["bank-movements", ownerId] }); toast.success("Hareket bu cihazdaki şifreli kasaya kaydedildi"); },
     onError: (error: Error) => toast.error(error.message || "Hareket kaydedilemedi"),
   });
 }
@@ -86,12 +271,13 @@ export function useDeleteBankMovement(ownerId: string | null | undefined) {
   return useMutation({
     mutationFn: async (id: string) => {
       if (!ownerId) throw new Error("Oturum gerekli");
-      const { data: auth, error: authError } = await supabase.auth.getUser();
-      if (authError || auth.user?.id !== ownerId) throw new Error("Oturum değişti. Lütfen yeniden deneyin.");
-      const { error } = await supabase.from("bank_transactions").delete().eq("id", id).eq("owner_id", ownerId);
-      if (error) throw error;
+      const vault = await readVault(ownerId);
+      const next = vault.transactions.filter((row) => row.id !== id);
+      if (next.length === vault.transactions.length) throw new Error("Hareket bulunamadı.");
+      vault.transactions = next;
+      await writeVault(ownerId, vault);
     },
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["bank-movements", ownerId] }); toast.success("Hareket silindi"); },
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["bank-movements", ownerId] }); toast.success("Hareket şifreli kasadan silindi"); },
     onError: (error: Error) => toast.error(error.message || "Hareket silinemedi"),
   });
 }

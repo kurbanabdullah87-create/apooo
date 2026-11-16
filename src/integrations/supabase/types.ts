@@ -31,6 +31,10 @@ export type Database = {
           archived: boolean
           owner_id: string
           team_id: string
+          connection_id: string | null
+          account_kind: string
+          provider_account_id: string | null
+          last_balance_synced_at: string | null
         }
         Insert: {
           bank_name?: string
@@ -48,6 +52,10 @@ export type Database = {
           id?: string
           owner_id?: string
           team_id?: string
+          connection_id?: string | null
+          account_kind?: string
+          provider_account_id?: string | null
+          last_balance_synced_at?: string | null
         }
         Update: {
           bank_name?: string
@@ -65,6 +73,10 @@ export type Database = {
           id?: string
           owner_id?: string
           team_id?: string
+          connection_id?: string | null
+          account_kind?: string
+          provider_account_id?: string | null
+          last_balance_synced_at?: string | null
         }
         Relationships: []
       }
@@ -87,6 +99,9 @@ export type Database = {
           status: string
           team_id: string
           type: string
+          provider_transaction_id: string | null
+          provider_updated_at: string | null
+          receipt_status: string
         }
         Insert: {
           account_id: string
@@ -106,6 +121,9 @@ export type Database = {
           status?: string
           team_id?: string
           type?: string
+          provider_transaction_id?: string | null
+          provider_updated_at?: string | null
+          receipt_status?: string
         }
         Update: {
           account_id?: string
@@ -125,6 +143,93 @@ export type Database = {
           status?: string
           team_id?: string
           type?: string
+          provider_transaction_id?: string | null
+          provider_updated_at?: string | null
+          receipt_status?: string
+        }
+        Relationships: []
+      }
+      bank_connections: {
+        Row: {
+          id: string
+          team_id: string
+          owner_id: string
+          provider: string
+          provider_connection_id: string | null
+          status: string
+          consent_expires_at: string | null
+          last_sync_at: string | null
+          last_sync_error: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          team_id?: string
+          owner_id?: string
+          provider: string
+          provider_connection_id?: string | null
+          status?: string
+          consent_expires_at?: string | null
+          last_sync_at?: string | null
+          last_sync_error?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          team_id?: string
+          owner_id?: string
+          provider?: string
+          provider_connection_id?: string | null
+          status?: string
+          consent_expires_at?: string | null
+          last_sync_at?: string | null
+          last_sync_error?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      bank_documents: {
+        Row: {
+          id: string
+          team_id: string
+          owner_id: string
+          account_id: string
+          transaction_id: string | null
+          kind: string
+          period_month: string | null
+          object_path: string
+          original_filename: string
+          official: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          team_id?: string
+          owner_id?: string
+          account_id: string
+          transaction_id?: string | null
+          kind: string
+          period_month?: string | null
+          object_path: string
+          original_filename: string
+          official?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          team_id?: string
+          owner_id?: string
+          account_id?: string
+          transaction_id?: string | null
+          kind?: string
+          period_month?: string | null
+          object_path?: string
+          original_filename?: string
+          official?: boolean
+          created_at?: string
         }
         Relationships: []
       }
