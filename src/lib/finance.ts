@@ -119,7 +119,11 @@ export function formatTL(n: number) {
 }
 
 export function formatDate(d: string) {
-  return new Date(d + "T00:00:00").toLocaleDateString("tr-TR");
+  const includesTime = d.length > 10;
+  const date = new Date(includesTime ? d : d + "T00:00:00");
+  return includesTime
+    ? `${date.toLocaleDateString("tr-TR")} ${date.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}`
+    : date.toLocaleDateString("tr-TR");
 }
 
 export function todayISO() {

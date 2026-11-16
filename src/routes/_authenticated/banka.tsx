@@ -1,16 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { ArrowDownLeft, ArrowUpRight, CalendarDays, Download, FileDown, FileText, LockKeyhole, Plus, Search, ShieldCheck, Sparkles, Trash2, WalletCards, KeyRound, MessageSquareText } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { ArrowDownLeft, ArrowUpRight, CalendarDays, Download, FileDown, FileText, LockKeyhole, Plus, Search, ShieldCheck, Sparkles, Trash2, WalletCards, KeyRound, MessageSquareText, Mail, Paperclip, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDate, formatTL, monthKey, todayISO } from "@/lib/finance";
 import { pageHead } from "@/lib/work";
-import { deleteLegacyBankDocuments, migrateLegacyBankData, useAddBankMovement, useBankAccounts, useBankMovements, useBankOwnerId, useBankVault, useDeleteBankMovement, type BankDirection } from "@/lib/bank";
+import { deleteLegacyBankDocuments, getBankDocumentFile, importBankStatementFile, migrateLegacyBankData, useAddBankMovement, useBankAccounts, useBankDocuments, useBankMovements, useBankOwnerId, useBankVault, useDeleteBankMovement, type BankDirection } from "@/lib/bank";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { parseBankSms } from "@/lib/bank-sms";
+import { isSupportedBankStatement, parseBankStatement, parseBankStatementFile, type ImportedBankMovement } from "@/lib/bank-statement";
 
 export const Route = createFileRoute("/_authenticated/banka")({
   head: () => pageHead("Banka hareketleri", "Kişisel hesap hareketleri ve aylık harcama özeti."),
@@ -25,6 +26,7 @@ function Bank() {
   const [requestedAccountId, setRequestedAccountId] = useState("");
   const activeAccount = accounts.data?.find((account) => account.id === requestedAccountId) ?? accounts.data?.[0] ?? null;
   const records = useBankMovements(ownerId, activeAccount?.id, vault.unlocked);
+  const bankDocuments = useBankDocuments(ownerId, vault.unlocked);
   const add = useAddBankMovement(ownerId, activeAccount?.id);
   const remove = useDeleteBankMovement(ownerId);
   const [month, setMonth] = useState(monthKey(todayISO()));
@@ -40,11 +42,17 @@ function Bank() {
   const [vaultBusy, setVaultBusy] = useState(false);
   const [smsImportOpen, setSmsImportOpen] = useState(false);
   const [smsText, setSmsText] = useState("");
+  const [statementFile, setStatementFile] = useState<File | null>(null);
+  const [statementRows, setStatementRows] = useState<ImportedBankMovement[]>([]);
+  const [statementError, setStatementError] = useState("");
+  const [importBusy, setImportBusy] = useState(false);
+  const statementInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!vault.unlocked) {
       queryClient.removeQueries({ queryKey: ["bank-accounts"] });
       queryClient.removeQueries({ queryKey: ["bank-movements"] });
+      queryClient.removeQueries({ queryKey: ["bank-documents"] });
     }
   }, [vault.unlocked, ownerId, queryClient]);
 
@@ -303,7 +311,7 @@ function Bank() {
         const descriptionLines = doc.splitTextToSize(descriptionText, 59) as string[];
         const referenceText = row.reference?.trim() || "Referans yok";
         const statusText = row.status?.trim() || "Durum belirtilmedi";
-        const sourceText = row.source === "open_banking" ? "Banka bağlantısı" : "Elle kayıt";
+        const sourceText = row.source === "open_banking" ? "Banka bağlantısı" : row.source === "email_attachment" ? "E-posta ekstresi dosyasından aktarıldı" : "Elle kayıt";
         const typeText = row.type?.trim() || "Diğer";
         const referenceLines = doc.splitTextToSize(`${typeText} · ${statusText}\n${referenceText}\n${sourceText}`, 31) as string[];
         const rowHeight = Math.max(20, 5 + nameLines.length * 4 + descriptionLines.length * 3.5, referenceLines.length * 3.5 + 7);
@@ -448,7 +456,7 @@ function Bank() {
       drawField("İşlem açıklaması", row.description || "Açıklama eklenmemiş");
       drawField("İşlem türü · Durum", `${row.type || "Diğer"}  ·  ${row.status || "Belirtilmedi"}`);
       drawField("Banka referansı", row.reference || "Referans sağlanmadı");
-      drawField("Kayıt kaynağı", row.source === "open_banking" ? "Banka bağlantısından eşitlendi" : "Kullanıcı tarafından elle girildi");
+      drawField("Kayıt kaynağı", row.source === "open_banking" ? "Banka bağlantısından eşitlendi" : row.source === "email_attachment" ? "E-posta ekstresi dosyasından içe aktarıldı" : "Kullanıcı tarafından elle girildi");
 
       doc.setDrawColor(...line);
       doc.line(margin, 190, pageWidth - margin, 190);
@@ -460,7 +468,7 @@ function Bank() {
       doc.setFontSize(6.5);
       doc.setTextColor(...muted);
       doc.text("Bu belge, bu cihazdaki şifreli kasada bulunan hareket bilgilerini özetler.", margin, 202);
-      const filename = `saha-hareket-${row.date}-${row.id.slice(0, 8)}.pdf`;
+      const filename = `saha-hareket-${row.date.replace(/[^0-9-]/g, "-")}-${row.id.slice(0, 8)}.pdf`;
       doc.save(filename);
       toast.success("SAHA hareket belgesi bu cihazda oluşturuldu; sunucuya kaydedilmedi.");
     } catch {
@@ -528,6 +536,74 @@ function Bank() {
     toast.success("Tutar ve yön cihazında ayrıştırıldı. Kaydetmeden önce tarihi ve karşı tarafı doğrula.");
   }
 
+  async function inspectStatement(file?: File) {
+    setStatementFile(null);
+    setStatementRows([]);
+    setStatementError("");
+    if (!file) return;
+    if (!isSupportedBankStatement(file.name)) {
+      setStatementError("Şimdilik CSV, TSV, OFX, QIF veya TXT ekstre dosyaları destekleniyor. Banka uygulamasından bu biçimlerden biriyle dışa aktar.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setStatementError("Ekstre dosyası en fazla 8 MB olabilir.");
+      return;
+    }
+    try {
+      let parsed: ImportedBankMovement[];
+      if (/\.pdf$/i.test(file.name)) parsed = await parseBankStatementFile(file);
+      else {
+        let text = await file.text();
+        if (text.includes("\uFFFD")) text = new TextDecoder("windows-1254").decode(await file.arrayBuffer());
+        parsed = parseBankStatement(file.name, text);
+      }
+      if (parsed.length === 0) {
+        setStatementError("Dosyada tanınan işlem satırı bulunamadı. CSV dosyasında tarih, tutar ve açıklama sütunları olmalı; dosya değişmeden kalır.");
+        return;
+      }
+      setStatementFile(file);
+      setStatementRows(parsed);
+    } catch {
+      setStatementError("Dosya okunamadı. Ekstreyi bankadan tekrar indirip yeniden seç.");
+    }
+  }
+
+  async function saveStatementImport() {
+    if (!ownerId || !activeAccount || !statementFile || !statementRows.length) return;
+    setImportBusy(true);
+    try {
+      const result = await importBankStatementFile(ownerId, activeAccount.id, statementFile, statementRows);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["bank-movements", ownerId] }),
+        queryClient.invalidateQueries({ queryKey: ["bank-documents", ownerId] }),
+      ]);
+      toast.success(`${result.importedCount} hareket aktarıldı; ${result.duplicateCount} tekrar kayıt atlandı. Dosyanın şifreli aslı bu cihazda saklandı.`);
+      setStatementFile(null);
+      setStatementRows([]);
+      setStatementError("");
+      if (statementInput.current) statementInput.current.value = "";
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Ekstre aktarılamadı.");
+    } finally {
+      setImportBusy(false);
+    }
+  }
+
+  async function downloadOriginalStatement(documentId: string) {
+    try {
+      if (!ownerId) return;
+      const file = await getBankDocumentFile(ownerId, documentId);
+      const url = URL.createObjectURL(file);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = file.name;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Ekstre dosyası açılamadı.");
+    }
+  }
+
   if (ownerId === undefined) return <p className="py-12 text-center text-muted-foreground">Oturum kontrol ediliyor…</p>;
   if (!ownerId) return <p className="py-12 text-center text-muted-foreground">Hareketleri görmek için oturum açın.</p>;
   if (vault.exists === null) return <p className="py-12 text-center text-muted-foreground">Bu cihazdaki şifreli kasa kontrol ediliyor…</p>;
@@ -571,13 +647,23 @@ function Bank() {
     {accounts.error && <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">Şifreli kasa açılamadı. Kapatıp parolanla yeniden aç.</p>}
     <section className="flex flex-col gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.04] p-4 sm:flex-row sm:items-center sm:justify-between">
       <div><p className="flex items-center gap-2 font-semibold"><LockKeyhole className="size-4 text-emerald-600"/>Bu cihazdaki kasa açık</p><p className="mt-1 text-xs text-muted-foreground">Kayıtlar Supabase’e gitmez. İşin bitince kasayı kilitle.</p></div>
-      <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" disabled={vaultBusy} onClick={() => void migrateLegacy()}><ShieldCheck className="size-4"/>Eski bulut hareketlerini taşı ve sil</Button><Button variant="outline" size="sm" disabled={vaultBusy} onClick={() => void removeCloudPdfs()}><FileText className="size-4"/>Eski bulut PDF’lerini sil</Button><Button variant="secondary" size="sm" onClick={() => { vault.lock(); queryClient.removeQueries({ queryKey: ["bank-accounts", ownerId] }); queryClient.removeQueries({ queryKey: ["bank-movements", ownerId] }); }}><LockKeyhole className="size-4"/>Kasayı kilitle</Button></div>
+      <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" disabled={vaultBusy} onClick={() => void migrateLegacy()}><ShieldCheck className="size-4"/>Eski bulut hareketlerini taşı ve sil</Button><Button variant="outline" size="sm" disabled={vaultBusy} onClick={() => void removeCloudPdfs()}><FileText className="size-4"/>Eski bulut PDF’lerini sil</Button><Button variant="secondary" size="sm" onClick={() => { vault.lock(); queryClient.removeQueries({ queryKey: ["bank-accounts", ownerId] }); queryClient.removeQueries({ queryKey: ["bank-movements", ownerId] }); queryClient.removeQueries({ queryKey: ["bank-documents", ownerId] }); }}><LockKeyhole className="size-4"/>Kasayı kilitle</Button></div>
+    </section>
+    <section className="space-y-4 rounded-3xl border border-primary/20 bg-card p-4 shadow-sm sm:p-5">
+      <div className="flex items-start gap-3"><div className="rounded-2xl bg-primary/10 p-3 text-primary"><Mail className="size-5"/></div><div className="min-w-0 flex-1"><p className="text-xs font-bold uppercase tracking-wider text-primary">E-posta eki / banka ekstresi</p><h2 className="mt-1 text-lg font-semibold">Ekstre dosyasını içe aktar</h2><p className="mt-1 text-sm leading-relaxed text-muted-foreground">Bankanın e-postayla gönderdiği PDF, CSV, OFX, QIF veya TSV/TXT ekini indirip seç. Okunabilen tarih, saat, yön, tutar, açıklama, taraf ve referans bilgileri çıkarılır; kaydetmeden önce örnek satırları kontrol et.</p></div></div>
+      <input ref={statementInput} type="file" accept=".csv,.tsv,.txt,.ofx,.qif,.pdf,text/csv,text/plain,application/x-ofx,application/pdf" className="sr-only" onChange={(event) => void inspectStatement(event.target.files?.[0])}/>
+      <div className="flex flex-wrap items-center gap-2"><Button type="button" variant="secondary" onClick={() => statementInput.current?.click()} disabled={importBusy || !activeAccount}><Paperclip className="size-4"/>{statementFile ? "Başka ekstre seç" : "E-postadan indirdiğim dosyayı seç"}</Button>{statementFile && <span className="max-w-full truncate text-xs text-muted-foreground">{statementFile.name} · {(statementFile.size / 1024).toFixed(0)} KB</span>}</div>
+      {statementError && <p role="alert" className="rounded-xl border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">{statementError}</p>}
+      {statementFile && <div className="space-y-3 rounded-2xl border bg-background/60 p-3 sm:p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-semibold">{statementRows.length} satır bulundu</p><p className="text-xs text-muted-foreground">PDF tarama görüntüsüyse metin çıkarılamaz. Saat ve karşı taraf dosyada yoksa uygulama bunları tahmin etmez.</p></div><span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs text-amber-700 dark:text-amber-300">Kontrol etmeden kaydetme</span></div>
+        <div className="max-h-72 overflow-auto rounded-xl border"><table className="w-full min-w-[620px] text-left text-xs"><thead className="sticky top-0 bg-muted text-muted-foreground"><tr><th className="p-2">Tarih / saat</th><th className="p-2">Yön</th><th className="p-2">Karşı taraf</th><th className="p-2">Açıklama</th><th className="p-2 text-right">Tutar</th></tr></thead><tbody>{statementRows.slice(0, 100).map((row, index) => <tr key={`${row.date}-${index}`} className="border-t"><td className="whitespace-nowrap p-2">{formatDate(row.date)}</td><td className="p-2">{row.direction === "incoming" ? "Gelen" : "Giden"}</td><td className="max-w-40 truncate p-2">{row.counterparty || "Dosyada belirtilmemiş"}</td><td className="max-w-56 truncate p-2">{row.description || "—"}</td><td className="whitespace-nowrap p-2 text-right font-semibold">{formatTL(row.amount)}</td></tr>)}</tbody></table></div>
+        {statementRows.length > 100 && <p className="text-xs text-muted-foreground">Önizlemede ilk 100 satır gösteriliyor; {statementRows.length} satırın tamamı aktarılacak.</p>}
+        <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="ghost" onClick={() => { setStatementFile(null); setStatementRows([]); setStatementError(""); if (statementInput.current) statementInput.current.value = ""; }}>Vazgeç</Button><Button type="button" onClick={() => void saveStatementImport()} disabled={importBusy || statementRows.length === 0}>{importBusy ? <RefreshCw className="size-4 animate-spin"/> : <Download className="size-4"/>}Hareketleri ve dosyayı şifreli kaydet</Button></div></div>}
+      {bankDocuments.data?.length ? <div className="space-y-2 border-t pt-3"><p className="text-sm font-semibold">Bu cihazdaki ekstre arşivi</p>{bankDocuments.data.map((document) => <div key={document.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2"><div className="flex min-w-0 items-center gap-2"><FileText className="size-4 shrink-0 text-muted-foreground"/><div className="min-w-0"><p className="truncate text-sm font-medium">{document.file_name}</p><p className="text-[11px] text-muted-foreground">{formatDate(document.imported_at)} · {document.movement_count} yeni hareket</p></div></div><Button type="button" variant="ghost" size="sm" onClick={() => void downloadOriginalStatement(document.id)}><Download className="size-4"/>Dosyayı indir</Button></div>)}</div> : null}
+      <p className="text-[11px] leading-relaxed text-muted-foreground">Dosya ve işlemler bu cihazdaki kasaya, kilitli ve şifreli biçimde yazılır; uygulama e-posta kutuna bağlanmaz ve dosyayı sunucuya yüklemez. E-posta ekini önce indirip burada seçmen gerekir.</p>
     </section>
     <section className="relative overflow-hidden rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
       <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-emerald-400 via-primary to-indigo-500"/>
-      <div className="flex items-start gap-3 pl-1"><div className="rounded-xl bg-emerald-500/10 p-2.5 text-emerald-700 dark:text-emerald-300"><ShieldCheck className="size-5"/></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold">Hesap sahibi özelinde · salt okunur</p><span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">Canlı sağlayıcı ayarı bekleniyor</span></div><p className="mt-1 text-sm leading-relaxed text-muted-foreground">Hesap bağlantısı yalnızca hesap sahibine ait olacak. Canlı bağlantı için BKM/TCMB yetkili hesap bilgisi sağlayıcısının API erişimi ve üretim anahtarları gerekir. Saha banka şifresi veya SMS kodu istemez; para transferi yetkisi kullanılmaz.</p></div></div>
-      <div className="mt-4 grid gap-2 border-t pt-3 text-xs text-muted-foreground sm:grid-cols-3"><p><span className="mr-2 font-bold text-primary">01</span>Bankanı seç</p><p><span className="mr-2 font-bold text-primary">02</span>Tek hesabı seç</p><p><span className="mr-2 font-bold text-primary">03</span>Bankanda salt-okunur izni onayla</p></div>
-      <p className="mt-3 text-[11px] text-muted-foreground">Sağlayıcı seçimi ve üretim erişimi yapılandırılana kadar bu ekranda yalnızca elle girilmiş hareketler görünür. Desteklenmeyen banka veya eksik karşı taraf bilgisi doğrulanmış gibi gösterilmez.</p>
+      <div className="flex items-start gap-3 pl-1"><div className="rounded-xl bg-emerald-500/10 p-2.5 text-emerald-700 dark:text-emerald-300"><ShieldCheck className="size-5"/></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold">Hesap sahibi özelinde · banka bağlantısı yok</p><span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">Yalnızca senin seçtiğin ekstre</span></div><p className="mt-1 text-sm leading-relaxed text-muted-foreground">Banka hesabına veya e-posta kutuna otomatik erişim yapılmaz. Hareketler, yukarıdan içe aktardığın ekstre dosyasından okunur; uygulama hiçbir transfer başlatamaz.</p></div></div>
     </section>
 
     <section className="relative overflow-hidden rounded-3xl border bg-card shadow-sm">
@@ -621,7 +707,7 @@ function Bank() {
     <div className="space-y-3"><div className="flex items-center justify-between px-1"><div><h2 className="font-semibold">İşlemler</h2><p className="text-xs text-muted-foreground">{rows.length} kayıt · {monthLabel}</p></div><span className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">{displayedRows.length} gösteriliyor</span></div>
     <div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/><Input aria-label="Hareketlerde ara" placeholder="Kişi veya açıklamada ara" value={search} onChange={(e) => setSearch(e.target.value)} className="h-11 rounded-xl pl-9"/></div>
     {displayedRows.map((row) => <article key={row.id} className="flex items-start justify-between gap-3 rounded-2xl border bg-card p-4 shadow-sm">
-      <div className="flex min-w-0 gap-3"><div className={"mt-0.5 rounded-xl p-2 " + (row.direction === "incoming" ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600")}>{row.direction === "incoming" ? <ArrowDownLeft className="size-4"/> : <ArrowUpRight className="size-4"/>}</div><div className="min-w-0"><p className="truncate font-medium">{row.counterparty || (row.source === "open_banking" ? "Karşı taraf banka verisinde yok" : row.direction === "incoming" ? "Gelen para" : "Çıkan para")}</p><p className="mt-1 text-xs text-muted-foreground">{formatDate(row.date)} · {row.direction === "incoming" ? "Kimden" : "Kime"}{row.status && row.status !== "completed" ? ` · ${row.status}` : ""}{row.source === "open_banking" ? " · Bankadan eşitlendi" : ""}</p>{row.description && <p className="mt-2 break-words text-sm text-muted-foreground">{row.description}</p>}{row.reference && <p className="mt-1 truncate font-mono text-[10px] text-muted-foreground">Ref: {row.reference}</p>}</div></div>
+      <div className="flex min-w-0 gap-3"><div className={"mt-0.5 rounded-xl p-2 " + (row.direction === "incoming" ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600")}>{row.direction === "incoming" ? <ArrowDownLeft className="size-4"/> : <ArrowUpRight className="size-4"/>}</div><div className="min-w-0"><p className="truncate font-medium">{row.counterparty || (row.source === "open_banking" ? "Karşı taraf banka verisinde yok" : row.direction === "incoming" ? "Gelen para" : "Çıkan para")}</p><p className="mt-1 text-xs text-muted-foreground">{formatDate(row.date)} · {row.direction === "incoming" ? "Kimden" : "Kime"}{row.status && row.status !== "completed" ? ` · ${row.status}` : ""}{row.source === "open_banking" ? " · Bankadan eşitlendi" : row.source === "email_attachment" ? " · Ekstre dosyasından" : ""}</p>{row.description && <p className="mt-2 break-words text-sm text-muted-foreground">{row.description}</p>}{row.reference && <p className="mt-1 truncate font-mono text-[10px] text-muted-foreground">Ref: {row.reference}</p>}</div></div>
       <div className="flex shrink-0 items-start gap-1"><span className={"num pt-1 text-right text-sm font-semibold " + (row.direction === "incoming" ? "text-emerald-600" : "text-rose-600")}>{row.direction === "incoming" ? "+" : "−"}{formatTL(row.amount)}</span><Button variant="ghost" size="icon" aria-label="SAHA hareket belgesini indir" title="SAHA belgesi (resmi banka dekontu değildir)" onClick={() => void downloadSahaReceipt(row)}><FileDown className="size-4"/></Button><Button variant="ghost" size="icon" aria-label="Hareketi kalıcı sil" title="Kalıcı sil" disabled={remove.isPending} onClick={() => remove.mutate(row.id)}><Trash2 className="size-4"/></Button></div>
     </article>)}
     {!displayedRows.length && !records.isLoading && !records.error && (rows.length ? <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">Aramanla eşleşen hareket yok.</p> : <div className="rounded-2xl border border-dashed bg-card/60 px-5 py-10 text-center"><div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary"><WalletCards className="size-6"/></div><p className="mt-3 font-semibold">Bu ay için hareket yok</p><p className="mt-1 text-sm text-muted-foreground">İlk gelen veya çıkan para kaydını ekleyebilirsin.</p><Button className="mt-4" variant="secondary" onClick={() => setAdding(true)}><Plus/>Hareket ekle</Button></div>)}

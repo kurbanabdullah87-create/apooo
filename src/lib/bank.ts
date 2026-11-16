@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import type { ImportedBankMovement } from "@/lib/bank-statement";
 
 export type BankDirection = "incoming" | "outgoing";
 export interface BankMovement {
@@ -29,7 +30,15 @@ export interface BankAccountOption {
   currency: string;
   account_kind?: "personal" | "business";
 }
-type BankVault = { accounts: BankAccountOption[]; transactions: BankMovement[] };
+export interface BankDocument {
+  id: string;
+  file_name: string;
+  mime_type: string;
+  file_data: string;
+  imported_at: string;
+  movement_count: number;
+}
+type BankVault = { accounts: BankAccountOption[]; transactions: BankMovement[]; documents?: BankDocument[] };
 type EncryptedVault = { version: 1; salt: string; iv: string; ciphertext: string };
 
 const PBKDF2_ITERATIONS = 600_000;
@@ -43,7 +52,7 @@ const base64ToBytes = (value: string) => Uint8Array.from(atob(value), (char) => 
 
 async function deriveKey(passphrase: string, salt: Uint8Array) {
   const material = await crypto.subtle.importKey("raw", utf8.encode(passphrase), "PBKDF2", false, ["deriveKey"]);
-  return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" }, material, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  return crypto.subtle.deriveKey({ name: "PBKDF2", salt: Uint8Array.from(salt).buffer, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" }, material, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
 }
 
 async function encryptVault(ownerId: string, passphrase: string, vault: BankVault) {
@@ -71,7 +80,9 @@ async function readVault(ownerId: string): Promise<BankVault> {
   if (!encrypted || !key) throw new Error("Kişisel kasanın kilidini aç.");
   try {
     const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: base64ToBytes(encrypted.iv), additionalData: vaultAad(ownerId) }, key, base64ToBytes(encrypted.ciphertext));
-    return JSON.parse(decoder.decode(plaintext)) as BankVault;
+    const parsed = JSON.parse(decoder.decode(plaintext)) as BankVault;
+    if (!Array.isArray(parsed.accounts) || !Array.isArray(parsed.transactions)) throw new Error("Kasa verisi doğrulanamadı.");
+    return { ...parsed, documents: Array.isArray(parsed.documents) ? parsed.documents : [] };
   } catch {
     keyCache.delete(ownerId);
     throw new Error("Kasa kilitlendi. Parolanla yeniden aç.");
@@ -248,6 +259,62 @@ export function useBankMovements(ownerId: string | null | undefined, accountId: 
       return vault.transactions.filter((row) => row.account_id === accountId).sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at));
     },
   });
+}
+
+export function useBankDocuments(ownerId: string | null | undefined, unlocked: boolean) {
+  return useQuery({
+    queryKey: ["bank-documents", ownerId, unlocked], enabled: Boolean(ownerId && unlocked), staleTime: 0,
+    queryFn: async () => ownerId ? (await readVault(ownerId)).documents ?? [] : [],
+  });
+}
+
+/** Save the original statement and its parsed movements together in the encrypted local vault. */
+export async function importBankStatementFile(ownerId: string, accountId: string, file: File, parsedRows: ImportedBankMovement[]) {
+  const { data: auth, error } = await supabase.auth.getUser();
+  if (error || auth.user?.id !== ownerId) throw new Error("Oturum değişti. Yeniden giriş yap.");
+  if (file.size > 8 * 1024 * 1024) throw new Error("Ekstre dosyası en fazla 8 MB olabilir.");
+  if (parsedRows.length === 0) throw new Error("Dosyada aktarılabilir hareket yok.");
+  const vault = await readVault(ownerId);
+  vault.documents ??= [];
+  const account = vault.accounts.find((candidate) => candidate.id === accountId);
+  if (!account) throw new Error("Aktarım hesabı bulunamadı.");
+  const documentId = crypto.randomUUID();
+  const binary = new Uint8Array(await file.arrayBuffer());
+  let binaryString = "";
+  for (let offset = 0; offset < binary.length; offset += 0x8000) binaryString += String.fromCharCode(...binary.subarray(offset, offset + 0x8000));
+  const fileData = btoa(binaryString);
+  const existing = new Set(vault.transactions.map((row) => {
+    const key = row.reference?.trim().toLocaleLowerCase("tr-TR");
+    return key ? `${row.account_id}|ref|${key}` : `${row.account_id}|${row.date}|${row.direction}|${row.amount.toFixed(2)}|${row.counterparty.trim().toLocaleLowerCase("tr-TR")}|${row.description.trim().toLocaleLowerCase("tr-TR")}`;
+  }));
+  const now = new Date().toISOString();
+  let importedCount = 0;
+  for (const row of parsedRows) {
+    const ref = row.reference?.trim().toLocaleLowerCase("tr-TR");
+    const key = ref ? `${account.id}|ref|${ref}` : `${account.id}|${row.date}|${row.direction}|${row.amount.toFixed(2)}|${row.counterparty.trim().toLocaleLowerCase("tr-TR")}|${row.description.trim().toLocaleLowerCase("tr-TR")}`;
+    if (existing.has(key)) continue;
+    existing.add(key);
+    vault.transactions.unshift({
+      id: crypto.randomUUID(), owner_id: ownerId, account_id: account.id,
+      direction: row.direction, amount: row.amount, date: row.date,
+      counterparty: row.counterparty, description: row.description,
+      ...(row.reference ? { reference: row.reference } : {}),
+      ...(row.balance_after !== undefined ? { balance_after: row.balance_after } : {}),
+      status: "completed", source: "email_attachment", created_at: now,
+    });
+    importedCount++;
+  }
+  vault.documents.unshift({ id: documentId, file_name: file.name.slice(0, 180), mime_type: file.type || "application/octet-stream", file_data: fileData, imported_at: now, movement_count: importedCount });
+  await writeVault(ownerId, vault);
+  return { importedCount, duplicateCount: parsedRows.length - importedCount, documentId };
+}
+
+export async function getBankDocumentFile(ownerId: string, documentId: string) {
+  const document = (await readVault(ownerId)).documents?.find((item) => item.id === documentId);
+  if (!document) throw new Error("Ekstre dosyası bulunamadı.");
+  const binary = atob(document.file_data);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new File([bytes], document.file_name, { type: document.mime_type });
 }
 
 export function useAddBankMovement(ownerId: string | null | undefined, accountId: string | null | undefined) {
