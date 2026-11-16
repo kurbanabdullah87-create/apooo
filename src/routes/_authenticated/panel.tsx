@@ -11,6 +11,7 @@ import { getPosition, coordsOf, distanceMeters } from "@/lib/geo";
 import { useMe } from "@/hooks/use-me";
 import { toast } from "sonner";
 import { whatsappLink } from "@/lib/templates";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/panel")({
   head: () => pageHead("Panel", "Aylık gelir, gider ve kâr özeti."),
