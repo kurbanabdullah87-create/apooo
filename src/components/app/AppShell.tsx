@@ -67,7 +67,7 @@ export function AppShell() {
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-xl flex-col">
+    <div className="mx-auto flex min-h-dvh max-w-md flex-col">
       <header className="sticky top-0 z-30 border-b bg-background/90 px-4 pb-3 pt-[max(env(safe-area-inset-top),0.75rem)] backdrop-blur">
         <div className="flex items-center gap-2"><Button variant="secondary"
           onClick={() => setSearchOpen(true)}
@@ -117,34 +117,21 @@ export function AppShell() {
         )}
       </main>
 
-      {isUsta && (
-        <Button
-          aria-label="Hızlı ekle"
-          onClick={() => {
-            haptic();
-            setAddOpen(true);
-          }}
-          className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-[max(1.25rem,calc(50%-18rem+1.25rem))] z-40 flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 active:scale-95"
-        >
-          <Plus className="size-6" />
-        </Button>
-      )}
-
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 backdrop-blur">
-        <div className="mx-auto grid max-w-xl grid-cols-5">
-          {NAV.filter(n => isUsta || ["/isler", "/yevmiye"].includes(n.to)).map((n) => {
+        <div className={`mx-auto grid max-w-md ${isUsta ? "grid-cols-11" : "grid-cols-2"}`}>
+          {NAV.filter(n => isUsta || ["/isler", "/yevmiye"].includes(n.to)).map((n, index) => {
             const active = path.startsWith(n.to);
-            return (
+            return <div key={n.to} className="contents">
+              {isUsta && index === 3 && <button type="button" aria-label="Hızlı işlem ekle" onClick={() => { haptic(); setAddOpen(true); }} className="-mt-4 flex flex-col items-center justify-start gap-1 py-1 text-[10px] font-semibold text-primary"><span className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition active:scale-95"><Plus className="size-6"/></span>Ekle</button>}
               <Link
-                key={n.to}
                 to={n.to}
                 onClick={() => haptic(8)}
-                className={cn("flex flex-col items-center gap-1 py-3 text-[11px] font-medium", active ? "text-primary" : "text-muted-foreground")}
+                className={cn("flex flex-col items-center gap-1 py-3 text-[11px] font-medium", isUsta && "col-span-2", active ? "text-primary" : "text-muted-foreground")}
               >
                 <n.icon className="size-5" />
                 {n.label}
               </Link>
-            );
+            </div>;
           })}
         </div>
       </nav>
