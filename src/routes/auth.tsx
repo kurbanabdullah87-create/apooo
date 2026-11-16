@@ -141,7 +141,7 @@ function AuthPage() {
   }
 
   return (
-    <main className="relative isolate min-h-dvh overflow-hidden bg-[#080a0e] text-foreground">
+    <main className="relative isolate min-h-dvh overflow-hidden bg-[#080a0e] text-foreground selection:bg-primary/30">
       <div aria-hidden="true" className="pointer-events-none absolute -left-48 -top-56 size-[34rem] rounded-full bg-primary/10 blur-[110px]" />
       <div aria-hidden="true" className="pointer-events-none absolute -bottom-64 right-0 size-[36rem] rounded-full bg-sky-500/[0.07] blur-[130px]" />
       <div className="relative mx-auto grid min-h-dvh w-full max-w-[1440px] lg:grid-cols-[minmax(0,1.05fr)_minmax(460px,0.95fr)]">
@@ -164,7 +164,7 @@ function AuthPage() {
         </aside>
 
         <div className="flex min-h-dvh items-center justify-center px-3 py-5 sm:px-8 sm:py-8 lg:px-10">
-          <section className="relative w-full max-w-[480px] rounded-[1.5rem] border border-white/[0.09] bg-[#101318]/95 p-4 shadow-[0_32px_100px_-35px_rgba(0,0,0,0.85)] backdrop-blur-xl sm:rounded-[2rem] sm:p-9">
+          <section className="relative w-full max-w-[500px] rounded-[1.5rem] border border-white/[0.1] bg-gradient-to-b from-[#141820]/95 to-[#0e1116]/95 p-4 shadow-[0_32px_100px_-35px_rgba(0,0,0,0.85)] backdrop-blur-xl sm:rounded-[2rem] sm:p-9">
             <div aria-hidden="true" className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent" />
             <div className="mb-7 flex flex-col items-start gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between lg:hidden">
               <div className="flex items-center gap-3"><div className="flex size-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/15"><HardHat className="size-5" /></div><div><p className="text-lg font-bold">Saha</p><p className="text-xs text-muted-foreground">Operasyon ve finans</p></div></div>
@@ -197,7 +197,7 @@ function AuthPage() {
                   <div className="space-y-2"><Label htmlFor="email">{legacy && mode === "login" && !resetMode ? "Eski kullanıcı adı" : "E-posta adresi"}</Label><div className="relative"><Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/><Input id="email" type={mode === "signup" || resetMode ? "email" : "text"} inputMode={legacy && !resetMode ? "text" : "email"} autoCapitalize="none" autoComplete={mode === "login" ? "username" : "email"} placeholder={legacy && mode === "login" && !resetMode ? "eski kullanıcı adın" : "adiniz@gmail.com"} maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} required className="h-12 rounded-xl border-white/10 bg-black/20 pl-11 focus-visible:ring-primary/40"/></div></div>
                   {!resetMode && <div className="space-y-2"><div className="flex items-center justify-between"><Label htmlFor="password">Şifre</Label>{mode === "signup" && <span className="text-[11px] text-muted-foreground">En az 12 karakter</span>}</div><div className="relative"><LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/><Input id="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "signup" ? 12 : undefined} value={password} onChange={(e) => setPassword(e.target.value)} required className="h-12 rounded-xl border-white/10 bg-black/20 pl-11 focus-visible:ring-primary/40"/></div></div>}
                   {!resetMode && mode === "login" && !legacy && <button type="button" onClick={() => setResetMode(true)} className="-mt-1 text-left text-xs font-medium text-primary hover:underline">Şifremi unuttum</button>}
-                  {!resetMode && <label className="flex cursor-pointer flex-wrap items-center gap-x-2.5 gap-y-1 rounded-xl border border-white/10 bg-white/[0.025] px-3.5 py-3 text-sm"><input type="checkbox" className="size-4 shrink-0 accent-primary" checked={remember} onChange={(e) => setRemember(e.target.checked)}/><span>Beni hatırla</span><span className="w-full pl-[26px] text-[11px] text-muted-foreground sm:ml-auto sm:w-auto sm:pl-0">{remember ? "Bu cihazda açık kalır" : "Bu sekmede açık kalır"}</span></label>}
+                  {!resetMode && <label className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-3 text-sm transition-colors ${remember ? "border-primary/30 bg-primary/[0.07]" : "border-white/10 bg-white/[0.025] hover:bg-white/[0.045]"}`}><input type="checkbox" className="size-4 shrink-0 accent-primary" checked={remember} onChange={(e) => setRemember(e.target.checked)}/><span className="min-w-0 flex-1 font-medium">Beni hatırla</span><span className="shrink-0 text-[11px] text-muted-foreground">{remember ? "Bu cihazda açık kalır" : "Bu sekmede açık kalır"}</span></label>}
                   <Button type="submit" className="h-12 w-full rounded-xl bg-primary text-base font-semibold shadow-lg shadow-primary/10 transition hover:brightness-105" disabled={busy}>{busy ? <Loader2 className="animate-spin"/> : <>{resetMode ? "Yenileme bağlantısı gönder" : mode === "login" ? "Giriş yap" : "Hesap oluştur"}<ArrowRight/></>}</Button>
                 </form>
 

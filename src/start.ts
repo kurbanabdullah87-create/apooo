@@ -1,4 +1,5 @@
 import { createStart, createCsrfMiddleware, createMiddleware } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 
 import { renderErrorPage } from "./lib/error-page";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
@@ -25,7 +26,20 @@ const csrfMiddleware = createCsrfMiddleware({
   filter: (ctx) => ctx.handlerType === "serverFn",
 });
 
+// Vercel serves both the stable project domain and its generated production
+// alias. Browser storage is origin-scoped, so keep auth and OAuth callbacks on
+// one canonical origin to make remembered sessions consistent.
+const canonicalHostMiddleware = createMiddleware().server(async ({ next }) => {
+  const request = getRequest();
+  const url = new URL(request.url);
+  if (url.hostname === "sahav2full-abdullah-6206.vercel.app") {
+    url.hostname = "sahav2full.vercel.app";
+    return Response.redirect(url, 308);
+  }
+  return next();
+});
+
 export const startInstance = createStart(() => ({
   functionMiddleware: [attachSupabaseAuth],
-  requestMiddleware: [errorMiddleware, csrfMiddleware],
+  requestMiddleware: [canonicalHostMiddleware, errorMiddleware, csrfMiddleware],
 }));
