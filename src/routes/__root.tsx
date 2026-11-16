@@ -38,7 +38,6 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: ErrorComponentProps) {
   console.error(error);
   const router = useRouter();
-  const showDiagnostics = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("debug") === "1";
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
@@ -47,9 +46,7 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold text-foreground">Sayfa yüklenemedi</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {showDiagnostics && error instanceof Error ? `${error.name}: ${error.message}` : "Bir sorun oluştu. Tekrar deneyin."}
-        </p>
+        <p className="mt-2 text-sm text-muted-foreground">Bir sorun oluştu. Tekrar deneyin.</p>
         <button
           onClick={() => {
             router.invalidate();

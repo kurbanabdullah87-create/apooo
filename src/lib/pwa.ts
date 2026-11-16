@@ -23,7 +23,10 @@ export async function initializeOffline() {
     );
     return;
   }
-  const { Workbox } = await import("workbox-window");
-  const wb = new Workbox("/sw.js");
-  void wb.register();
+  try {
+    await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+  } catch (error) {
+    // Offline support is optional; a registration issue must never break app startup.
+    console.warn("[PWA] Service worker registration failed", error);
+  }
 }
