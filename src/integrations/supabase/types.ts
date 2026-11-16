@@ -238,6 +238,11 @@ export type Database = {
           address: string | null
           created_at: string
           id: string
+          credit_limit: number
+          payment_due_days: number
+          is_blocked: boolean
+          latitude: number | null
+          longitude: number | null
           name: string
           notes: string | null
           phone: string | null
@@ -248,6 +253,11 @@ export type Database = {
           address?: string | null
           created_at?: string
           id?: string
+          credit_limit?: number
+          payment_due_days?: number
+          is_blocked?: boolean
+          latitude?: number | null
+          longitude?: number | null
           name: string
           notes?: string | null
           phone?: string | null
@@ -258,6 +268,11 @@ export type Database = {
           address?: string | null
           created_at?: string
           id?: string
+          credit_limit?: number
+          payment_due_days?: number
+          is_blocked?: boolean
+          latitude?: number | null
+          longitude?: number | null
           name?: string
           notes?: string | null
           phone?: string | null
@@ -274,6 +289,8 @@ export type Database = {
           description: string | null
           id: string
           occurred_on: string
+          receipt_photo_url: string | null
+          job_record_id: string | null
           team_id: string
         }
         Insert: {
@@ -283,6 +300,8 @@ export type Database = {
           description?: string | null
           id?: string
           occurred_on?: string
+          receipt_photo_url?: string | null
+          job_record_id?: string | null
           team_id?: string
         }
         Update: {
@@ -292,6 +311,8 @@ export type Database = {
           description?: string | null
           id?: string
           occurred_on?: string
+          receipt_photo_url?: string | null
+          job_record_id?: string | null
           team_id?: string
         }
         Relationships: []
@@ -458,6 +479,8 @@ export type Database = {
     }
     Functions: {
       bill_job: { Args: { _job_id: string }; Returns: string }
+      complete_appointment: { Args: { _appointment_id: string }; Returns: string }
+      customer_credit_status: { Args: { _customer_id: string }; Returns: Json }
       service_equipment: { Args: { _equipment_id: string; _note?: string; _cost?: number }; Returns: number }
       current_team: { Args: never; Returns: string }
       has_role: {

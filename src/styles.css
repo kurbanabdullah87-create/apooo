@@ -90,6 +90,44 @@
   --sidebar-ring: oklch(0.78 0.12 175);
 }
 
+:root[data-field-mode="sunlight"] {
+  color-scheme: light;
+  --background: #fff;
+  --foreground: #111827;
+  --card: #fff;
+  --card-foreground: #111827;
+  --popover: #fff;
+  --popover-foreground: #111827;
+  --primary: #065f46;
+  --primary-foreground: #fff;
+  --secondary: #e5e7eb;
+  --secondary-foreground: #111827;
+  --muted: #e5e7eb;
+  --muted-foreground: #374151;
+  --accent: #d1fae5;
+  --accent-foreground: #064e3b;
+  --destructive: #b91c1c;
+  --destructive-foreground: #fff;
+  --success: #047857;
+  --warning: #92400e;
+  --border: #4b5563;
+  --input: #374151;
+  --ring: #065f46;
+  --chart-1: #047857;
+  --chart-2: #b45309;
+  --chart-3: #1d4ed8;
+  --chart-4: #b91c1c;
+  --chart-5: #7e22ce;
+  --sidebar: #f3f4f6;
+  --sidebar-foreground: #111827;
+  --sidebar-primary: #065f46;
+  --sidebar-primary-foreground: #fff;
+  --sidebar-accent: #d1fae5;
+  --sidebar-accent-foreground: #064e3b;
+  --sidebar-border: #4b5563;
+  --sidebar-ring: #065f46;
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
@@ -97,6 +135,7 @@
   html {
     color-scheme: dark;
   }
+  html[data-field-mode="sunlight"] { color-scheme: light; }
   body {
     background-color: var(--color-background);
     background-image:

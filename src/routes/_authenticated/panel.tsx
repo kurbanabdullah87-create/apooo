@@ -1,12 +1,16 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useMemo } from "react";
 import { fetchWeather, wmo, DEFAULT_LOCATION, type WeatherData } from "@/lib/weather";
-import { ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertTriangle, MapPin, MessageCircle, Wallet, HardHat, CloudRainWind } from "lucide-react";
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { useCustomers, useExpenses, useTransactions } from "@/lib/data";
-import { customerBalance, EXPENSE_LABELS, formatTL, monthKey, monthSummary, overdueAmount, profitBreakdown, todayISO, type ExpenseCategory } from "@/lib/finance";
-import { pageHead } from "@/lib/work";
+import { customerBalance, customerRestriction, EXPENSE_LABELS, formatTL, monthKey, monthSummary, overdueAmount, profitBreakdown, todayISO, type ExpenseCategory } from "@/lib/finance";
+import { pageHead, useRecords, useSaveRecord } from "@/lib/work";
 import { MaintenanceAlerts } from "@/components/app/MaintenanceAlerts";
+import { getPosition, coordsOf, distanceMeters } from "@/lib/geo";
+import { useMe } from "@/hooks/use-me";
+import { toast } from "sonner";
+import { whatsappLink } from "@/lib/templates";
 
 export const Route = createFileRoute("/_authenticated/panel")({
   head: () => pageHead("Panel", "Aylık gelir, gider ve kâr özeti."),
@@ -22,19 +26,19 @@ function shiftMonth(m: string, d: number) {
 }
 
 
-function WeatherWidget() {
+function WeatherWidget({ onWeather }: { onWeather?: (weather: WeatherData) => void }) {
   const [w, setW] = useState<WeatherData | null>(null);
   useEffect(() => {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => void fetchWeather(pos.coords.latitude, pos.coords.longitude, "Konumum").then(setW).catch(() => {}),
-        () => void fetchWeather(DEFAULT_LOCATION.lat, DEFAULT_LOCATION.lon, DEFAULT_LOCATION.name).then(setW).catch(() => {}),
+        (pos) => void fetchWeather(pos.coords.latitude, pos.coords.longitude, "Konumum").then((data) => { setW(data); onWeather?.(data); }).catch(() => {}),
+        () => void fetchWeather(DEFAULT_LOCATION.lat, DEFAULT_LOCATION.lon, DEFAULT_LOCATION.name).then((data) => { setW(data); onWeather?.(data); }).catch(() => {}),
         { timeout: 4000 }
       );
     } else {
-      void fetchWeather(DEFAULT_LOCATION.lat, DEFAULT_LOCATION.lon, DEFAULT_LOCATION.name).then(setW).catch(() => {});
+      void fetchWeather(DEFAULT_LOCATION.lat, DEFAULT_LOCATION.lon, DEFAULT_LOCATION.name).then((data) => { setW(data); onWeather?.(data); }).catch(() => {});
     }
-  }, []);
+  }, [onWeather]);
   if (!w) return null;
   return (
     <Link to="/hava" className="block rounded-2xl overflow-hidden">
@@ -72,6 +76,12 @@ function Panel() {
   const txs = useTransactions();
   const exps = useExpenses();
   const customers = useCustomers();
+  const appointments = useRecords("appointment");
+  const saveJob = useSaveRecord("job");
+  const me = useMe();
+  const navigate = useNavigate();
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [nearby, setNearby] = useState<{ customer: NonNullable<typeof customers.data>[number]; meters: number } | null>(null);
 
   const data = useMemo(() => {
     const t = txs.data ?? [];
@@ -90,7 +100,7 @@ function Panel() {
     const overdue = (customers.data ?? [])
       .map((c) => {
         const ct = t.filter((x) => x.customer_id === c.id);
-        return { c, overdue: overdueAmount(ct), balance: customerBalance(ct) };
+        return { c, overdue: overdueAmount(ct, new Date(), c.payment_due_days ?? 15), balance: customerBalance(ct) };
       })
       .filter((x) => x.overdue > 0)
       .sort((a, b) => b.overdue - a.overdue);
@@ -98,6 +108,30 @@ function Panel() {
   }, [txs.data, exps.data, customers.data, month]);
 
   const label = new Date(month + "-01T00:00:00").toLocaleDateString("tr-TR", { month: "long", year: "numeric" });
+  const today = todayISO();
+  const todayIncome = (txs.data ?? []).filter((tx) => tx.kind === "payment" && tx.occurred_on === today).reduce((sum, tx) => sum + tx.amount, 0);
+  const todayExpense = (exps.data ?? []).filter((e) => e.occurred_on === today).reduce((sum, e) => sum + e.amount, 0);
+  useEffect(() => {
+    let active = true;
+    if (!customers.data?.length) return;
+    void getPosition(5000).then((position) => {
+      if (!active) return;
+      const closest = customers.data!.map((customer) => { const coords = coordsOf({ lat: customer.latitude, lng: customer.longitude }); return coords ? { customer, meters: distanceMeters(position, coords) } : null; }).filter((row): row is { customer: NonNullable<typeof customers.data>[number]; meters: number } => row !== null && row.meters <= 100).sort((a, b) => a.meters - b.meters)[0] ?? null;
+      setNearby(closest);
+    }).catch(() => setNearby(null));
+    return () => { active = false; };
+  }, [customers.data]);
+  const outdoorWarnings = (appointments.data ?? []).filter((a) => a.payload.outdoor === true && String(a.payload.date ?? "") >= today && String(a.payload.date ?? "") <= shiftMonth(today.slice(0, 7), 1) + "-31").filter((a) => {
+    const forecast = weather?.daily.find((d) => d.date === a.payload.date);
+    return Boolean(forecast && (forecast.rain >= 5 || forecast.code >= 51 && forecast.code <= 99)) || Boolean(a.payload.date === today && weather && weather.current.windSpeed >= 40);
+  });
+
+  function startNearbyJob(customer: NonNullable<typeof customers.data>[number]) {
+    const related = (txs.data ?? []).filter((tx) => tx.customer_id === customer.id);
+    const risk = customerRestriction(customer, related);
+    if (risk.blocked) { toast.error("Cari kilidi aktif; önce tahsilat alın."); void navigate({ to: "/cari/$id", params: { id: customer.id } }); return; }
+    saveJob.mutate({ owner_id: me.data?.id, payload: { title: "Hızlı saha işi", customer_id: customer.id, address: customer.address ?? "", date: today, status: "Devam Ediyor", seconds: 0, started_at: new Date().toISOString(), no_machine: true, equipment_id: null, vat_rate: 0 } }, { onSuccess: () => void navigate({ to: "/isler" }) });
+  }
 
   return (
     <div className="space-y-5">
@@ -116,8 +150,11 @@ function Panel() {
         />
       </div>
 
+      {nearby && <section className="rounded-2xl border-2 border-emerald-500/50 bg-emerald-500/10 p-4"><div className="flex items-start gap-3"><MapPin className="mt-0.5 size-5 shrink-0 text-emerald-700 dark:text-emerald-300"/><div className="min-w-0 flex-1"><p className="font-semibold">Şu an {nearby.customer.name} konumuna yakınsınız</p><p className="text-xs text-muted-foreground">Yaklaşık {Math.round(nearby.meters)} metre · konum yalnızca cihazda karşılaştırılır</p><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" disabled={saveJob.isPending} onClick={() => startNearbyJob(nearby.customer)}><HardHat/>Hızlı iş başlat</Button><Button asChild size="sm" variant="secondary"><Link to="/cari/$id" params={{ id: nearby.customer.id }}><Wallet/>Tahsilat al</Link></Button></div></div></div></section>}
       <MaintenanceAlerts />
-      <WeatherWidget />
+      <WeatherWidget onWeather={setWeather}/>
+      {outdoorWarnings.length > 0 && <section role="alert" className="rounded-2xl border border-warning/60 bg-warning/10 p-4"><div className="flex items-start gap-3"><CloudRainWind className="size-5 text-warning"/><div><p className="font-semibold">Açık alan randevusu için hava uyarısı</p>{outdoorWarnings.map((a) => <p className="mt-1 text-sm" key={a.id}>{String(a.payload.date)} {String(a.payload.time ?? "")} · {String(a.payload.name)} · {weather?.daily.find((d) => d.date === a.payload.date)?.desc} / yağış {weather?.daily.find((d) => d.date === a.payload.date)?.rain} mm</p>)}</div></div></section>}
+      <section className="grid grid-cols-2 gap-3"><div className="rounded-2xl border bg-card p-4"><p className="text-xs text-muted-foreground">Bugünkü tahsilat</p><p className="mt-1 text-xl font-bold text-success">{formatTL(todayIncome)}</p></div><div className="rounded-2xl border bg-card p-4"><p className="text-xs text-muted-foreground">Bugünkü gider</p><p className="mt-1 text-xl font-bold text-destructive">{formatTL(todayExpense)}</p></div><div className="col-span-2 rounded-2xl bg-slate-950 p-4 text-white"><p className="text-xs text-slate-300">GÜNÜN NET NAKİT AKIŞI</p><p className={`mt-1 text-2xl font-bold ${todayIncome - todayExpense < 0 ? "text-rose-300" : "text-emerald-300"}`}>{formatTL(todayIncome - todayExpense)}</p></div></section>
       <div className="flex items-center justify-between">
         <button onClick={() => setMonth(shiftMonth(month, -1))} className="rounded-full p-2 hover:bg-secondary" aria-label="Önceki ay">
           <ChevronLeft />
@@ -147,11 +184,8 @@ function Panel() {
           <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-destructive">
             <AlertTriangle className="size-4" /> 30 günü geçen alacaklar
           </div>
-          {data.overdue.map(({ c, overdue }) => (
-            <Link key={c.id} to="/cari/$id" params={{ id: c.id }} className="flex justify-between py-1.5 text-sm">
-              <span>{c.name}</span>
-              <span className="num font-semibold text-destructive">{formatTL(overdue)}</span>
-            </Link>
+          {data.overdue.slice(0, 3).map(({ c, overdue }) => (
+            <div key={c.id} className="flex items-center gap-2 border-b border-destructive/15 py-2"><Link to="/cari/$id" params={{ id: c.id }} className="min-w-0 flex-1 truncate text-sm font-medium">{c.name}</Link><span className="num whitespace-nowrap text-sm font-semibold text-destructive">{formatTL(overdue)}</span>{c.phone && <Button asChild size="icon" variant="secondary" className="size-9"><a target="_blank" rel="noreferrer" href={whatsappLink(c.phone, `Merhaba ${c.name}, ${formatTL(overdue)} tutarında vadesi geçmiş bakiyeniz bulunuyor. Uygun olduğunuzda ödeme bilgisini paylaşabilir misiniz?`)} aria-label={`${c.name} için WhatsApp ödeme hatırlatması`}><MessageCircle/></a></Button>}</div>
           ))}
         </div>
       )}

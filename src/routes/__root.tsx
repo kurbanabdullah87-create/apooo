@@ -112,6 +112,9 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
+    try {
+      document.documentElement.dataset.fieldMode = localStorage.getItem("saha-field-mode") === "sunlight" ? "sunlight" : "standard";
+    } catch { /* Device storage can be disabled. */ }
     void initializeOffline();
     const { data } = supabase.auth.onAuthStateChange((event) => {
       if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;

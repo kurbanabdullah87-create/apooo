@@ -14,14 +14,14 @@ export function MaintenanceAlerts() {
   const alerts = (equipment.data ?? [])
     .map((e) => {
       const m = maintenanceStatus(e.payload, now);
-      return { e, interval: m.interval, used: m.used, ratio: m.ratio, level: m.level };
+      return { e, interval: m.interval, used: m.used, ratio: m.ratio, level: m.level, blocked: m.remaining < -5 || e.payload.maintenance_blocked === true };
     })
-    .filter((a) => a.level === "warn" || a.level === "over")
+    .filter((a) => a.level === "warn" || a.level === "over" || a.blocked)
     .sort((a, b) => b.ratio - a.ratio);
   if (!alerts.length) return null;
   return (
     <section className="space-y-2">
-      {alerts.map(({ e, interval, used, ratio }) => {
+      {alerts.map(({ e, interval, used, ratio, blocked }) => {
         const overdue = ratio >= 1;
         return (
           <Link key={e.id} to="/ekipman" className={"flex items-center gap-3 rounded-2xl border p-4 " + (overdue ? "border-destructive/50 bg-destructive/10" : "border-warning/50 bg-warning/10")}>
@@ -29,7 +29,7 @@ export function MaintenanceAlerts() {
             <div className="min-w-0 flex-1">
               <p className="truncate font-semibold">{String(e.payload.name)}</p>
               <p className="text-xs text-muted-foreground">
-                {overdue ? `Bakım ${(used - interval).toFixed(1)} saat gecikti` : `Bakıma ${(interval - used).toFixed(1)} saat kaldı`} · {used.toFixed(1)}/{interval} saat
+                {blocked ? "İş atama kilidi · bakım kaydı girilmeli" : overdue ? `Bakım ${(used - interval).toFixed(1)} saat gecikti` : `Bakıma ${(interval - used).toFixed(1)} saat kaldı`} · {used.toFixed(1)}/{interval} saat
               </p>
             </div>
           </Link>

@@ -49,6 +49,7 @@ function Payroll() {
   const [tab, setTab] = useState<"calendar" | "workplaces" | "report">("calendar");
   const [selectedDate, setSelectedDate] = useState(todayISO());
   const [entry, setEntry] = useState<{ kind: "payroll" | "advance" | "payment"; id?: string; owner_id?: string; payload: Payload } | null>(null);
+  const [advanceConfirmed, setAdvanceConfirmed] = useState(false);
   const [placeForm, setPlaceForm] = useState<{ id?: string; payload: Payload } | null>(null);
   const [workplaceSearch, setWorkplaceSearch] = useState("");
 
@@ -71,6 +72,11 @@ function Payroll() {
   const advanced = advancesByCurrency.TRY ?? 0;
   const paid = paymentsByCurrency.TRY ?? 0;
   const outstanding = payrollBalance(earned, advanced + paid);
+  const earnedAllTime = allPayrollRows.filter((r) => String(r.payload.currency ?? "TRY") === "TRY").reduce((sum, r) => sum + payrollEntryAmount(r.payload), 0);
+  const advancedAllTime = (advances.data ?? []).filter((r) => r.owner_id === ownerId && r.id !== entry?.id && String(r.payload.currency ?? "TRY") === "TRY").reduce((sum, r) => sum + n(r.payload.amount), 0);
+  const paidAllTime = (payments.data ?? []).filter((r) => r.owner_id === ownerId && String(r.payload.currency ?? "TRY") === "TRY").reduce((sum, r) => sum + n(r.payload.amount), 0);
+  const availableAdvance = earnedAllTime - advancedAllTime - paidAllTime;
+  const advanceWouldExceed = entry?.kind === "advance" && String(entry.payload.currency ?? "TRY") === "TRY" && n(entry.payload.amount) > Math.max(0, availableAdvance);
 
   const first = new Date(`${month}-01T12:00:00`);
   const daysCount = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
@@ -82,6 +88,7 @@ function Payroll() {
   };
 
   function openEntry(kind: "payroll" | "advance" | "payment", date = selectedDate, record?: WorkRecord) {
+    setAdvanceConfirmed(false);
     setSelectedDate(date);
     if (record) setEntry({ kind, id: record.id, owner_id: record.owner_id, payload: { ...record.payload } });
     else if (kind === "payroll") {
@@ -113,6 +120,7 @@ function Payroll() {
     if (entry.kind === "payroll" && !String(entry.payload.workplace_name ?? "").trim()) return void toast.error("Bir işyeri seçin. Önce İşyeri sekmesinden ekleyebilirsiniz.");
     if (entry.kind === "payroll" && n(entry.payload.days) !== 0 && n(entry.payload.rate) <= 0) return void toast.error("İşyerinin ücret bilgisi sıfırdan büyük olmalı.");
     if (entry.kind !== "payroll" && n(entry.payload.amount) <= 0) return void toast.error("Tutar sıfırdan büyük olmalı.");
+    if (entry.kind === "advance" && advanceWouldExceed && !advanceConfirmed) return void toast.error("Hak edişi aşan avans için onayı işaretleyin.");
     if (entry.kind === "payroll") {
       const days = n(entry.payload.days);
       const payload = { ...entry.payload, status: days === 0 ? "İzinli" : statuses.find((s) => s.value === days)?.label, multiplier: 1 };
@@ -281,7 +289,8 @@ function Payroll() {
           <div className="rounded-2xl bg-slate-950 p-4 text-white"><p className="text-xs text-slate-300">BU ÇALIŞMA İÇİN HAK EDİLEN</p><p className="mt-1 text-2xl font-bold">{amountText(payrollEntryAmount(entry.payload), String(entry.payload.currency ?? "TRY"))}</p></div>
         </> : <>
           {me.data?.isUsta && <div className="space-y-2"><Label htmlFor="money-employee">Çalışan *</Label><select id="money-employee" className="h-11 w-full rounded-xl border bg-background px-3 text-sm" value={String(entry.owner_id || ownerId)} onChange={(e) => setEntry({ ...entry, owner_id: e.target.value })}>{members.map((m) => <option key={m.id} value={m.id}>{m.username}</option>)}</select></div>}
-          <div className="grid grid-cols-2 gap-3"><div className="space-y-2"><Label htmlFor="money-amount">Tutar *</Label><Input id="money-amount" type="number" min="0.01" step="0.01" required inputMode="decimal" value={String(entry.payload.amount ?? "")} onChange={(e) => setEntryValue("amount", e.target.value)}/></div><div className="space-y-2"><Label htmlFor="money-currency">Para birimi</Label><select id="money-currency" className="h-11 w-full rounded-xl border bg-background px-3 text-sm" value={String(entry.payload.currency ?? "TRY")} onChange={(e) => setEntryValue("currency", e.target.value)}>{CURRENCIES.map((c) => <option value={c} key={c}>{c}</option>)}</select></div></div>
+          <div className="grid grid-cols-2 gap-3"><div className="space-y-2"><Label htmlFor="money-amount">Tutar *</Label><Input id="money-amount" type="number" min="0.01" step="0.01" required inputMode="decimal" value={String(entry.payload.amount ?? "")} onChange={(e) => { setAdvanceConfirmed(false); setEntryValue("amount", e.target.value); }}/></div><div className="space-y-2"><Label htmlFor="money-currency">Para birimi</Label><select id="money-currency" className="h-11 w-full rounded-xl border bg-background px-3 text-sm" value={String(entry.payload.currency ?? "TRY")} onChange={(e) => { setAdvanceConfirmed(false); setEntryValue("currency", e.target.value); }}>{CURRENCIES.map((c) => <option value={c} key={c}>{c}</option>)}</select></div></div>
+          {entry.kind === "advance" && advanceWouldExceed && <div role="alert" className="space-y-3 rounded-xl border-2 border-amber-500/60 bg-amber-500/10 p-3 text-sm"><p className="font-semibold text-amber-800 dark:text-amber-200">Avans, mevcut hak ediş bakiyesini aşacak.</p><p className="text-xs">Kullanılabilir hak ediş: {amountText(Math.max(0, availableAdvance), String(entry.payload.currency ?? "TRY"))}. Bu avans sonrası çalışan bakiyesi eksiye düşebilir.</p><label className="flex min-h-11 items-center gap-3"><input type="checkbox" checked={advanceConfirmed} onChange={(e) => setAdvanceConfirmed(e.target.checked)}/><span>Bu avansı eksi bakiyeye rağmen onaylıyorum.</span></label></div>}
           <div className="space-y-2"><Label htmlFor="money-notes">Açıklama <span className="font-normal text-muted-foreground">(opsiyonel)</span></Label><textarea id="money-notes" className="min-h-20 w-full rounded-xl border bg-background p-3 text-sm" value={String(entry.payload.notes ?? "")} onChange={(e) => setEntryValue("notes", e.target.value)}/></div>
         </>}
       </div>}

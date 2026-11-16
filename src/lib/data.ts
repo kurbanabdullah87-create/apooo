@@ -13,6 +13,11 @@ export interface Customer {
   address: string | null;
   rating: number | null;
   notes: string | null;
+  credit_limit: number;
+  payment_due_days: number;
+  is_blocked: boolean;
+  latitude: number | null;
+  longitude: number | null;
   created_at: string;
 }
 

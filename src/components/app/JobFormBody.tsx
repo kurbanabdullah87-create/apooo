@@ -1,14 +1,20 @@
 import { AlertTriangle, Cog, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 import { RecordFields } from "@/components/app/RecordFields";
-import type { Customer } from "@/lib/data";
+import { useExpenses, type Customer } from "@/lib/data";
+import { useTransactions } from "@/lib/data";
+import { customerRestriction } from "@/lib/finance";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { jobFields, type Member } from "@/lib/job-fields";
 import {
   findMachineConflicts,
   machineChosen,
   maintenanceStatus,
+  payrollEntryAmount,
   type Payload,
   type WorkRecord,
+  useRecords,
 } from "@/lib/work";
 import { cn } from "@/lib/utils";
 
@@ -72,6 +78,7 @@ export function MachineGate({
       <div className="grid gap-2" role="radiogroup" aria-label="Kullanılacak makine">
         {equipment.map((e) => {
           const m = maintenanceStatus(e.payload);
+          const blocked = m.remaining < -5 || e.payload.maintenance_blocked === true;
           const on = form.equipment_id === e.id;
           return (
             <button
@@ -92,12 +99,16 @@ export function MachineGate({
                   "shrink-0 rounded-full px-2 py-0.5 text-[11px]",
                   m.level === "over"
                     ? "bg-destructive/20 text-destructive"
-                    : m.level === "warn"
+                    : blocked
+                      ? "bg-destructive/20 text-destructive"
+                      : m.level === "warn"
                       ? "bg-warning/20 text-warning"
                       : "text-muted-foreground",
                 )}
               >
-                {m.level === "over"
+                {blocked
+                  ? "İş atama kilidi"
+                  : m.level === "over"
                   ? "Bakım geçti"
                   : m.level === "warn"
                     ? `${m.remaining.toFixed(0)} sa kaldı`
@@ -147,6 +158,9 @@ export function JobFormBody({
   startingNow?: boolean;
   children?: ReactNode;
 }) {
+  const txs = useTransactions();
+  const payrollRows = useRecords("payroll");
+  const expenseRows = useExpenses();
   const chosen = machineChosen(form);
   const eqId = String(form.equipment_id ?? "");
   const planned = Math.max(0, Number(form.planned_hours ?? 0)) * 3600;
@@ -158,6 +172,18 @@ export function JobFormBody({
       )
     : [];
   const done = form.status === "Tamamlandı";
+  const customer = customers.find((c) => c.id === form.customer_id);
+  const customerTxs = (txs.data ?? []).filter((t) => t.customer_id === customer?.id);
+  const credit = customer ? customerRestriction(customer, customerTxs) : null;
+  const machineBlocked = Boolean(eqId) && (maintenanceStatus(equipment.find((e) => e.id === eqId)?.payload ?? {}).remaining < -5 || equipment.find((e) => e.id === eqId)?.payload.maintenance_blocked === true);
+  const hasRestrictedCustomer = Boolean(credit?.blocked);
+  const jobPrice = Number(form.price ?? 0) || Number(form.hourly_rate ?? 0) * Math.max(0, Number(form.planned_hours ?? 0));
+  const linkedPayroll = selfId ? (payrollRows.data ?? []).filter((r) => r.payload.job_id === selfId).reduce((sum, r) => sum + payrollEntryAmount(r.payload), 0) : 0;
+  const linkedExpenses = selfId ? (expenseRows.data ?? []).filter((r) => r.job_record_id === selfId).reduce((sum, r) => sum + r.amount, 0) : 0;
+  const laborCost = linkedPayroll > 0 ? linkedPayroll : Number(form.estimated_labor_cost ?? 0);
+  const otherExpenseCost = linkedExpenses > 0 ? linkedExpenses : Number(form.estimated_expense_cost ?? 0);
+  const totalCost = Number(form.material_cost ?? 0) + laborCost + otherExpenseCost;
+  const margin = jobPrice > 0 ? ((jobPrice - totalCost) / jobPrice) * 100 : null;
   return (
     <>
       <MachineGate equipment={equipment} form={form} onChange={onChange} />
@@ -188,6 +214,10 @@ export function JobFormBody({
           )}
           <h3 className="pt-1 text-sm font-semibold">2 · İş bilgileri</h3>
           <RecordFields fields={jobFields(customers, members)} value={form} onChange={onChange} />
+          {hasRestrictedCustomer && <div role="alert" className="space-y-2 rounded-xl border-2 border-destructive/70 bg-destructive/10 p-3 text-sm"><p className="font-semibold text-destructive">Cari kilidi · {customer?.name}</p><ul className="list-disc space-y-1 pl-5 text-destructive">{credit?.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul><p className="text-xs">Devam etmek için yönetici olarak istisna gerekçesini kayda yazın veya tahsilat alın.</p></div>}
+          {machineBlocked && <div role="alert" className="space-y-2 rounded-xl border-2 border-destructive/70 bg-destructive/10 p-3 text-sm"><p className="font-semibold text-destructive">Ekipman bakım kilidi</p><p className="text-xs">Bakım aralığı 5 saatten fazla aşıldı. Önce ekipman bölümünden bakım kaydı girin veya aşağıya yönetici istisna gerekçesi yazın.</p></div>}
+          {(hasRestrictedCustomer || machineBlocked) && <div className="space-y-2"><Label htmlFor="job-override-reason">Yönetici istisna gerekçesi *</Label><Textarea id="job-override-reason" required value={String(form.override_reason ?? "")} onChange={(e) => onChange({ ...form, override_reason: e.target.value })} placeholder="İstisna neden gerekli?"/></div>}
+          {margin != null && <div role={margin < 30 ? "alert" : undefined} className={`rounded-xl border p-3 text-sm ${margin < 30 ? "border-destructive/60 bg-destructive/10 text-destructive" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"}`}><p className="font-semibold">{margin < 30 ? "Düşük kârlı · zarar riski" : "Tahmini kârlılık"} · %{margin.toFixed(1)}</p><p className="mt-1 text-xs">İş tutarı {jobPrice.toLocaleString("tr-TR")} ₺ · malzeme + {linkedPayroll > 0 ? "bağlı yevmiye" : "tahmini yevmiye"} + {linkedExpenses > 0 ? "bağlı gider" : "tahmini gider"}: {totalCost.toLocaleString("tr-TR")} ₺. Maliyet iş tutarının %70’ini aşınca risk uyarısı gösterilir.</p></div>}
           {children}
         </>
       )}

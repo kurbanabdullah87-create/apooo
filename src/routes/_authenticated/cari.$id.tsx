@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   Pencil,
@@ -9,6 +9,7 @@ import {
   ArrowLeft,
   Phone,
   MapPin,
+  Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -16,9 +17,9 @@ import { CustomerForm } from "@/components/app/forms/CustomerForm";
 import { TransactionForm } from "@/components/app/forms/TransactionForm";
 import { MessageSheet } from "@/components/app/MessageSheet";
 import { useCustomers, useTransactions } from "@/lib/data";
-import { customerBalance, formatDate, formatTL, todayISO, type Tx } from "@/lib/finance";
+import { customerBalance, customerRestriction, formatDate, formatTL, todayISO, type Tx } from "@/lib/finance";
 import { buildReceipt, shareOrDownload } from "@/lib/receipt";
-import { pageHead, useRecords } from "@/lib/work";
+import { pageHead, useRecords, useSaveRecord } from "@/lib/work";
 import { buildStatementText } from "@/lib/statement";
 import { whatsappLink } from "@/lib/templates";
 export const Route = createFileRoute("/_authenticated/cari/$id")({
@@ -30,9 +31,14 @@ function CustomerDetail() {
   const customers = useCustomers();
   const txs = useTransactions();
   const settings = useRecords("settings");
+  const jobs = useRecords("job");
+  const saveJob = useSaveRecord("job");
+  const navigate = useNavigate();
   const c = customers.data?.find((c) => c.id === id);
   const rows = (txs.data ?? []).filter((t) => t.customer_id === id);
   const balance = customerBalance(rows);
+  const credit = customerRestriction(c ?? {}, rows);
+  const lastJob = (jobs.data ?? []).filter((job) => job.payload.customer_id === id).sort((a, b) => String(b.payload.date ?? b.created_at).localeCompare(String(a.payload.date ?? a.created_at)))[0];
   const [edit, setEdit] = useState(false);
   const [kind, setKind] = useState<"debt" | "payment">("debt");
   const [open, setOpen] = useState(false);
@@ -162,6 +168,10 @@ function CustomerDetail() {
           Tahsilat
         </Button>
       </div>
+      {lastJob && <Button variant="outline" className="h-12 w-full" disabled={saveJob.isPending || credit.blocked} onClick={() => {
+        saveJob.mutate({ owner_id: lastJob.owner_id, payload: { ...lastJob.payload, customer_id: id, date: todayISO(), status: "Bekliyor", seconds: 0, started_at: null, billed: false, appointment_id: null, override_reason: "" } }, { onSuccess: () => { toast.success("Son işin bilgileri yeni işe kopyalandı."); void navigate({ to: "/isler" }); } });
+      }}><Copy/>Son işlemi tekrar et</Button>}
+      {credit.blocked && <p role="alert" className="rounded-xl border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive">Cari kilidi açık. Yeni iş için önce tahsilat alın veya iş ekranında gerekçeli yönetici istisnası girin.</p>}
       {file && (
         <Button className="w-full" onClick={() => void shareOrDownload(file)}>
           <Download />

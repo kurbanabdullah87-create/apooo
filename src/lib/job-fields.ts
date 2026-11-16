@@ -26,6 +26,8 @@ export function jobFields(customers: Customer[], members: Member[]): Field[] {
     { key: "hourly_rate", label: "Saatlik ücret (TL)", type: "number" },
     { key: "price", label: "Sabit iş ücreti (TL)", type: "number" },
     { key: "material_cost", label: "Malzeme maliyeti (TL)", type: "number" },
+    { key: "estimated_labor_cost", label: "Tahmini yevmiye maliyeti (TL)", type: "number" },
+    { key: "estimated_expense_cost", label: "Tahmini diğer gider (TL)", type: "number" },
     {
       key: "vat_rate",
       label: "KDV",

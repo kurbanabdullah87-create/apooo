@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useMe } from "@/hooks/use-me";
 import type { WorkRecord, Payload } from "@/lib/work";
+import { Input } from "@/components/ui/input";
 export function MediaTools({
   record,
   onSave,
@@ -207,4 +208,34 @@ export function MediaTools({
       {urls["audio"] && <audio controls src={urls["audio"]} className="w-full" />}
     </div>
   );
+}
+
+/** Receipt image uploader for finance records. Files remain in the private saha-media bucket. */
+export function ReceiptPhotoField({ recordId, value, onChange }: { recordId: string; value?: string | null; onChange: (path: string | null) => void }) {
+  const me = useMe();
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [signedUrl, setSignedUrl] = useState("");
+  useEffect(() => {
+    let alive = true;
+    if (value) void supabase.storage.from("saha-media").createSignedUrl(value, 3600).then(({ data }) => { if (alive) setSignedUrl(data?.signedUrl ?? ""); });
+    else setSignedUrl("");
+    return () => { alive = false; };
+  }, [value]);
+  async function upload(file?: File) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return void toast.error("Fiş için resim dosyası seçin.");
+    if (file.size > 10 * 1024 * 1024) return void toast.error("Fiş fotoğrafı 10 MB'dan küçük olmalı.");
+    const teamId = me.data?.profile?.team_id;
+    if (!teamId) return void toast.error("Ekip bilgisi alınamadı.");
+    const path = `${teamId}/${recordId}/receipt-${crypto.randomUUID()}`;
+    setBusy(true);
+    try {
+      const { error } = await supabase.storage.from("saha-media").upload(path, file, { contentType: file.type, upsert: false });
+      if (error) throw error;
+      onChange(path); toast.success("Fiş fotoğrafı güvenli depoya yüklendi.");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Fiş yüklenemedi."); }
+    finally { setBusy(false); }
+  }
+  return <div className="space-y-2 rounded-xl border p-3"><div className="flex items-center justify-between gap-2"><div><p className="text-sm font-medium">Fiş / fatura fotoğrafı</p><p className="text-xs text-muted-foreground">Özel depoda saklanır, yalnız ekip üyeleri açabilir.</p></div><Button type="button" variant="secondary" size="sm" disabled={busy} onClick={() => input.current?.click()}><Camera/>{busy ? "Yükleniyor…" : value ? "Değiştir" : "Fotoğraf ekle"}</Button></div><Input ref={input} className="hidden" type="file" accept="image/*" capture="environment" onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = ""; }}/>{signedUrl && <img src={signedUrl} alt="Yüklenen fiş" className="max-h-56 w-full rounded-lg border object-contain"/>}{value && <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => onChange(null)}><Trash2/>Fiş fotoğrafını kaldır</Button>}</div>;
 }

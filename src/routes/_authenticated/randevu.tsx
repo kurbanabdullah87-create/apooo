@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Archive, Bell, CalendarDays, ChevronLeft, ChevronRight, MessageCircle, Phone, Play, Plus, Search, Trash2, Undo2 } from "lucide-react";
+import { Archive, Bell, CalendarDays, ChevronLeft, ChevronRight, Download, MessageCircle, Phone, Play, Plus, Search, Trash2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,12 +11,16 @@ import { JobFormBody } from "@/components/app/JobFormBody";
 import { SwipeRow } from "@/components/app/SwipeRow";
 import { useMe } from "@/hooks/use-me";
 import { useCustomers } from "@/lib/data";
-import { formatDate, todayISO } from "@/lib/finance";
+import { customerBalance, formatDate, todayISO, type Tx } from "@/lib/finance";
 import { useMembers } from "@/lib/job-fields";
 import { persistWrite } from "@/lib/offline";
 import { REMIND_OPTIONS, apptStart, askNotifyPermission, notifySupported } from "@/lib/reminders";
 import { whatsappLink } from "@/lib/templates";
 import { appointmentReminderText } from "@/lib/statement";
+import { useTransactions } from "@/lib/data";
+import { customerRestriction } from "@/lib/finance";
+import { Textarea } from "@/components/ui/textarea";
+import { buildReceipt, shareOrDownload } from "@/lib/receipt";
 import { pageHead, useRecords, useSaveRecord, validateJobForm, type Payload, type WorkRecord } from "@/lib/work";
 
 export const Route = createFileRoute("/_authenticated/randevu")({
@@ -31,6 +35,7 @@ const empty = (): Payload => ({ name: "", phone: "", date: todayISO(), time: "09
 function Appointments() {
   const recs = useRecords("appointment");
   const customers = useCustomers();
+  const transactions = useTransactions();
   const save = useSaveRecord("appointment");
   const saveJob = useSaveRecord("job");
   const members = useMembers();
@@ -47,6 +52,7 @@ function Appointments() {
   const [day, setDay] = useState(todayISO());
   const [edit, setEdit] = useState<{ id?: string; owner_id?: string; payload: Payload } | null>(null);
   const [job, setJob] = useState<{ appt: WorkRecord; form: Payload } | null>(null);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [now, setNow] = useState(Date.now());
   const [perm, setPerm] = useState(notifySupported() ? Notification.permission : "denied");
 
@@ -149,6 +155,10 @@ function Appointments() {
     if (!edit) return;
     const p = edit.payload;
     if (!norm(p.name)) return void toast.error("İsim gerekli");
+    const selectedCustomer = (customers.data ?? []).find((customer) => customer.id === p.customer_id);
+    const customerTxs = (transactions.data ?? []).filter((tx) => tx.customer_id === selectedCustomer?.id);
+    const credit = selectedCustomer ? customerRestriction(selectedCustomer, customerTxs) : null;
+    if (credit?.blocked && !String(p.override_reason ?? "").trim()) return void toast.error("Cari kilitli. Tahsilat alın veya yönetici istisna gerekçesini yazın.");
     const clash = (recs.data ?? []).find(
       (r) => r.id !== edit.id && !r.payload.archived && r.payload.status === "Bekliyor" && r.payload.date === p.date && r.payload.time === p.time,
     );
@@ -168,6 +178,8 @@ function Appointments() {
         equipment_id: null,
         address: c?.address ?? "",
         notes: String(a.payload.notes ?? ""),
+        override_reason: String(a.payload.override_reason ?? ""),
+        price: Number(a.payload.price ?? 0),
         vat_rate: 0,
         seconds: 0,
       },
@@ -194,6 +206,34 @@ function Appointments() {
     }
   }
 
+  async function completeAppointment(a: WorkRecord) {
+    const customer = (customers.data ?? []).find((c) => c.id === a.payload.customer_id);
+    if (!customer) {
+      toast.error("Önce randevuyu kayıtlı bir müşteriyle eşleştirin.");
+      setEdit({ id: a.id, owner_id: a.owner_id, payload: { ...a.payload } });
+      return;
+    }
+    if (Number(a.payload.price ?? 0) <= 0) {
+      toast.error("Önce randevuya tahsil edilecek iş tutarını girin.");
+      setEdit({ id: a.id, owner_id: a.owner_id, payload: { ...a.payload } });
+      return;
+    }
+    try {
+      const { data: transactionId, error } = await supabase.rpc("complete_appointment", { _appointment_id: a.id });
+      if (error) throw error;
+      await Promise.all([qc.invalidateQueries({ queryKey: ["work"] }), qc.invalidateQueries({ queryKey: ["transactions"] })]);
+      const { data: row, error: txError } = await supabase.from("transactions").select("*").eq("id", transactionId).single();
+      if (txError) throw txError;
+      const tx = { ...row, amount: Number(row.amount), material_cost: Number(row.material_cost), vat_rate: Number(row.vat_rate) } as Tx;
+      const customerRows = (transactions.data ?? []).filter((item) => item.customer_id === customer.id);
+      const file = await buildReceipt({ profile: profile ?? {}, customer, tx, balance: customerBalance([...customerRows, tx]) });
+      setReceiptFile(file);
+      toast.success("İş tamamlandı ve müşteri carisine işlendi. Makbuz hazır.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Randevu tamamlanamadı.");
+    }
+  }
+
   const today = todayISO();
   const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
   const activeAppointments = (recs.data ?? []).filter((r) => !r.payload.archived && r.payload.status === "Bekliyor");
@@ -205,6 +245,9 @@ function Appointments() {
   const calendarOffset = (calendarStart.getDay() + 6) % 7;
   const calendarDays = new Date(calendarStart.getFullYear(), calendarStart.getMonth() + 1, 0).getDate();
   const upd = (k: string, v: string) => setEdit((s) => s && { ...s, payload: { ...s.payload, [k]: v } });
+  const appointmentCustomer = customers.data?.find((customer) => customer.id === edit?.payload.customer_id);
+  const appointmentCustomerTransactions = (transactions.data ?? []).filter((tx) => tx.customer_id === appointmentCustomer?.id);
+  const appointmentCredit = appointmentCustomer ? customerRestriction(appointmentCustomer, appointmentCustomerTransactions) : null;
 
   return (
     <div className="space-y-4">
@@ -309,7 +352,7 @@ function Appointments() {
             const due = r.payload.status === "Bekliyor" && now >= apptStart(r.payload);
             const phone = String(r.payload.phone ?? "");
             return (
-              <SwipeRow key={r.id} onDelete={() => (view === "archive" ? purge(r) : setArchived(r, true))}>
+              <SwipeRow key={r.id} onDelete={() => (view === "archive" ? purge(r) : setArchived(r, true))} onComplete={view !== "archive" && me.data?.isUsta && r.payload.status !== "Tamamlandı" ? () => void completeAppointment(r) : undefined}>
                 <div className="space-y-3 p-4">
                   <button type="button" className="flex w-full items-center justify-between gap-3 text-left" onClick={() => setEdit({ id: r.id, owner_id: r.owner_id, payload: r.payload })}>
                     <div className="min-w-0 flex-1">
@@ -401,6 +444,9 @@ function Appointments() {
               <Label htmlFor="ap-title">Konu</Label>
               <Input id="ap-title" value={String(edit.payload.title ?? "")} onChange={(e) => upd("title", e.target.value)} />
             </div>
+            <div className="space-y-2"><Label htmlFor="ap-price">Tahmini iş tutarı (₺)</Label><Input id="ap-price" type="number" min="0" step="0.01" value={String(edit.payload.price ?? "")} onChange={(e) => upd("price", e.target.value)}/></div>
+            <label className="flex min-h-12 items-center gap-3 rounded-xl border px-3"><input type="checkbox" checked={edit.payload.outdoor === true} onChange={(e) => setEdit((current) => current && ({ ...current, payload: { ...current.payload, outdoor: e.target.checked } }))}/><span className="text-sm">Açık alan randevusu</span></label>
+            {appointmentCredit?.blocked && <div role="alert" className="space-y-2 rounded-xl border-2 border-destructive/70 bg-destructive/10 p-3 text-sm"><p className="font-semibold text-destructive">Cari kilidi · {appointmentCustomer?.name}</p><ul className="list-disc pl-5 text-destructive">{appointmentCredit.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul><p className="text-xs">Randevuyu kaydetmek için tahsilat alın veya yönetici istisna gerekçesi yazın.</p><Textarea required aria-label="Yönetici istisna gerekçesi" value={String(edit.payload.override_reason ?? "")} onChange={(e) => upd("override_reason", e.target.value)} placeholder="İstisna gerekçesi"/></div>}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="ap-remind">Hatırlat</Label>
@@ -429,6 +475,9 @@ function Appointments() {
 
       <FormDrawer open={!!job} onOpenChange={(o) => !o && setJob(null)} title="İşi başlat" busy={saveJob.isPending} onSubmit={() => void startJob()}>
         {job && <JobFormBody form={job.form} onChange={(form) => setJob({ ...job, form })} customers={customers.data ?? []} members={members} equipment={equipment.data ?? []} jobs={jobsAll.data ?? []} startingNow />}
+      </FormDrawer>
+      <FormDrawer open={Boolean(receiptFile)} onOpenChange={(o) => !o && setReceiptFile(null)} title="İş makbuzu hazır" submitLabel="Makbuzu paylaş / indir" onSubmit={() => { if (receiptFile) void shareOrDownload(receiptFile).then(() => setReceiptFile(null)); }}>
+        <div className="space-y-3 rounded-2xl border bg-card p-4"><div className="flex items-center gap-3"><div className="rounded-xl bg-emerald-500/10 p-3 text-emerald-700"><Download/></div><div><p className="font-semibold">Cari borç işlendi</p><p className="text-sm text-muted-foreground">Makbuz PDF’i oluşturuldu. Paylaşım ekranını açmak için alttaki düğmeye dokunun.</p></div></div>{receiptFile && <p className="text-xs text-muted-foreground">{receiptFile.name} · {Math.max(1, Math.round(receiptFile.size / 1024))} KB</p>}</div>
       </FormDrawer>
     </div>
   );

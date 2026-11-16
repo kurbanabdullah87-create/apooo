@@ -1,11 +1,11 @@
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
-import { LayoutDashboard, Users, Receipt, Settings, Plus, Search, Loader2, ArrowDown, HardHat, CalendarDays, Wrench, CalendarClock, Cloud, ShoppingCart, Landmark } from "lucide-react";
+import { LayoutDashboard, Users, Receipt, Settings, Plus, Search, Loader2, ArrowDown, HardHat, CalendarDays, Wrench, CalendarClock, Cloud, CloudUpload, ShoppingCart, Landmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DeviceLock } from "./DeviceLock";
 import { useEffect } from "react";
-import { flushQueue } from "@/lib/offline";
+import { flushQueue, pendingCount } from "@/lib/offline";
 import { cn } from "@/lib/utils";
 import { haptic } from "@/lib/haptic";
 import { useMe } from "@/hooks/use-me";
@@ -36,6 +36,7 @@ export function AppShell() {
   const [addOpen, setAddOpen] = useState(false);
   const [pull, setPull] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [queuedWrites, setQueuedWrites] = useState(0);
   const startY = useRef<number | null>(null);
 
   const isUsta = me.data?.isUsta ?? false;
@@ -48,6 +49,15 @@ export function AppShell() {
     if (me.data) sync();
     return () => { window.removeEventListener("online", sync); window.removeEventListener("saha-synced", refresh); };
   }, [me.data?.id, qc]);
+  useEffect(() => {
+    let active = true;
+    const update = () => void pendingCount().then((n) => { if (active) setQueuedWrites(n); }).catch(() => {});
+    update();
+    window.addEventListener("saha-queue", update);
+    window.addEventListener("saha-synced", update);
+    window.addEventListener("online", update);
+    return () => { active = false; window.removeEventListener("saha-queue", update); window.removeEventListener("saha-synced", update); window.removeEventListener("online", update); };
+  }, [me.data?.id]);
 
   async function refresh() {
     setRefreshing(true);
@@ -65,6 +75,7 @@ export function AppShell() {
         >
           <Search className="size-4" /><span className="truncate">Saha · Ara</span>
         </Button>{isUsta&&<Button asChild variant="ghost" size="icon" title="Randevular"><Link to="/randevu"><CalendarClock/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Hava Durumu"><Link to="/hava"><Cloud/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Hesap hareketleri"><Link to="/banka"><Landmark/></Link></Button>{isUsta&&<Button asChild variant="ghost" size="icon" title="Giderler"><Link to="/giderler"><Receipt/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Ayarlar"><Link to="/ayarlar"><Settings/></Link></Button></div>
+        {queuedWrites > 0 && <div className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-warning" role="status"><CloudUpload className="size-3.5"/>{queuedWrites} çevrimdışı kayıt senkronizasyon bekliyor</div>}
       </header>
 
       <main

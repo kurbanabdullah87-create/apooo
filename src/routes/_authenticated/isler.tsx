@@ -9,7 +9,7 @@ import { JobFormBody, MachineInfo } from "@/components/app/JobFormBody";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MediaTools } from "@/components/app/MediaTools";
-import { useCustomers } from "@/lib/data";
+import { useCustomers, useExpenses } from "@/lib/data";
 import { useMembers } from "@/lib/job-fields";
 import { RouteButtons } from "@/components/app/RouteButtons";
 import { LocationButton } from "@/components/app/LocationButton";
@@ -21,6 +21,7 @@ import {
   useSaveRecord,
   elapsedSeconds,
   hourlyCharge,
+  payrollEntryAmount,
   maintenanceStatus,
   validateJobForm,
   pageHead,
@@ -28,6 +29,7 @@ import {
   type WorkRecord,
 } from "@/lib/work";
 import { todayISO, formatTL } from "@/lib/finance";
+import { applyVoiceJob, parseVoiceJob } from "@/lib/voice-job";
 
 export const Route = createFileRoute("/_authenticated/isler")({
   head: () => pageHead("İşler", "İş planı, çalışma süreleri ve saha kayıtları."),
@@ -42,6 +44,8 @@ function Jobs() {
   const saveTemplate = useSaveRecord("job_template");
   const save = useSaveRecord("job");
   const customers = useCustomers();
+  const payrollRows = useRecords("payroll");
+  const expenses = useExpenses();
   const equipment = useRecords("equipment");
   const me = useMe();
   const qc = useQueryClient();
@@ -376,16 +380,25 @@ function Jobs() {
           const v = validateJobForm(form, equipment.data ?? [], jobs.data ?? [], editing?.id);
           if (v.error) return void toast.error(v.error);
           v.warnings.forEach((w) => toast.warning(w));
+          const quote = Number(form.price ?? 0) || Number(form.hourly_rate ?? 0) * Number(form.planned_hours ?? 0);
+          const linkedLabor = editing ? (payrollRows.data ?? []).filter((r) => r.payload.job_id === editing.id).reduce((sum, r) => sum + payrollEntryAmount(r.payload), 0) : 0;
+          const linkedExpense = editing ? (expenses.data ?? []).filter((r) => r.job_record_id === editing.id).reduce((sum, r) => sum + r.amount, 0) : 0;
+          const costs = Number(form.material_cost ?? 0) + (linkedLabor || Number(form.estimated_labor_cost ?? 0)) + (linkedExpense || Number(form.estimated_expense_cost ?? 0));
+          const estimated_profit_margin = quote > 0 ? Math.round(((quote - costs) / quote) * 10000) / 100 : null;
           const { owner_id, ...payload } = form;
           save.mutate(
-            { id: editing?.id, owner_id: String(owner_id ?? me.data?.id), payload },
+            { id: editing?.id, owner_id: String(owner_id ?? me.data?.id), payload: { ...payload, estimated_profit_margin } },
             { onSuccess: () => setOpen(false) },
           );
         }}
       >
         <JobFormBody form={form} onChange={setForm} customers={customers.data ?? []} members={members} equipment={equipment.data ?? []} jobs={jobs.data ?? []} selfId={editing?.id}>
           <LocationButton value={form} onChange={setForm} />
-          <VoiceNoteButton onText={(t) => setForm((f) => ({ ...f, notes: [f.notes, t].filter(Boolean).join(" ") }))} />
+          <VoiceNoteButton onText={(t) => {
+            const draft = parseVoiceJob(t, customers.data ?? []);
+            setForm((current) => applyVoiceJob(current, draft));
+            toast.success(`Sesli taslak dolduruldu${draft.customer ? ` · ${draft.customer.name}` : ""}${draft.plannedHours ? ` · ${draft.plannedHours} sa` : ""}${draft.price ? ` · ${formatTL(draft.price)}` : ""}`);
+          }} />
         </JobFormBody>
       </FormDrawer>
       <FormDrawer

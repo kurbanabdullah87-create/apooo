@@ -1,12 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { Plus, PieChart } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Plus, PieChart, ReceiptText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ExpenseForm } from "@/components/app/forms/ExpenseForm";
 import { SwipeRow } from "@/components/app/SwipeRow";
 import { useExpenses, useUndoableDelete } from "@/lib/data";
 import { EXPENSE_LABELS, formatDate, formatTL, todayISO } from "@/lib/finance";
 import { pageHead } from "@/lib/work";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/giderler")({
   head: () => pageHead("Giderler", "Yakıt, yemek, hırdavat ve vergi giderleri."),
@@ -72,11 +73,11 @@ function Expenses() {
           <div className="flex items-center justify-between gap-3 p-4">
             <div className="min-w-0 flex-1">
               <p className="font-medium">{EXPENSE_LABELS[e.category]}</p>
-              <p className="text-xs text-muted-foreground">
-                {formatDate(e.occurred_on)} · {e.description}
-              </p>
+              <p className="text-xs text-muted-foreground">{formatDate(e.occurred_on)} · {e.description}</p>
+              {e.job_record_id && <p className="text-[11px] text-primary">İş bağlantısı · kârlılık hesabına dahil</p>}
             </div>
             <div className="flex items-center gap-3">
+              {e.receipt_photo_url && <ReceiptPreview path={e.receipt_photo_url}/>}
               <span className="num text-destructive">{formatTL(e.amount)}</span>
               <Button
                 variant="ghost"
@@ -96,4 +97,11 @@ function Expenses() {
       <ExpenseForm open={open} onOpenChange={setOpen} />
     </div>
   );
+}
+
+function ReceiptPreview({ path }: { path: string }) {
+  const [url, setUrl] = useState("");
+  useEffect(() => { let active = true; void supabase.storage.from("saha-media").createSignedUrl(path, 3600).then(({ data }) => { if (active) setUrl(data?.signedUrl ?? ""); }); return () => { active = false; }; }, [path]);
+  if (!url) return null;
+  return <Button asChild size="icon" variant="ghost" title="Fiş fotoğrafını görüntüle" aria-label="Fiş fotoğrafını görüntüle"><a href={url} target="_blank" rel="noreferrer"><ReceiptText/></a></Button>;
 }

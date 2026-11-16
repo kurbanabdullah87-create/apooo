@@ -209,6 +209,7 @@ function Equipment() {
             const seconds = elapsedSeconds(p, now); // yalnızca elle kronometre
             const total = machineSeconds(p, now); // kronometre + tamamlanan işler
             const m = maintenanceStatus(p, now);
+            const blocked = m.remaining < -5 || p.maintenance_blocked === true;
             const mine = (jobs.data ?? []).filter((j) => j.payload.equipment_id === item.id && j.payload.billed);
             const earned = mine.reduce((t, j) => t + (Number(j.payload.hourly_rate) > 0 ? hourlyCharge(Number(j.payload.seconds ?? 0), Number(j.payload.hourly_rate)) : Number(j.payload.price ?? 0)), 0);
             const price = Number(p.price ?? 0);
@@ -242,7 +243,8 @@ function Equipment() {
                   </div>
                 </div>
                 <p className="num text-lg">{(total / 3600).toFixed(2)} saat <span className="text-xs text-muted-foreground">toplam çalışma</span></p>
-                {m.level === "over" && <p className="rounded-md bg-destructive/10 p-2 text-sm font-semibold text-destructive">🔴 Bakım zamanı geçti ({(-m.remaining).toFixed(1)} saat) — yağ / motor bakımı yapın</p>}
+                {blocked && <p role="alert" className="rounded-md bg-destructive/10 p-2 text-sm font-semibold text-destructive">🔒 İş atama kilidi · eşik 5 saatten fazla aşıldı. Bakım kaydı girin.</p>}
+                {!blocked && m.level === "over" && <p className="rounded-md bg-warning/10 p-2 text-sm font-semibold text-warning">🔴 Bakım zamanı geçti ({(-m.remaining).toFixed(1)} saat) — bakım planlayın</p>}
                 {m.level === "warn" && <p className="rounded-md bg-warning/10 p-2 text-sm font-semibold text-warning">🟡 Bakım yaklaşıyor: {m.remaining.toFixed(1)} saat kaldı</p>}
                 <div className="h-1.5 overflow-hidden rounded-full bg-secondary"><div className={"h-full " + (m.level === "over" ? "bg-destructive" : m.level === "warn" ? "bg-warning" : "bg-primary")} style={{ width: `${Math.min(100, m.ratio * 100)}%` }} /></div>
                 {mine.length > 0 && (
@@ -285,7 +287,7 @@ function Equipment() {
                   {p.started_at ? <Pause /> : <Play />}
                   {p.started_at ? "Durdur" : "Çalıştır"}
                 </Button>
-                {(m.level === "warn" || m.level === "over") && (
+                {(m.level === "warn" || m.level === "over" || blocked) && (
                   <Button variant="outline" size="sm" className="ml-2" onClick={() => setSelected(item.id)}>
                     <Wrench /> Bakım kaydı gir
                   </Button>

@@ -38,6 +38,7 @@ function Settings() {
   const [busy, setBusy] = useState(false);
   const [linkBusy, setLinkBusy] = useState(false);
   const [count, setCount] = useState(0);
+  const [fieldMode, setFieldMode] = useState(() => { try { return localStorage.getItem("saha-field-mode") === "sunlight"; } catch { return false; } });
   useEffect(() => {
     if (settings.data?.[0]) setForm(settings.data[0].payload);
   }, [settings.data]);
@@ -46,6 +47,10 @@ function Settings() {
       .then(setCount)
       .catch(() => {});
   }, []);
+  useEffect(() => {
+    document.documentElement.dataset.fieldMode = fieldMode ? "sunlight" : "standard";
+    try { localStorage.setItem("saha-field-mode", fieldMode ? "sunlight" : "standard"); } catch { /* device storage can be disabled */ }
+  }, [fieldMode]);
   const completed = (jobs.data ?? []).filter((j) => j.payload.status === "Tamamlandı").length;
   const income = (txs.data ?? [])
     .filter((t) => t.kind === "payment" && t.occurred_on.startsWith(todayISO().slice(0, 7)))
@@ -64,6 +69,7 @@ function Settings() {
         <>
           <section className="space-y-3">
             <h2 className="font-semibold">İşletme</h2>
+            <label className="flex min-h-14 items-center justify-between gap-3 rounded-2xl border bg-card p-3"><span><span className="block font-semibold">Saha modu · yüksek kontrast</span><span className="text-xs text-muted-foreground">Güneş ışığında daha net metin ve kenarlıklar</span></span><input type="checkbox" checked={fieldMode} onChange={(e) => setFieldMode(e.target.checked)}/></label>
             <Label htmlFor="business">Makbuz işletme adı</Label>
             <Input
               id="business"

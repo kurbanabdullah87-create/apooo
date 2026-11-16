@@ -18,6 +18,8 @@ export interface Expense {
   amount: number;
   occurred_on: string;
   description?: string | null;
+  receipt_photo_url?: string | null;
+  job_record_id?: string | null;
 }
 
 export type ExpenseCategory = "yakit" | "yemek" | "hirdavat" | "vergi" | "diger";
@@ -61,7 +63,7 @@ function daysBetween(a: string, b: Date) {
  * FIFO: payments settle oldest debts first. Returns unpaid portion of debts
  * older than OVERDUE_DAYS.
  */
-export function overdueAmount(txs: Tx[], today: Date = new Date()): number {
+export function overdueAmount(txs: Tx[], today: Date = new Date(), dueDays = OVERDUE_DAYS): number {
   const sorted = [...txs].sort((a, b) => a.occurred_on.localeCompare(b.occurred_on));
   let paid = sorted.filter((t) => t.kind === "payment").reduce((s, t) => s + Number(t.amount), 0);
   let overdue = 0;
@@ -70,9 +72,22 @@ export function overdueAmount(txs: Tx[], today: Date = new Date()): number {
     const covered = Math.min(paid, Number(t.amount));
     paid -= covered;
     const open = Number(t.amount) - covered;
-    if (open > 0 && daysBetween(t.occurred_on, today) > OVERDUE_DAYS) overdue += open;
+    if (open > 0 && daysBetween(t.occurred_on, today) > dueDays) overdue += open;
   }
   return round2(overdue);
+}
+
+export function customerRestriction(customer: { is_blocked?: boolean; credit_limit?: number; payment_due_days?: number }, txs: Tx[]) {
+  const balance = customerBalance(txs);
+  const overdue = overdueAmount(txs, new Date(), customer.payment_due_days ?? 15);
+  const creditLimit = Number(customer.credit_limit ?? 0);
+  const blocked = Boolean(customer.is_blocked) || balance > creditLimit || overdue > 0;
+  const reasons = [
+    customer.is_blocked ? "Cari kartı yönetici tarafından bloke edilmiş" : "",
+    balance > creditLimit ? `Bakiye ${formatTL(balance)} kredi limitini (${formatTL(creditLimit)}) aşıyor` : "",
+    overdue > 0 ? `${formatTL(overdue)} tutarında vadesi geçmiş alacak var` : "",
+  ].filter(Boolean);
+  return { blocked, balance, creditLimit, overdue, reasons };
 }
 
 export function monthKey(date: string) {

@@ -2,6 +2,13 @@ import type { Payload } from "@/lib/work";
 
 export interface Coords { lat: number; lng: number }
 
+export function distanceMeters(a: Coords, b: Coords) {
+  const rad = (degree: number) => degree * Math.PI / 180;
+  const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 6_371_000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
 export function getPosition(timeoutMs = 10_000): Promise<Coords> {
   return new Promise((resolve, reject) => {
     if (!("geolocation" in navigator)) return reject(new Error("Konum desteklenmiyor"));
