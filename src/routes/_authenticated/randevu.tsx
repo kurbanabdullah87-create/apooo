@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Archive, Bell, ChevronLeft, ChevronRight, MessageCircle, Phone, Play, Plus, Search, Trash2, Undo2 } from "lucide-react";
+import { Archive, Bell, CalendarDays, ChevronLeft, ChevronRight, MessageCircle, Phone, Play, Plus, Search, Trash2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,7 +43,7 @@ function Appointments() {
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<string>("");
-  const [view, setView] = useState<"all" | "day" | "archive">("all");
+  const [view, setView] = useState<"all" | "day" | "month" | "archive">("all");
   const [day, setDay] = useState(todayISO());
   const [edit, setEdit] = useState<{ id?: string; owner_id?: string; payload: Payload } | null>(null);
   const [job, setJob] = useState<{ appt: WorkRecord; form: Payload } | null>(null);
@@ -71,7 +71,8 @@ function Appointments() {
           !!r.payload.archived === (view === "archive") &&
           (!needle || norm(r.payload.name).includes(needle)) &&
           (view === "archive" || !status || r.payload.status === status) &&
-          (view !== "day" || r.payload.date === day),
+          (view !== "day" || r.payload.date === day) &&
+          (view !== "month" || String(r.payload.date ?? "").startsWith(day.slice(0, 7))),
       )
       .sort((a, b) => {
         const k = `${a.payload.date}${a.payload.time}`.localeCompare(`${b.payload.date}${b.payload.time}`);
@@ -195,18 +196,31 @@ function Appointments() {
 
   const today = todayISO();
   const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+  const activeAppointments = (recs.data ?? []).filter((r) => !r.payload.archived && r.payload.status === "Bekliyor");
+  const todayAppointments = activeAppointments.filter((r) => r.payload.date === today).length;
+  const upcomingAppointments = activeAppointments.filter((r) => String(r.payload.date ?? "") > today).length;
   const tomorrowList = (recs.data ?? []).filter((r) => !r.payload.archived && r.payload.status === "Bekliyor" && r.payload.date === tomorrow);
+  const calendarMonth = day.slice(0, 7);
+  const calendarStart = new Date(`${calendarMonth}-01T12:00:00`);
+  const calendarOffset = (calendarStart.getDay() + 6) % 7;
+  const calendarDays = new Date(calendarStart.getFullYear(), calendarStart.getMonth() + 1, 0).getDate();
   const upd = (k: string, v: string) => setEdit((s) => s && { ...s, payload: { ...s.payload, [k]: v } });
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Randevular</h1>
-        <Button onClick={() => setEdit({ payload: empty() })}>
+      <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-violet-950 p-5 text-white shadow-lg sm:p-7">
+        <div className="absolute -right-12 -top-16 size-56 rounded-full bg-violet-400/10 blur-3xl" />
+        <div className="relative flex flex-wrap items-start justify-between gap-4">
+          <div><p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[.2em] text-violet-300"><CalendarDays className="size-4"/>SAHA · PLANLAMA</p><h1 className="mt-2 text-2xl font-bold sm:text-3xl">Randevu takvimi</h1><p className="mt-1 text-sm text-slate-300">Gününü planla, müşteriye hatırlat ve randevudan iş kaydı başlat.</p></div>
+          <Button className="bg-white text-slate-950 hover:bg-slate-100" onClick={() => setEdit({ payload: empty() })}>
           <Plus />
-          Randevu
-        </Button>
-      </div>
+          Yeni randevu
+          </Button>
+        </div>
+        <div className="relative mt-5 grid grid-cols-3 gap-2 sm:gap-3">
+          {[["Bugün", todayAppointments, "text-violet-200"], ["Bekleyen", activeAppointments.length, "text-amber-200"], ["İleri tarih", upcomingAppointments, "text-emerald-200"]].map(([label, count, tone]) => <div key={String(label)} className="rounded-2xl border border-white/10 bg-white/[.06] p-3"><p className="text-xs text-slate-300">{label}</p><p className={`mt-1 text-xl font-bold ${tone}`}>{count}</p></div>)}
+        </div>
+      </header>
 
       {notifySupported() && perm !== "granted" && (
         <Button
@@ -244,10 +258,20 @@ function Appointments() {
       <div className="grid grid-cols-3 gap-2">
         <Button size="sm" variant={view === "all" ? "default" : "secondary"} onClick={() => setView("all")}>Tüm tarihler</Button>
         <Button size="sm" variant={view === "day" ? "default" : "secondary"} onClick={() => setView("day")}>Gün gün</Button>
+        <Button size="sm" variant={view === "month" ? "default" : "secondary"} onClick={() => setView("month")}>Takvim</Button>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
         <Button size="sm" variant={view === "archive" ? "default" : "secondary"} onClick={() => setView("archive")}>
           <Archive /> Arşiv{archivedCount ? ` (${archivedCount})` : ""}
         </Button>
+        <span className="flex items-center justify-end px-2 text-xs text-muted-foreground">{rows.length} randevu gösteriliyor</span>
       </div>
+
+      {view === "month" && <section className="space-y-3 rounded-2xl border bg-card p-3 sm:p-4">
+        <div className="flex items-center justify-between"><Button variant="secondary" size="icon" aria-label="Önceki ay" onClick={() => { const d = new Date(`${calendarMonth}-01T12:00:00`); d.setMonth(d.getMonth() - 1); setDay(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`); }}><ChevronLeft/></Button><h2 className="font-semibold capitalize">{calendarStart.toLocaleDateString("tr-TR", { month: "long", year: "numeric" })}</h2><Button variant="secondary" size="icon" aria-label="Sonraki ay" onClick={() => { const d = new Date(`${calendarMonth}-01T12:00:00`); d.setMonth(d.getMonth() + 1); setDay(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`); }}><ChevronRight/></Button></div>
+        <div className="grid grid-cols-7 gap-1">{["Pt", "Sa", "Ça", "Pe", "Cu", "Ct", "Pa"].map((x) => <span key={x} className="py-1 text-center text-[10px] font-semibold text-muted-foreground">{x}</span>)}{Array.from({ length: calendarOffset }, (_, i) => <span key={`blank-${i}`}/>)}{Array.from({ length: calendarDays }, (_, i) => { const date = `${calendarMonth}-${String(i + 1).padStart(2, "0")}`; const count = (recs.data ?? []).filter((r) => !r.payload.archived && r.payload.date === date).length; return <button type="button" key={date} onClick={() => { setDay(date); setView("day"); }} className={`min-h-14 rounded-xl border p-1 text-left text-xs transition hover:border-violet-500 ${date === today ? "border-violet-500 bg-violet-500/10" : "border-border"}`}><span className="font-semibold">{i + 1}</span>{count > 0 && <span className="mt-1 block truncate rounded-md bg-violet-500/15 px-1 text-[9px] font-semibold text-violet-700 dark:text-violet-300">{count} randevu</span>}</button>; })}</div>
+        <p className="text-xs text-muted-foreground">Bir güne dokunarak o günün randevularını açın.</p>
+      </section>}
 
       {view === "day" && (
         <div className="flex items-center gap-2">
@@ -258,7 +282,7 @@ function Appointments() {
         </div>
       )}
 
-      {view === "archive" ? (
+      {view === "month" ? null : view === "archive" ? (
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs text-muted-foreground">Silinen randevular burada durur; geri alabilir veya kalıcı silebilirsiniz.</p>
           {archivedCount > 0 && <Button size="sm" variant="ghost" className="text-destructive" onClick={purgeAll}>Arşivi boşalt</Button>}
@@ -275,7 +299,7 @@ function Appointments() {
 
       {recs.error && <p className="text-destructive">Randevular yüklenemedi.</p>}
 
-      {groups.map(([date, list]) => (
+      {view !== "month" && groups.map(([date, list]) => (
         <section key={date} className="space-y-2">
           <h2 className={"text-sm font-semibold " + (date === today ? "text-primary" : "text-muted-foreground")}>
             {date === today ? "Bugün · " : ""}
@@ -343,7 +367,7 @@ function Appointments() {
           })}
         </section>
       ))}
-      {!rows.length && !recs.isLoading && (
+      {view !== "month" && !rows.length && !recs.isLoading && (
         <p className="py-8 text-center text-muted-foreground">{q ? "Bu isimle randevu bulunamadı." : view === "archive" ? "Arşiv boş." : view === "day" ? "Bu gün için randevu yok." : "Randevu yok."}</p>
       )}
 

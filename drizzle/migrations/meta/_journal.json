@@ -43,6 +43,20 @@
       "when": 1794700800000,
       "tag": "0005_private_bank_transactions",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794787200000,
+      "tag": "0009_bank_open_banking",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794873600000,
+      "tag": "0010_workplaces_payroll_payments",
+      "breakpoints": true
     }
   ]
 }
