@@ -12,7 +12,7 @@ BEGIN
     rate:=coalesce((NEW.payload->>'rate')::numeric,-1);
     multiplier:=coalesce((NEW.payload->>'multiplier')::numeric,1);
     overtime_hours:=coalesce((NEW.payload->>'overtime_hours')::numeric,0);
-    IF days NOT IN (0,0.5,1,1.5,2) OR rate<0 OR multiplier NOT IN (1,1.5,2)
+    IF days NOT IN (0,0.25,0.5,1,1.5,2) OR rate<0 OR multiplier NOT IN (1,1.5,2)
       OR overtime_hours<0 OR coalesce((NEW.payload->>'overtime_multiplier')::numeric,1.5) NOT IN (1,1.5,2) THEN
       RAISE EXCEPTION 'Geçersiz yevmiye';
     END IF;
