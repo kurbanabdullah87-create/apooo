@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, LockKeyhole, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ChevronRight, LockKeyhole, ShieldCheck } from "lucide-react";
 
 export const Route = createFileRoute("/gizlilik")({
   head: () => ({
@@ -15,9 +15,7 @@ function PrivacyPage() {
   return (
     <main className="min-h-dvh bg-background px-4 py-8 text-foreground sm:px-6 sm:py-14">
       <article className="mx-auto max-w-3xl">
-        <Link to="/auth" className="inline-flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground">
-          <ArrowLeft className="size-4" /> Giriş sayfasına dön
-        </Link>
+        <nav aria-label="Ekmek kırıntısı" className="text-sm text-muted-foreground"><ol className="flex items-center gap-2"><li><Link to="/" className="hover:text-foreground">Ana sayfa</Link></li><li aria-hidden="true"><ChevronRight className="size-4" /></li><li aria-current="page" className="font-medium text-foreground">Gizlilik ve KVKK</li></ol></nav>
         <header className="mt-8 rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card to-card p-6 sm:p-9">
           <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/15 text-primary"><ShieldCheck className="size-6" /></div>
           <p className="mt-6 text-sm font-semibold uppercase tracking-[0.18em] text-primary">Saha · Şeffaflık ve güven</p>
@@ -46,7 +44,7 @@ function PrivacyPage() {
           <section><h2 className="text-xl font-bold text-foreground">6. Haklarınız ve başvuru</h2><p className="mt-3">KVKK’nın 11. maddesi kapsamındaki haklarınız için veri sorumlusuna başvurabilirsiniz. Başvuru kanalı yukarıdaki iletişim e-postasıdır; bu alan işletmeci tarafından doldurulmalıdır. Başvuruda talebinizi ve kimliğinizi doğrulamak için gereken asgari bilgileri belirtin; parola veya doğrulama kodu göndermeyin.</p></section>
           <section><h2 className="text-xl font-bold text-foreground">7. Metin değişiklikleri</h2><p className="mt-3">Uygulama özellikleri, hizmet sağlayıcıları veya mevzuat değişirse bu metin güncellenebilir. Güncel sürüm bu adreste yayımlanır.</p></section>
         </div>
-        <footer className="mt-10 flex flex-wrap gap-4 border-t pt-6 text-sm"><Link to="/kullanim-sartlari" className="text-primary hover:underline">Kullanım şartları</Link><Link to="/auth" className="text-muted-foreground hover:text-foreground">Giriş sayfası</Link></footer>
+        <footer className="mt-10 flex flex-wrap gap-4 border-t pt-6 text-sm"><Link to="/sss" className="text-muted-foreground hover:text-foreground">Sık sorulanlar</Link><Link to="/kullanim-sartlari" className="text-primary hover:underline">Kullanım şartları</Link><Link to="/auth" className="text-muted-foreground hover:text-foreground"><ArrowLeft className="mr-1 inline size-3.5"/>Giriş sayfası</Link></footer>
       </article>
     </main>
   );

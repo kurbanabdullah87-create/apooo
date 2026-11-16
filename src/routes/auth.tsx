@@ -15,6 +15,7 @@ export const Route = createFileRoute("/auth")({
     meta: [
       { title: "Giriş — Saha" },
       { name: "description", content: "Saha hesabına güvenli şekilde giriş yap." },
+      { name: "robots", content: "noindex,nofollow" },
       { property: "og:title", content: "Giriş — Saha" },
       { property: "og:description", content: "Saha hesabına güvenli şekilde giriş yap." },
       { property: "og:type", content: "website" },
