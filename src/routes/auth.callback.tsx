@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { getRememberMe } from "@/integrations/supabase/rememberedAuthStorage";
 
 export const Route = createFileRoute("/auth/callback")({
   ssr: false,
@@ -25,6 +26,20 @@ function AuthCallback() {
     let active = true;
     void (async () => {
       try {
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        const session = sessionData.session;
+        if (sessionError || !session) throw new Error("OAuth oturumu bulunamadı");
+
+        // OAuth returns through a full-page redirect. Re-save the completed session
+        // using the selected remember-me storage so it survives closing the browser.
+        if (getRememberMe()) {
+          const { error: persistError } = await supabase.auth.setSession({
+            access_token: session.access_token,
+            refresh_token: session.refresh_token,
+          });
+          if (persistError) throw persistError;
+        }
+
         const { data, error } = await supabase.auth.getUser();
         if (error || !data.user) throw new Error("Giriş doğrulanamadı");
         const { data: profile, error: profileError } = await supabase

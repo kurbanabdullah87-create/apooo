@@ -71,6 +71,8 @@ function createSupabaseClient() {
       storage: rememberedAuthStorage(brokeredPreviewStorage()),
       persistSession: true,
       autoRefreshToken: true,
+      detectSessionInUrl: true,
+      flowType: 'pkce',
     },
   });
 }
