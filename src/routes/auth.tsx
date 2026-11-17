@@ -1,5 +1,5 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { ArrowRight, BarChart3, Check, HardHat, Loader2, LockKeyhole, Mail, ShieldCheck, Sparkles, UsersRound, Eye, EyeOff, CalendarDays, WalletCards } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,23 @@ function AuthPage() {
   const [remember, setRemember] = useState(getRememberMe);
   const [busy, setBusy] = useState(false);
   const [confirmationSent, setConfirmationSent] = useState(false);
+
+  useEffect(() => {
+    // OAuth can return through browser back/forward cache or an external auth
+    // app. Restore the form's interactive state whenever this page is visible.
+    const restoreForm = () => setBusy(false);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") restoreForm();
+    };
+    window.addEventListener("pageshow", restoreForm);
+    window.addEventListener("focus", restoreForm);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pageshow", restoreForm);
+      window.removeEventListener("focus", restoreForm);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -131,6 +148,9 @@ function AuthPage() {
       if (error) throw error;
       if (!data.url) throw new Error("oauth_redirect_missing");
       window.location.assign(data.url);
+      // Fallback for browsers that block the redirect without firing focus or
+      // visibility events. The timeout naturally disappears on full navigation.
+      window.setTimeout(() => setBusy(false), 15_000);
     } catch (error) {
       const message = error instanceof Error ? error.message.toLocaleLowerCase("en-US") : "";
       if (/unsupported provider|provider is not enabled|validation_failed/.test(message)) {
