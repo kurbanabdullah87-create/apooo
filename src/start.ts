@@ -37,7 +37,10 @@ const canonicalHostMiddleware = createMiddleware().server(async ({ next }) => {
   // generated production aliases before login starts, so OAuth returns to the
   // same origin that stored its verifier/session.
   const isSahaProjectHost = /^sahav2full(?:-[a-z0-9]+)*\.vercel\.app$/i.test(url.hostname);
-  if (url.hostname !== "sahav2full.vercel.app" && isSahaProjectHost) {
+  // Keep preview deployments on their own host so they can be reviewed before
+  // production promotion. Only normalize production aliases for auth storage.
+  const isPreviewDeployment = process.env["VERCEL_ENV"] === "preview";
+  if (!isPreviewDeployment && url.hostname !== "sahav2full.vercel.app" && isSahaProjectHost) {
     url.hostname = "sahav2full.vercel.app";
     return Response.redirect(url, 308);
   }
