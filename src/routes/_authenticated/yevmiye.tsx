@@ -37,6 +37,7 @@ function Payroll() {
   const advances = useRecords("advance");
   const payments = useRecords("payment");
   const workplacesQuery = useRecords("workplace");
+  const settingsQuery = useRecords("settings");
   const jobsQuery = useRecords("job");
   const savePayroll = useSaveRecord("payroll");
   const saveAdvance = useSaveRecord("advance");
@@ -58,6 +59,7 @@ function Payroll() {
   }, []);
 
   const ownerId = selectedOwner || me.data?.id || "";
+  const selectedMasterName = String(settingsQuery.data?.find((record) => record.owner_id === me.data?.id)?.payload.master_report_name || me.data?.profile?.display_name || me.data?.profile?.username || "Usta");
   const workplaces = useMemo(() => (workplacesQuery.data ?? []).filter((r) => r.payload.active !== false), [workplacesQuery.data]);
   const allPayrollRows = (payroll.data ?? []).filter((r) => r.owner_id === ownerId);
   const rows = allPayrollRows.filter((r) => String(r.payload.date ?? "").startsWith(month));
@@ -155,8 +157,11 @@ function Payroll() {
       const header = () => {
         doc.setFillColor(15, 31, 54); doc.rect(0, 0, 210, 45, "F");
         doc.setTextColor(255, 255, 255); doc.setFont("DejaVu", "bold"); doc.setFontSize(20); doc.text("SAHA · YEVMIYE RAPORU", margin, 20);
-        doc.setFont("DejaVu", "normal"); doc.setFontSize(10); doc.text(`${monthTitle(month)}  ·  ${members.find((m) => m.id === ownerId)?.username ?? "Çalışan"}`, margin, 29);
-        doc.setTextColor(173, 190, 211); doc.text(`Oluşturulma: ${new Date().toLocaleString("tr-TR")}`, margin, 37);
+        const selectedMasterName = String(settingsQuery.data?.find((record) => record.owner_id === me.data?.id)?.payload.master_report_name ?? me.data?.profile?.display_name ?? me.data?.profile?.username ?? "Usta");
+        const employeeName = members.find((m) => m.id === ownerId)?.username ?? "Çalışan";
+        doc.setFont("DejaVu", "normal"); doc.setFontSize(8.5); doc.text(`${monthTitle(month)}  ·  Çalışan: ${employeeName}`, margin, 29);
+        doc.text(`Usta / işveren: ${selectedMasterName}`, margin, 35);
+        doc.setTextColor(173, 190, 211); doc.setFontSize(7.5); doc.text(`Oluşturulma: ${new Date().toLocaleString("tr-TR")}`, margin, 41);
         y = 56;
       };
       const ensure = (height: number) => { if (y + height > 280) { doc.addPage(); y = 18; } };
@@ -212,7 +217,7 @@ function Payroll() {
         <div><p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[.2em] text-emerald-300"><TrendingUp className="size-4"/>SAHA · ÇALIŞMA TAKİBİ</p><h1 className="mt-2 text-2xl font-bold sm:text-3xl">Yevmiye ve bordro</h1><p className="mt-1 max-w-lg text-sm text-slate-300">İşyeri ücretlerini, günlük çalışmalarını, mesaileri ve ödemeleri tek yerden yönetin.</p></div>
         {me.data?.isUsta && <Button className="bg-white text-slate-950 hover:bg-slate-100" onClick={() => openEntry("payroll")}><Plus/>Çalışma ekle</Button>}
       </div>
-      {me.data?.isUsta && <div className="relative mt-5 max-w-xs"><Label className="mb-1 block text-xs text-slate-300" htmlFor="payroll-employee">Çalışan görünümü</Label><select id="payroll-employee" className="h-10 w-full rounded-xl border border-white/20 bg-white/10 px-3 text-sm text-white" value={ownerId} onChange={(e) => setSelectedOwner(e.target.value)}>{members.map((m) => <option className="text-slate-900" key={m.id} value={m.id}>{m.username}</option>)}</select></div>}
+      {me.data?.isUsta && <div className="relative mt-5 max-w-xs"><Label className="mb-1 block text-xs text-slate-300" htmlFor="payroll-employee">Çalışan görünümü</Label><select id="payroll-employee" className="h-10 w-full rounded-xl border border-white/20 bg-white/10 px-3 text-sm text-white" value={ownerId} onChange={(e) => setSelectedOwner(e.target.value)}>{members.map((m) => <option className="text-slate-900" key={m.id} value={m.id}>{m.id === me.data?.id ? selectedMasterName : m.username}</option>)}</select></div>}
       <div className="relative mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
         {[["Hak edilen", earned, "text-emerald-300"], ["Avans", advanced, "text-amber-300"], ["Ödenen", paid, "text-sky-300"], ["Kalan", outstanding, "text-white"]].map(([label, value, color]) => <div key={String(label)} className="rounded-2xl border border-white/10 bg-white/[.06] p-3"><p className="text-xs text-slate-300">{label}</p><p className={`mt-1 break-words text-lg font-bold ${color}`}>{amountText(Number(value), "TRY")}</p></div>)}
       </div>
@@ -234,8 +239,8 @@ function Payroll() {
           const isToday = date === todayISO();
           const dayStatuses = [...new Set(dayRows.map((row) => statusForDays(n(row.payload.days, 1)).value))].map(statusForDays);
           const primaryStatus = dayStatuses[0];
-          return <button type="button" key={date} disabled={!me.data?.isUsta} onClick={() => openEntry("payroll", date)} className={`group min-h-[74px] rounded-2xl border p-1.5 text-left transition sm:min-h-[90px] sm:p-2 disabled:cursor-default ${isToday ? "border-emerald-500 ring-1 ring-emerald-500/50" : primaryStatus ? primaryStatus.tile : "border-border bg-background hover:border-primary/50 hover:bg-secondary/60"}`}>
-            <span className={`inline-flex size-6 items-center justify-center rounded-full text-xs font-semibold ${isToday ? "bg-emerald-600 text-white" : "bg-background/70 text-foreground"}`}>{i + 1}</span>
+          return <button type="button" key={date} disabled={!me.data?.isUsta} onClick={() => openEntry("payroll", date)} aria-label={`${i + 1} ${monthTitle(month)}${isToday ? ", bugün" : ""}${dayRows.length ? `, ${dayRows.length} kayıt` : ""}`} className={`group min-h-[74px] rounded-2xl border p-1.5 text-left transition sm:min-h-[90px] sm:p-2 disabled:cursor-default ${isToday ? "border-primary/50 bg-primary/[0.04] ring-1 ring-primary/20" : primaryStatus ? primaryStatus.tile : "border-border bg-background hover:border-primary/50 hover:bg-secondary/60"}`}>
+            <span className={`inline-flex size-6 items-center justify-center rounded-full text-xs font-semibold ${isToday ? "bg-primary/10 text-primary" : "bg-background/70 text-foreground"}`}>{i + 1}</span>{isToday && <span className="ml-1 text-[8px] font-medium text-primary">Bugün</span>}
             {dayRows.length > 0 && <><p className="mt-1 truncate text-[9px] font-semibold sm:text-[10px]">{dayRows.length} kayıt</p><div className="mt-1 flex flex-wrap gap-1">{dayStatuses.slice(0, 2).map((status) => <span key={status.value} className={`rounded-full border px-1 py-0.5 text-[8px] leading-none sm:text-[9px] ${status.tile}`}>{status.label}</span>)}{dayStatuses.length > 2 && <span className="text-[8px]">+{dayStatuses.length - 2}</span>}</div><p className="mt-1 truncate text-[9px] text-muted-foreground sm:text-[10px]">{amountText(earnedDay, String(dayRows[0]?.payload.currency ?? "TRY"))}</p></>}
           </button>;
         })}
