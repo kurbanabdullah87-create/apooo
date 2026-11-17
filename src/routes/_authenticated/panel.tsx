@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, AlertTriangle, MapPin, MessageCircle, Wallet, HardHat, Sparkles, ArrowDownLeft, ArrowUpRight, WalletCards, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertTriangle, MapPin, MessageCircle, Wallet, HardHat, WalletCards } from "lucide-react";
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { useCustomers, useExpenses, useTransactions } from "@/lib/data";
 import { customerBalance, customerRestriction, EXPENSE_LABELS, formatTL, monthKey, monthSummary, overdueAmount, profitBreakdown, todayISO, type ExpenseCategory } from "@/lib/finance";
@@ -64,11 +64,6 @@ function Panel() {
 
   const label = new Date(month + "-01T00:00:00").toLocaleDateString("tr-TR", { month: "long", year: "numeric" });
   const today = todayISO();
-  const greeting = new Date().getHours() < 12 ? "Günaydın" : new Date().getHours() < 18 ? "İyi günler" : "İyi akşamlar";
-  const firstName = (me.data?.profile?.display_name || me.data?.profile?.username || "").trim().split(/\s+/)[0];
-  const todayLabel = new Date(`${today}T12:00:00`).toLocaleDateString("tr-TR", { weekday: "long", day: "numeric", month: "long" });
-  const todayIncome = (txs.data ?? []).filter((tx) => tx.kind === "payment" && tx.occurred_on === today).reduce((sum, tx) => sum + tx.amount, 0);
-  const todayExpense = (exps.data ?? []).filter((e) => e.occurred_on === today).reduce((sum, e) => sum + e.amount, 0);
   useEffect(() => {
     let active = true;
     if (!customers.data?.length) return;
@@ -89,23 +84,6 @@ function Panel() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-5 pb-8 sm:space-y-6">
-      <section className="relative isolate overflow-hidden rounded-[1.75rem] border border-white/10 bg-gradient-to-br from-[#10192a] via-[#111827] to-[#082b29] p-5 text-white shadow-xl shadow-black/10 sm:rounded-[2rem] sm:p-7 lg:p-8">
-        <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-28 -z-10 size-80 rounded-full bg-emerald-400/15 blur-3xl" />
-        <div aria-hidden="true" className="pointer-events-none absolute -bottom-36 left-1/3 -z-10 size-72 rounded-full bg-sky-400/10 blur-3xl" />
-        <div className="flex flex-wrap items-start justify-between gap-5">
-          <div className="min-w-0">
-            <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-300"><Sparkles className="size-4"/>Saha kontrol merkezi</p>
-            <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{greeting}{firstName ? `, ${firstName}` : ""}</h1>
-            <p className="mt-1.5 flex items-center gap-2 text-sm capitalize text-slate-300"><CalendarDays className="size-4 text-emerald-300"/>{todayLabel}</p>
-            <p className="mt-4 max-w-xl text-sm leading-6 text-slate-300">Bugünün işlerini, tahsilatlarını ve saha akışını tek ekrandan takip et.</p>
-          </div>
-        </div>
-        <div className="mt-6 grid grid-cols-2 gap-2.5 border-t border-white/10 pt-4 sm:max-w-md sm:gap-3">
-          <div className="flex items-center gap-2.5 rounded-xl bg-black/15 px-3 py-2.5"><ArrowDownLeft className="size-4 text-emerald-300"/><span className="text-xs text-slate-300">Bugün tahsilat</span><span className="num ml-auto text-sm font-semibold text-white">{formatTL(todayIncome)}</span></div>
-          <div className="flex items-center gap-2.5 rounded-xl bg-black/15 px-3 py-2.5"><ArrowUpRight className="size-4 text-rose-300"/><span className="text-xs text-slate-300">Bugün gider</span><span className="num ml-auto text-sm font-semibold text-white">{formatTL(todayExpense)}</span></div>
-        </div>
-      </section>
-
       {/* Hızlı Not */}
       <section className="rounded-2xl border border-amber-500/15 bg-gradient-to-br from-amber-500/[0.07] to-card p-3.5 sm:p-4">
         <div className="mb-2 flex items-center gap-2">
