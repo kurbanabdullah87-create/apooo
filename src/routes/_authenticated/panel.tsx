@@ -30,10 +30,11 @@ function shiftMonth(m: string, d: number) {
 function Panel() {
   const [month, setMonth] = useState(monthKey(todayISO()));
   const [quickNote, setQuickNote] = useState(() => { try { return localStorage.getItem("panel_note") ?? ""; } catch { return ""; } });
-  const saveNote = (v: string) => { setQuickNote(v); try { localStorage.setItem("panel_note", v); } catch {} };
+  const saveNote = (v: string) => { setQuickNote(v); try { localStorage.setItem("panel_note", v); } catch { /* local note storage is optional */ } };
   const txs = useTransactions();
   const exps = useExpenses();
   const customers = useCustomers();
+  const customerRows = customers.data;
   const saveJob = useSaveRecord("job");
   const me = useMe();
   const navigate = useNavigate();
@@ -67,14 +68,14 @@ function Panel() {
   const today = todayISO();
   useEffect(() => {
     let active = true;
-    if (!customers.data?.length) return;
+    if (!customerRows?.length) return;
     void getPosition(5000).then((position) => {
       if (!active) return;
-      const closest = customers.data!.map((customer) => { const coords = coordsOf({ lat: customer.latitude, lng: customer.longitude }); return coords ? { customer, meters: distanceMeters(position, coords) } : null; }).filter((row): row is { customer: NonNullable<typeof customers.data>[number]; meters: number } => row !== null && row.meters <= 100).sort((a, b) => a.meters - b.meters)[0] ?? null;
+      const closest = customerRows.map((customer) => { const coords = coordsOf({ lat: customer.latitude, lng: customer.longitude }); return coords ? { customer, meters: distanceMeters(position, coords) } : null; }).filter((row): row is { customer: NonNullable<typeof customers.data>[number]; meters: number } => row !== null && row.meters <= 100).sort((a, b) => a.meters - b.meters)[0] ?? null;
       setNearby(closest);
     }).catch(() => setNearby(null));
     return () => { active = false; };
-  }, [customers.data]);
+  }, [customerRows]);
 
   function startNearbyJob(customer: NonNullable<typeof customers.data>[number]) {
     const related = (txs.data ?? []).filter((tx) => tx.customer_id === customer.id);

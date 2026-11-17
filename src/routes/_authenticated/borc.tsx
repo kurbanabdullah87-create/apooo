@@ -22,6 +22,7 @@ type Direction = "receivable" | "payable";
 type Debt = { id: string; direction: Direction; name: string; description: string; total_amount: number; acquired_on: string; installment_count: number; interval_months: number; first_due_on: string; created_at: string };
 type Installment = { id: string; debt_id: string; installment_no: number; amount: number; due_on: string; paid_amount: number; paid_at: string | null };
 type Payment = { id: string; debt_id: string; installment_id: string | null; amount: number; paid_on: string; note: string };
+const EMPTY_INSTALLMENTS: Installment[] = [];
 
 function monthDate(firstDate: string, monthOffset: number) {
   const [year = 1970, month = 1, day = 1] = firstDate.split("-").map(Number);
@@ -98,7 +99,7 @@ function DebtPage() {
   }, onSuccess: () => { void refresh(); toast.success("Kayıt silindi"); }, onError: (error: Error) => toast.error(error.message) });
 
   const rows = debts.data ?? [];
-  const dueRows = installments.data ?? [];
+  const dueRows = installments.data ?? EMPTY_INSTALLMENTS;
   const paymentRows = payments.data ?? [];
   const visibleRows = rows.filter((d) => d.direction === direction);
   const outstanding = (d: Debt) => dueRows.filter((i) => i.debt_id === d.id).reduce((sum, i) => sum + leftAmount(i), 0);
