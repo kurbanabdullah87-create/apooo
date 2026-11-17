@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, BriefcaseBusiness, CalendarDays, ChevronLeft, ChevronRight, Clock3, Download, FileText, Plus, TrendingUp, Wallet, X } from "lucide-react";
+import { Banknote, BriefcaseBusiness, CalendarDays, ChevronLeft, ChevronRight, Clock3, Download, FileText, Plus, TrendingUp, Wallet, X, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -215,7 +215,7 @@ function Payroll() {
       <div className="absolute -right-10 -top-16 size-56 rounded-full bg-emerald-400/10 blur-3xl" />
       <div className="relative flex flex-wrap items-start justify-between gap-4">
         <div><p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[.2em] text-emerald-300"><TrendingUp className="size-4"/>SAHA · ÇALIŞMA TAKİBİ</p><h1 className="mt-2 text-2xl font-bold sm:text-3xl">Yevmiye ve bordro</h1><p className="mt-1 max-w-lg text-sm text-slate-300">İşyeri ücretlerini, günlük çalışmalarını, mesaileri ve ödemeleri tek yerden yönetin.</p></div>
-        {me.data?.isUsta && <Button className="bg-white text-slate-950 hover:bg-slate-100" onClick={() => openEntry("payroll")}><Plus/>Çalışma ekle</Button>}
+        <div className="flex flex-wrap gap-2">{me.data?.isUsta && <Button asChild variant="outline" className="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"><Link to="/puantaj"><UserCheck/>Puantaj</Link></Button>}{me.data?.isUsta && <Button className="bg-white text-slate-950 hover:bg-slate-100" onClick={() => openEntry("payroll")}><Plus/>Çalışma ekle</Button>}</div>
       </div>
       {me.data?.isUsta && <div className="relative mt-5 max-w-xs"><Label className="mb-1 block text-xs text-slate-300" htmlFor="payroll-employee">Çalışan görünümü</Label><select id="payroll-employee" className="h-10 w-full rounded-xl border border-white/20 bg-white/10 px-3 text-sm text-white" value={ownerId} onChange={(e) => setSelectedOwner(e.target.value)}>{members.map((m) => <option className="text-slate-900" key={m.id} value={m.id}>{m.id === me.data?.id ? selectedMasterName : m.username}</option>)}</select></div>}
       <div className="relative mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">

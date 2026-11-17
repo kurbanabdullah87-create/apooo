@@ -64,6 +64,13 @@
       "when": 1794960000000,
       "tag": "0011_field_controls_and_receipts",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795046400000,
+      "tag": "0012_stock_and_attendance",
+      "breakpoints": true
     }
   ]
 }

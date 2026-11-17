@@ -1,12 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Play, Pause, Check, Copy, ChevronDown, Clock, Download, Search, X, CalendarCheck, Activity, Phone, MessageCircle, Share2 } from "lucide-react";
+import { Plus, Play, Pause, Check, Copy, ChevronDown, Clock, Download, Search, X, CalendarCheck, Activity, Phone, MessageCircle, Share2, FileText, ClipboardCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { FormDrawer } from "@/components/app/forms/FormDrawer";
 import { JobFormBody, MachineInfo } from "@/components/app/JobFormBody";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { MediaTools } from "@/components/app/MediaTools";
 import { useCustomers, useExpenses } from "@/lib/data";
@@ -39,7 +40,15 @@ export const Route = createFileRoute("/_authenticated/isler")({
   component: Jobs,
 });
 
-const STATUSES = ["Bekliyor", "Devam Ediyor", "Tamamlandı", "Ertelendi"];
+const STATUSES = ["Teklif", "Bekliyor", "Devam Ediyor", "Tamamlandı", "Ertelendi"];
+type ChecklistItem = { label: string; done: boolean };
+function checklistFor(payload: Payload): ChecklistItem[] {
+  try {
+    const parsed: unknown = JSON.parse(String(payload.checklist_json ?? "[]"));
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is ChecklistItem => typeof item === "object" && item !== null && typeof item.label === "string" && typeof item.done === "boolean");
+  } catch { return []; }
+}
 
 function Jobs() {
   const jobs = useRecords("job");
@@ -76,13 +85,14 @@ function Jobs() {
     setEditing(j);
     setForm(
       j
-        ? { ...j.payload, owner_id: j.owner_id }
+        ? { ...j.payload, checklist_draft: checklistFor(j.payload).map((item) => item.label).join("\n"), owner_id: j.owner_id }
         : {
             title: "",
             date,
             seconds: 0,
             started_at: null,
             status: "Bekliyor",
+            checklist_draft: "",
             vat_rate: 0,
             equipment_id: null,
             owner_id: me.data?.id,
@@ -116,6 +126,12 @@ function Jobs() {
   /** İşi tamamlar (cariden bağımsız). Süreyi makine sayacına ekleme işini veritabanı tetikleyicisi bir kez yapar. */
   async function complete(j: WorkRecord, seconds: number) {
     const p = j.payload;
+    const checklist = checklistFor(p);
+    if (p.checklist_required === true && checklist.some((item) => !item.done)) {
+      toast.error("İş kapatılamadı. Önce kontrol listesindeki bütün adımları tamamlayın.");
+      setExpanded(j.id);
+      return;
+    }
     const secs = Math.round(seconds);
     const eq = equipment.data?.find((e) => e.id === p.equipment_id);
     if (eq && secs < 60 && !confirm("Bu işin süresi 0. Makine sayacına süre eklenmeyecek. Yine de tamamlansın mı? (Süreyi sonradan 'Süreyi düzenle' ile girebilirsiniz.)")) return;
@@ -145,10 +161,11 @@ function Jobs() {
       doc.addFileToVFS("DejaVuSans-Bold.ttf", await loadFont("/fonts/DejaVuSans-Bold.ttf"));
       doc.addFont("DejaVuSans.ttf", "DejaVu", "normal");
       doc.addFont("DejaVuSans-Bold.ttf", "DejaVu", "bold");
+      const isQuote = job.payload.status === "Teklif";
       const margin = 18;
       let y = 22;
       doc.setFillColor(15, 31, 54); doc.rect(0, 0, 210, 42, "F");
-      doc.setFont("DejaVu", "bold"); doc.setFontSize(19); doc.setTextColor(255, 255, 255); doc.text("SAHA · İŞ RAPORU", margin, y);
+      doc.setFont("DejaVu", "bold"); doc.setFontSize(19); doc.setTextColor(255, 255, 255); doc.text(isQuote ? "SAHA · FİYAT TEKLİFİ" : "SAHA · İŞ RAPORU", margin, y);
       y += 10; doc.setFont("DejaVu", "normal"); doc.setFontSize(9); doc.setTextColor(205, 219, 235); doc.text(`Rapor tarihi: ${new Date().toLocaleString("tr-TR")}`, margin, y);
       y = 56;
       const section = (title: string) => { doc.setFont("DejaVu", "bold"); doc.setFontSize(11); doc.setTextColor(15, 31, 54); doc.text(title, margin, y); y += 3; doc.setDrawColor(220, 227, 236); doc.line(margin, y, 192, y); y += 8; };
@@ -159,7 +176,7 @@ function Jobs() {
         const lines = doc.splitTextToSize(val, 125) as string[];
         doc.text(lines, 63, y); y += Math.max(7, lines.length * 4.5);
       };
-      section("İŞ BİLGİLERİ");
+      section(isQuote ? "TEKLİF DETAYLARI" : "İŞ BİLGİLERİ");
       field("İş", job.payload.title); field("Müşteri", customer?.name ?? "Kayıtlı müşteri yok");
       if (customer?.phone) field("Telefon", customer.phone);
       field("Tarih", job.payload.date); field("Durum", job.payload.status);
@@ -170,11 +187,12 @@ function Jobs() {
       const seconds = elapsedSeconds(job.payload, Date.now());
       field("Çalışma süresi", `${Math.floor(seconds / 3600)} sa ${Math.floor((seconds % 3600) / 60)} dk`);
       field("Ücret", formatTL(Number(job.payload.hourly_rate) > 0 ? hourlyCharge(seconds, Number(job.payload.hourly_rate)) : Number(job.payload.price ?? 0)));
+      if (isQuote) field("Teklif tutarı", formatTL(Number(job.payload.price ?? 0) || Number(job.payload.planned_hours ?? 0) * Number(job.payload.hourly_rate ?? 0)));
       field("Malzeme maliyeti", formatTL(Number(job.payload.material_cost ?? 0)));
       if (job.payload["estimated_profit_margin"] != null) field("Tahmini kâr marjı", `%${Number(job.payload["estimated_profit_margin"]).toFixed(1)}`);
       doc.setFont("DejaVu", "normal"); doc.setFontSize(7.5); doc.setTextColor(115, 126, 141);
-      doc.text("Bu rapor uygulamadaki iş kaydına dayanır; fatura veya resmi belge yerine geçmez.", margin, 282, { maxWidth: 175 });
-      const filename = `saha-is-raporu-${String(job.payload.date ?? todayISO())}.pdf`;
+      doc.text(isQuote ? "Bu belge fiyat teklifidir; iş onayı veya fatura yerine geçmez." : "Bu rapor uygulamadaki iş kaydına dayanır; fatura veya resmi belge yerine geçmez.", margin, 282, { maxWidth: 175 });
+      const filename = `${isQuote ? "saha-fiyat-teklifi" : "saha-is-raporu"}-${String(job.payload.date ?? todayISO())}.pdf`;
       const blob = doc.output("blob");
       if (share && typeof File !== "undefined") {
         const file = new File([blob], filename, { type: "application/pdf" });
@@ -244,14 +262,9 @@ function Jobs() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">İşler</h1>
-        {me.data?.isUsta && (
-          <Button onClick={() => edit()}>
-            <Plus />
-            İş ekle
-          </Button>
-        )}
+        {me.data?.isUsta && <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => edit(undefined, { status: "Teklif" })}><FileText className="size-4"/>Teklif hazırla</Button><Button onClick={() => edit()}><Plus/>İş ekle</Button></div>}
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <input
@@ -356,7 +369,7 @@ function Jobs() {
                     <Button
                       variant="secondary"
                       size="sm"
-                      disabled={save.isPending || Boolean(p.billed) || p.status === "Tamamlandı"}
+                      disabled={save.isPending || Boolean(p.billed) || p.status === "Tamamlandı" || p.status === "Teklif"}
                       onClick={() =>
                         void change(j, {
                           ...p,
@@ -369,7 +382,7 @@ function Jobs() {
                       {p.started_at ? <Pause /> : <Play />}
                       {p.started_at ? "Duraklat" : "Başlat"}
                     </Button>
-                    {p.status !== "Tamamlandı" && (
+                    {p.status !== "Tamamlandı" && p.status !== "Teklif" && (
                       <Button size="sm" variant="outline" disabled={save.isPending} onClick={() => void complete(j, seconds)}>
                         <Check />
                         İşi tamamla
@@ -383,7 +396,7 @@ function Jobs() {
                     )}
                     <Button
                       size="sm"
-                      disabled={billing || Boolean(p.billed) || !navigator.onLine}
+                      disabled={billing || Boolean(p.billed) || p.status === "Teklif" || !navigator.onLine}
                       onClick={() => void bill(j)}
                     >
                       <Check />
@@ -425,6 +438,7 @@ function Jobs() {
               {expanded === j.id && (
                 <div className="space-y-3 border-t pt-3">
                   <p className="text-sm break-words">{p.notes}</p>
+                  {checklistFor(p).length > 0 && <section className="space-y-2 rounded-xl border bg-background p-3"><h3 className="flex items-center gap-2 text-sm font-semibold"><ClipboardCheck className="size-4 text-primary"/>İş kontrol listesi</h3>{checklistFor(p).map((item, itemIndex) => <label key={`${j.id}-${itemIndex}`} className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" checked={item.done} disabled={!me.data?.isUsta || Boolean(p.billed)} onChange={(event) => { const updated = checklistFor(p).map((task, index) => index === itemIndex ? { ...task, done: event.target.checked } : task); void change(j, { ...p, checklist_json: JSON.stringify(updated) }); }}/><span className={item.done ? "text-muted-foreground line-through" : ""}>{item.label}</span></label>)}{p.checklist_required === true && checklistFor(p).some((item) => !item.done) && <p className="text-xs text-amber-700 dark:text-amber-300">Bütün adımlar işaretlenmeden iş kapatılamaz.</p>}</section>}
                   {me.data?.isUsta && (
                     <>
                       <select
@@ -461,6 +475,7 @@ function Jobs() {
                   )}
                   <MediaTools record={j} readOnly={!me.data?.isUsta} onSave={(p) => change(j, p)} />
                   {me.data?.isUsta && <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" onClick={() => void downloadJobReport(j)}><Download className="size-4"/>PDF indir</Button><Button variant="secondary" size="sm" onClick={() => void downloadJobReport(j, true)}><Share2 className="size-4"/>PDF paylaş</Button></div>}
+                  {me.data?.isUsta && p.status === "Teklif" && <Button size="sm" onClick={() => void change(j, { ...p, status: "Bekliyor", quote_approved_at: new Date().toISOString() })}><Check className="size-4"/>Teklifi onayla · işe dönüştür</Button>}
                 </div>
               )}
             </article>
@@ -483,9 +498,11 @@ function Jobs() {
           const linkedExpense = editing ? (expenses.data ?? []).filter((r) => r.job_record_id === editing.id).reduce((sum, r) => sum + r.amount, 0) : 0;
           const costs = Number(form.material_cost ?? 0) + (linkedLabor || Number(form["estimated_labor_cost"] ?? 0)) + (linkedExpense || Number(form["estimated_expense_cost"] ?? 0));
           const estimated_profit_margin = quote > 0 ? Math.round(((quote - costs) / quote) * 10000) / 100 : null;
-          const { owner_id, ...payload } = form;
+          const previousChecklist = editing ? checklistFor(editing.payload) : [];
+          const checklist = String(form.checklist_draft ?? "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(0, 50).map((label) => ({ label: label.slice(0, 160), done: previousChecklist.find((item) => item.label === label)?.done ?? false }));
+          const { owner_id, checklist_draft: _checklistDraft, ...payload } = form;
           save.mutate(
-            { id: editing?.id, owner_id: String(owner_id ?? me.data?.id), payload: { ...payload, estimated_profit_margin } },
+            { id: editing?.id, owner_id: String(owner_id ?? me.data?.id), payload: { ...payload, estimated_profit_margin, checklist_json: JSON.stringify(checklist), checklist_required: checklist.length > 0 } },
             { onSuccess: () => setOpen(false) },
           );
         }}
@@ -497,6 +514,7 @@ function Jobs() {
             setForm((current) => applyVoiceJob(current, draft));
             toast.success(`Sesli taslak dolduruldu${draft.customer ? ` · ${draft.customer.name}` : ""}${draft.plannedHours ? ` · ${draft.plannedHours} sa` : ""}${draft.price ? ` · ${formatTL(draft.price)}` : ""}`);
           }} />
+          <div className="space-y-2 rounded-xl border bg-background p-3"><Label htmlFor="job-checklist-draft">İş kontrol listesi (adım başına bir satır)</Label><Textarea id="job-checklist-draft" rows={3} maxLength={2000} value={String(form.checklist_draft ?? "")} onChange={(event) => setForm({ ...form, checklist_draft: event.target.value })} placeholder={"Alanı güvenli hale getir\nMontajı kontrol et\nMüşteriyle teslimi doğrula"}/><p className="text-xs text-muted-foreground">Liste eklenirse iş, bütün adımlar işaretlenmeden kapatılamaz.</p></div>
         </JobFormBody>
       </FormDrawer>
       <FormDrawer

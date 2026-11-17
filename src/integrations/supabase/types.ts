@@ -491,6 +491,8 @@ export type Database = {
         Returns: boolean
       }
       is_team_usta: { Args: never; Returns: boolean }
+      record_stock_movement: { Args: { _item_id: string; _operation: string; _quantity: number; _notes?: string; _job_id?: string | null }; Returns: Json }
+      toggle_attendance: { Args: { _lat?: number | null; _lng?: number | null }; Returns: Json }
     }
     Enums: {
       app_role: "usta" | "cirak"

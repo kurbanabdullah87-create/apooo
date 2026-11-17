@@ -3,19 +3,22 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { cachedRead, persistWrite } from '@/lib/offline';
 
-export type WorkKind = 'job' | 'payroll' | 'advance' | 'payment' | 'workplace' | 'equipment' | 'maintenance' | 'shopping' | 'job_template' | 'settings' | 'appointment';
+export type WorkKind = 'job' | 'payroll' | 'advance' | 'payment' | 'workplace' | 'equipment' | 'maintenance' | 'shopping' | 'job_template' | 'settings' | 'appointment' | 'inventory' | 'stock_movement' | 'attendance';
 export type Payload = Record<string, string | number | boolean | null | undefined> & {seconds?: string | number | boolean | null | undefined; started_at?: string | number | boolean | null | undefined; business?: string | number | boolean | null | undefined; status?: string | number | boolean | null | undefined; date?: string | number | boolean | null | undefined; title?: string | number | boolean | null | undefined; customer_id?: string | number | boolean | null | undefined; address?: string | number | boolean | null | undefined; hourly_rate?: string | number | boolean | null | undefined; price?: string | number | boolean | null | undefined; billed?: string | number | boolean | null | undefined; notes?: string | number | boolean | null | undefined; material_cost?: string | number | boolean | null | undefined; vat_rate?: string | number | boolean | null | undefined; days?: string | number | boolean | null | undefined; rate?: string | number | boolean | null | undefined; multiplier?: string | number | boolean | null | undefined; amount?: string | number | boolean | null | undefined; site?: string | number | boolean | null | undefined; name?: string | number | boolean | null | undefined; borrower?: string | number | boolean | null | undefined; borrowed_on?: string | number | boolean | null | undefined; last_service_seconds?: string | number | boolean | null | undefined; maintenance_hours?: string | number | boolean | null | undefined; purchased?: string | number | boolean | null | undefined; years?: string | number | boolean | null | undefined; code?: string | number | boolean | null | undefined; equipment_id?: string | number | boolean | null | undefined; cost?: string | number | boolean | null | undefined; done?: string | number | boolean | null | undefined; target?: string | number | boolean | null | undefined; owner_id?: string | number | boolean | null | undefined; job_seconds?: string | number | boolean | null | undefined; time?: string | number | boolean | null | undefined; planned_hours?: string | number | boolean | null | undefined; no_machine?: string | number | boolean | null | undefined; machine_applied_seconds?: string | number | boolean | null | undefined; machine_applied_to?: string | number | boolean | null | undefined;};
 export interface WorkRecord { id: string; owner_id: string; team_id: string; kind: WorkKind; payload: Payload; created_at: string; }
 /** Randevular, mevcut "shopping" türünde (payload._t = 'appointment') saklanır; ek migration gerekmez. */
-const dbKind = (k: WorkKind) => (k === 'appointment' ? 'shopping' : k);
+const shoppingSubtypes = ['appointment', 'inventory_item', 'stock_movement', 'attendance'] as const;
+const subtypeOf = (kind: WorkKind) => kind === 'appointment' ? 'appointment' : kind === 'inventory' ? 'inventory_item' : kind === 'stock_movement' ? 'stock_movement' : kind === 'attendance' ? 'attendance' : null;
+const dbKind = (k: WorkKind) => subtypeOf(k) ? 'shopping' : k;
 export function useRecords(kind: WorkKind) {
   return useQuery({networkMode:'always',queryKey:['work',kind],queryFn:async () => {
     const rows = await cachedRead('work:'+dbKind(kind), async () => {
       const {data,error}=await supabase.from('work_records').select('*').eq('kind',dbKind(kind)).order('created_at',{ascending:false});
       if(error) throw error; return data as unknown as WorkRecord[];
     });
-    if(kind==='appointment') return rows.filter((r)=>r.payload._t==='appointment');
-    if(kind==='shopping') return rows.filter((r)=>r.payload._t!=='appointment');
+    const subtype = subtypeOf(kind);
+    if(subtype) return rows.filter((r)=>r.payload._t===subtype);
+    if(kind==='shopping') return rows.filter((r)=>!shoppingSubtypes.includes(r.payload._t as typeof shoppingSubtypes[number]));
     return rows;
   }});
 }
@@ -24,7 +27,8 @@ export function useSaveRecord(kind: WorkKind) {
  return useMutation({networkMode:'always',mutationFn: async (row:{id?:string | undefined;owner_id?:string | undefined;payload:Payload}) => {
    const {data}=await supabase.auth.getSession(); if(!data.session) throw new Error('Oturum gerekli');
    const id=row.id??crypto.randomUUID();
-   await persistWrite('work_records',row.id?'update':'insert',{...row,owner_id:row.owner_id??data.session.user.id,id,kind:dbKind(kind),payload:kind==='appointment'?{...row.payload,_t:'appointment'}:row.payload}); return id;
+   const subtype = subtypeOf(kind);
+   await persistWrite('work_records',row.id?'update':'insert',{...row,owner_id:row.owner_id??data.session.user.id,id,kind:dbKind(kind),payload:subtype?{...row.payload,_t:subtype}:row.payload}); return id;
  },onSuccess:()=>{qc.invalidateQueries({queryKey:['work']});toast.success('Kaydedildi');},onError:(e:Error)=>toast.error(e.message)});
 }
 export function elapsedSeconds(p:Payload, now=Date.now()) {

@@ -24,6 +24,7 @@ import { Route as AuthenticatedGiderlerRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedHavaRouteImport } from './routes/_authenticated/hava'
 import { Route as AuthenticatedIslerRouteImport } from './routes/_authenticated/isler'
 import { Route as AuthenticatedPanelRouteImport } from './routes/_authenticated/panel'
+import { Route as AuthenticatedPuantajRouteImport } from './routes/_authenticated/puantaj'
 import { Route as AuthenticatedRandevuRouteImport } from './routes/_authenticated/randevu'
 import { Route as AuthenticatedYevmiyeRouteImport } from './routes/_authenticated/yevmiye'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
@@ -105,6 +106,11 @@ const AuthenticatedPanelRoute = AuthenticatedPanelRouteImport.update({
   path: '/panel',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedPuantajRoute = AuthenticatedPuantajRouteImport.update({
+  id: '/puantaj',
+  path: '/puantaj',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedRandevuRoute = AuthenticatedRandevuRouteImport.update({
   id: '/randevu',
   path: '/randevu',
@@ -151,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/hava': typeof AuthenticatedHavaRoute
   '/isler': typeof AuthenticatedIslerRoute
   '/panel': typeof AuthenticatedPanelRoute
+  '/puantaj': typeof AuthenticatedPuantajRoute
   '/randevu': typeof AuthenticatedRandevuRoute
   '/yevmiye': typeof AuthenticatedYevmiyeRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -173,6 +180,7 @@ export interface FileRoutesByTo {
   '/hava': typeof AuthenticatedHavaRoute
   '/isler': typeof AuthenticatedIslerRoute
   '/panel': typeof AuthenticatedPanelRoute
+  '/puantaj': typeof AuthenticatedPuantajRoute
   '/randevu': typeof AuthenticatedRandevuRoute
   '/yevmiye': typeof AuthenticatedYevmiyeRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -197,6 +205,7 @@ export interface FileRoutesById {
   '/_authenticated/hava': typeof AuthenticatedHavaRoute
   '/_authenticated/isler': typeof AuthenticatedIslerRoute
   '/_authenticated/panel': typeof AuthenticatedPanelRoute
+  '/_authenticated/puantaj': typeof AuthenticatedPuantajRoute
   '/_authenticated/randevu': typeof AuthenticatedRandevuRoute
   '/_authenticated/yevmiye': typeof AuthenticatedYevmiyeRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -221,6 +230,7 @@ export interface FileRouteTypes {
     | '/hava'
     | '/isler'
     | '/panel'
+    | '/puantaj'
     | '/randevu'
     | '/yevmiye'
     | '/auth/callback'
@@ -243,6 +253,7 @@ export interface FileRouteTypes {
     | '/hava'
     | '/isler'
     | '/panel'
+    | '/puantaj'
     | '/randevu'
     | '/yevmiye'
     | '/auth/callback'
@@ -266,6 +277,7 @@ export interface FileRouteTypes {
     | '/_authenticated/hava'
     | '/_authenticated/isler'
     | '/_authenticated/panel'
+    | '/_authenticated/puantaj'
     | '/_authenticated/randevu'
     | '/_authenticated/yevmiye'
     | '/auth/callback'
@@ -390,6 +402,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPanelRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/puantaj': {
+      id: '/_authenticated/puantaj'
+      path: '/puantaj'
+      fullPath: '/puantaj'
+      preLoaderRoute: typeof AuthenticatedPuantajRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/randevu': {
       id: '/_authenticated/randevu'
       path: '/randevu'
@@ -445,6 +464,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedHavaRoute: typeof AuthenticatedHavaRoute
   AuthenticatedIslerRoute: typeof AuthenticatedIslerRoute
   AuthenticatedPanelRoute: typeof AuthenticatedPanelRoute
+  AuthenticatedPuantajRoute: typeof AuthenticatedPuantajRoute
   AuthenticatedRandevuRoute: typeof AuthenticatedRandevuRoute
   AuthenticatedYevmiyeRoute: typeof AuthenticatedYevmiyeRoute
   AuthenticatedCariIdRoute: typeof AuthenticatedCariIdRoute
@@ -461,6 +481,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedHavaRoute: AuthenticatedHavaRoute,
   AuthenticatedIslerRoute: AuthenticatedIslerRoute,
   AuthenticatedPanelRoute: AuthenticatedPanelRoute,
+  AuthenticatedPuantajRoute: AuthenticatedPuantajRoute,
   AuthenticatedRandevuRoute: AuthenticatedRandevuRoute,
   AuthenticatedYevmiyeRoute: AuthenticatedYevmiyeRoute,
   AuthenticatedCariIdRoute: AuthenticatedCariIdRoute,
