@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Save, UserPlus, LogOut, Fingerprint, LockKeyhole, Award, Link2, Loader2 } from "lucide-react";
+import { Save, UserPlus, LogOut, Fingerprint, LockKeyhole, Award, Link2, Loader2, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,10 +35,26 @@ function Settings() {
   const [form, setForm] = useState<Payload>({ business: "Saha", target: 0 });
   const [pin, setPin] = useState("");
   const [team, setTeam] = useState({ username: "", password: "", name: "" });
+  const [masterNameInput, setMasterNameInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [linkBusy, setLinkBusy] = useState(false);
   const [count, setCount] = useState(0);
   const [fieldMode, setFieldMode] = useState(() => { try { return localStorage.getItem("saha-field-mode") === "sunlight"; } catch { return false; } });
+  const masterNameOptions = [...new Set(String(form.master_names ?? "").split(/\r?\n/).map((name) => name.trim()).filter(Boolean))];
+  const addMasterName = () => {
+    const name = masterNameInput.trim();
+    if (!name) return;
+    if (masterNameOptions.some((existing) => existing.toLocaleLowerCase("tr-TR") === name.toLocaleLowerCase("tr-TR"))) {
+      toast.error("Bu usta adı zaten ekli.");
+      return;
+    }
+    setForm((current) => ({ ...current, master_names: [...masterNameOptions, name].join("\n") }));
+    setMasterNameInput("");
+  };
+  const removeMasterName = (name: string) => {
+    const remaining = masterNameOptions.filter((existing) => existing !== name);
+    setForm((current) => ({ ...current, master_names: remaining.join("\n"), ...(current.master_report_name === name ? { master_report_name: "" } : {}) }));
+  };
   useEffect(() => {
     if (settings.data?.[0]) setForm(settings.data[0].payload);
   }, [settings.data]);
@@ -87,6 +103,19 @@ function Settings() {
                 <Input id={k} value={String(form[k] ?? "")} onChange={(e) => setForm({ ...form, [k]: e.target.value })} />
               </div>
             ))}
+            <div className="space-y-3 rounded-2xl border bg-card p-4">
+              <div><Label htmlFor="master-name-input">Aynı hesaba usta adı ekle</Label><p className="mt-1 text-xs text-muted-foreground">Her usta/işveren adını ekleyin; giriş ve hesap yetkileri değişmez.</p></div>
+              <div className="flex gap-2">
+                <Input id="master-name-input" maxLength={80} value={masterNameInput} onChange={(e) => setMasterNameInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addMasterName(); } }} placeholder="Örn. Abdullah Usta" />
+                <Button type="button" variant="secondary" aria-label="Usta adı ekle" onClick={addMasterName}><Plus className="size-4"/>Ekle</Button>
+              </div>
+              {masterNameOptions.length > 0 ? <ul className="flex flex-wrap gap-2">{masterNameOptions.map((name) => <li key={name} className="inline-flex max-w-full items-center gap-1 rounded-full border bg-background px-3 py-1.5 text-sm"><span className="truncate">{name}</span><button type="button" className="rounded-full p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={`${name} adını sil`} onClick={() => removeMasterName(name)}><X className="size-3.5"/></button></li>)}</ul> : <p className="rounded-xl border border-dashed p-3 text-center text-xs text-muted-foreground">Henüz ek usta adı eklenmedi.</p>}
+              <Label htmlFor="master-report-name">Yevmiye PDF’inde gösterilecek ad</Label>
+              <select id="master-report-name" className="h-11 w-full rounded-xl border bg-background px-3 text-sm" value={String(form.master_report_name ?? "")} onChange={(e) => setForm({ ...form, master_report_name: e.target.value })}>
+                <option value="">Profil adı · {me.data?.profile?.display_name || me.data?.profile?.username || "Usta"}</option>
+                {masterNameOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+              </select>
+            </div>
             <Label htmlFor="target">Aylık ciro hedefi (TL)</Label>
             <Input
               id="target"

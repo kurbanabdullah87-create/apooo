@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, AlertTriangle, MapPin, MessageCircle, Wallet, HardHat, Sparkles, Plus, ArrowDownLeft, ArrowUpRight, WalletCards, CalendarDays, BriefcaseBusiness } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertTriangle, MapPin, MessageCircle, Wallet, HardHat, Sparkles, ArrowDownLeft, ArrowUpRight, WalletCards, CalendarDays } from "lucide-react";
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { useCustomers, useExpenses, useTransactions } from "@/lib/data";
 import { customerBalance, customerRestriction, EXPENSE_LABELS, formatTL, monthKey, monthSummary, overdueAmount, profitBreakdown, todayISO, type ExpenseCategory } from "@/lib/finance";
@@ -11,7 +11,6 @@ import { useMe } from "@/hooks/use-me";
 import { toast } from "sonner";
 import { whatsappLink } from "@/lib/templates";
 import { Button } from "@/components/ui/button";
-import { CurrencyConverter } from "@/components/app/CurrencyConverter";
 
 export const Route = createFileRoute("/_authenticated/panel")({
   head: () => pageHead("Panel", "Aylık gelir, gider ve kâr özeti."),
@@ -100,10 +99,6 @@ function Panel() {
             <p className="mt-1.5 flex items-center gap-2 text-sm capitalize text-slate-300"><CalendarDays className="size-4 text-emerald-300"/>{todayLabel}</p>
             <p className="mt-4 max-w-xl text-sm leading-6 text-slate-300">Bugünün işlerini, tahsilatlarını ve saha akışını tek ekrandan takip et.</p>
           </div>
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-            <Button asChild className="h-11 justify-center rounded-xl bg-emerald-400 px-4 font-semibold text-slate-950 shadow-lg shadow-emerald-950/20 hover:bg-emerald-300"><Link to="/isler"><Plus className="size-4"/>İş oluştur</Link></Button>
-            <Button asChild variant="outline" className="h-11 justify-center rounded-xl border-white/15 bg-white/[0.06] px-4 text-white hover:bg-white/10 hover:text-white"><Link to="/yevmiye"><BriefcaseBusiness className="size-4"/>Yevmiye</Link></Button>
-          </div>
         </div>
         <div className="mt-6 grid grid-cols-2 gap-2.5 border-t border-white/10 pt-4 sm:max-w-md sm:gap-3">
           <div className="flex items-center gap-2.5 rounded-xl bg-black/15 px-3 py-2.5"><ArrowDownLeft className="size-4 text-emerald-300"/><span className="text-xs text-slate-300">Bugün tahsilat</span><span className="num ml-auto text-sm font-semibold text-white">{formatTL(todayIncome)}</span></div>
@@ -126,8 +121,6 @@ function Panel() {
           rows={2}
         />
       </section>
-
-      <CurrencyConverter />
 
       {nearby && <section className="rounded-2xl border-2 border-emerald-500/50 bg-emerald-500/10 p-4"><div className="flex items-start gap-3"><MapPin className="mt-0.5 size-5 shrink-0 text-emerald-700 dark:text-emerald-300"/><div className="min-w-0 flex-1"><p className="font-semibold">Şu an {nearby.customer.name} konumuna yakınsınız</p><p className="text-xs text-muted-foreground">Yaklaşık {Math.round(nearby.meters)} metre · konum yalnızca cihazda karşılaştırılır</p><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" disabled={saveJob.isPending} onClick={() => startNearbyJob(nearby.customer)}><HardHat/>Hızlı iş başlat</Button><Button asChild size="sm" variant="secondary"><Link to="/cari/$id" params={{ id: nearby.customer.id }}><Wallet/>Tahsilat al</Link></Button></div></div></div></section>}
       <MaintenanceAlerts />

@@ -1,7 +1,7 @@
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
-import { LayoutDashboard, Users, Receipt, Settings, Plus, Search, Loader2, ArrowDown, HardHat, CalendarDays, Wrench, CalendarClock, Cloud, CloudUpload, ShoppingCart, Landmark } from "lucide-react";
+import { LayoutDashboard, Users, Receipt, Settings, Plus, Search, Loader2, ArrowDown, HardHat, CalendarDays, Wrench, CalendarClock, Cloud, CloudUpload, Landmark, Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DeviceLock } from "./DeviceLock";
 import { useEffect } from "react";
@@ -19,12 +19,7 @@ const NAV = [
   { to: "/cari", label: "Cari", icon: Users },
   { to: "/yevmiye", label: "Yevmiye", icon: CalendarDays },
   { to: "/ekipman", label: "Ekipman", icon: Wrench },
-] as const;
-
-const EXTRA_NAV = [
-  { to: "/hava", label: "Hava", icon: Cloud },
-  { to: "/banka", label: "Banka", icon: Landmark },
-  { to: "/alim", label: "Alım", icon: ShoppingCart },
+  { to: "/doviz", label: "Döviz", icon: Coins },
 ] as const;
 
 export function AppShell() {
@@ -118,7 +113,7 @@ export function AppShell() {
       </main>
 
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 backdrop-blur">
-        <div className={`mx-auto grid max-w-md ${isUsta ? "grid-cols-11" : "grid-cols-2"}`}>
+        <div className={`mx-auto grid max-w-md ${isUsta ? "grid-cols-13" : "grid-cols-2"}`}>
           {NAV.filter(n => isUsta || ["/isler", "/yevmiye"].includes(n.to)).map((n, index) => {
             const active = path.startsWith(n.to);
             return <div key={n.to} className="contents">
@@ -126,7 +121,7 @@ export function AppShell() {
               <Link
                 to={n.to}
                 onClick={() => haptic(8)}
-                className={cn("flex flex-col items-center gap-1 py-3 text-[11px] font-medium", isUsta && "col-span-2", active ? "text-primary" : "text-muted-foreground")}
+                className={cn("flex min-w-0 flex-col items-center gap-1 py-3 text-[10px] font-medium sm:text-[11px]", isUsta && "col-span-2", active ? "text-primary" : "text-muted-foreground")}
               >
                 <n.icon className="size-5" />
                 {n.label}

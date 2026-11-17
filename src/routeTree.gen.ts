@@ -12,22 +12,24 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
-import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
-import { Route as AuthResetPasswordRouteImport } from './routes/auth.reset-password'
 import { Route as GizlilikRouteImport } from './routes/gizlilik'
 import { Route as KullanimSartlariRouteImport } from './routes/kullanim-sartlari'
+import { Route as SssRouteImport } from './routes/sss'
+import { Route as AuthenticatedAlimRouteImport } from './routes/_authenticated/alim'
 import { Route as AuthenticatedAyarlarRouteImport } from './routes/_authenticated/ayarlar'
+import { Route as AuthenticatedBankaRouteImport } from './routes/_authenticated/banka'
+import { Route as AuthenticatedDovizRouteImport } from './routes/_authenticated/doviz'
 import { Route as AuthenticatedEkipmanRouteImport } from './routes/_authenticated/ekipman'
 import { Route as AuthenticatedGiderlerRouteImport } from './routes/_authenticated/giderler'
-import { Route as AuthenticatedRandevuRouteImport } from './routes/_authenticated/randevu'
+import { Route as AuthenticatedHavaRouteImport } from './routes/_authenticated/hava'
 import { Route as AuthenticatedIslerRouteImport } from './routes/_authenticated/isler'
 import { Route as AuthenticatedPanelRouteImport } from './routes/_authenticated/panel'
+import { Route as AuthenticatedRandevuRouteImport } from './routes/_authenticated/randevu'
 import { Route as AuthenticatedYevmiyeRouteImport } from './routes/_authenticated/yevmiye'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
+import { Route as AuthResetPasswordRouteImport } from './routes/auth.reset-password'
 import { Route as AuthenticatedCariIndexRouteImport } from './routes/_authenticated/cari.index'
 import { Route as AuthenticatedCariIdRouteImport } from './routes/_authenticated/cari.$id'
-import { Route as AuthenticatedHavaRouteImport } from './routes/_authenticated/hava'
-import { Route as AuthenticatedBankaRouteImport } from './routes/_authenticated/banka'
-import { Route as AuthenticatedAlimRouteImport } from './routes/_authenticated/alim'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -43,16 +45,6 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthCallbackRoute = AuthCallbackRouteImport.update({
-  id: '/auth/callback',
-  path: '/auth/callback',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthResetPasswordRoute = AuthResetPasswordRouteImport.update({
-  id: '/auth/reset-password',
-  path: '/auth/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const GizlilikRoute = GizlilikRouteImport.update({
   id: '/gizlilik',
   path: '/gizlilik',
@@ -63,9 +55,29 @@ const KullanimSartlariRoute = KullanimSartlariRouteImport.update({
   path: '/kullanim-sartlari',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SssRoute = SssRouteImport.update({
+  id: '/sss',
+  path: '/sss',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedAlimRoute = AuthenticatedAlimRouteImport.update({
+  id: '/alim',
+  path: '/alim',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAyarlarRoute = AuthenticatedAyarlarRouteImport.update({
   id: '/ayarlar',
   path: '/ayarlar',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedBankaRoute = AuthenticatedBankaRouteImport.update({
+  id: '/banka',
+  path: '/banka',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedDovizRoute = AuthenticatedDovizRouteImport.update({
+  id: '/doviz',
+  path: '/doviz',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedEkipmanRoute = AuthenticatedEkipmanRouteImport.update({
@@ -73,14 +85,14 @@ const AuthenticatedEkipmanRoute = AuthenticatedEkipmanRouteImport.update({
   path: '/ekipman',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedRandevuRoute = AuthenticatedRandevuRouteImport.update({
-  id: '/randevu',
-  path: '/randevu',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedGiderlerRoute = AuthenticatedGiderlerRouteImport.update({
   id: '/giderler',
   path: '/giderler',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedHavaRoute = AuthenticatedHavaRouteImport.update({
+  id: '/hava',
+  path: '/hava',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedIslerRoute = AuthenticatedIslerRouteImport.update({
@@ -93,28 +105,26 @@ const AuthenticatedPanelRoute = AuthenticatedPanelRouteImport.update({
   path: '/panel',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedRandevuRoute = AuthenticatedRandevuRouteImport.update({
+  id: '/randevu',
+  path: '/randevu',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedYevmiyeRoute = AuthenticatedYevmiyeRouteImport.update({
   id: '/yevmiye',
   path: '/yevmiye',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-
-const AuthenticatedHavaRoute = AuthenticatedHavaRouteImport.update({
-  id: '/hava',
-  path: '/hava',
-  getParentRoute: () => AuthenticatedRouteRoute,
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/callback',
+  path: '/callback',
+  getParentRoute: () => AuthRoute,
 } as any)
-const AuthenticatedBankaRoute = AuthenticatedBankaRouteImport.update({
-  id: '/banka',
-  path: '/banka',
-  getParentRoute: () => AuthenticatedRouteRoute,
+const AuthResetPasswordRoute = AuthResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => AuthRoute,
 } as any)
-const AuthenticatedAlimRoute = AuthenticatedAlimRouteImport.update({
-  id: '/alim',
-  path: '/alim',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-
 const AuthenticatedCariIndexRoute = AuthenticatedCariIndexRouteImport.update({
   id: '/cari/',
   path: '/cari/',
@@ -128,35 +138,45 @@ const AuthenticatedCariIdRoute = AuthenticatedCariIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/auth': typeof AuthRoute
-  '/auth/callback': typeof AuthCallbackRoute
-  '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/auth': typeof AuthRouteWithChildren
   '/gizlilik': typeof GizlilikRoute
   '/kullanim-sartlari': typeof KullanimSartlariRoute
+  '/sss': typeof SssRoute
+  '/alim': typeof AuthenticatedAlimRoute
   '/ayarlar': typeof AuthenticatedAyarlarRoute
+  '/banka': typeof AuthenticatedBankaRoute
+  '/doviz': typeof AuthenticatedDovizRoute
   '/ekipman': typeof AuthenticatedEkipmanRoute
   '/giderler': typeof AuthenticatedGiderlerRoute
-  '/randevu': typeof AuthenticatedRandevuRoute
+  '/hava': typeof AuthenticatedHavaRoute
   '/isler': typeof AuthenticatedIslerRoute
   '/panel': typeof AuthenticatedPanelRoute
+  '/randevu': typeof AuthenticatedRandevuRoute
   '/yevmiye': typeof AuthenticatedYevmiyeRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/auth/reset-password': typeof AuthResetPasswordRoute
   '/cari/$id': typeof AuthenticatedCariIdRoute
   '/cari/': typeof AuthenticatedCariIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/auth': typeof AuthRoute
-  '/auth/callback': typeof AuthCallbackRoute
-  '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/auth': typeof AuthRouteWithChildren
   '/gizlilik': typeof GizlilikRoute
   '/kullanim-sartlari': typeof KullanimSartlariRoute
+  '/sss': typeof SssRoute
+  '/alim': typeof AuthenticatedAlimRoute
   '/ayarlar': typeof AuthenticatedAyarlarRoute
+  '/banka': typeof AuthenticatedBankaRoute
+  '/doviz': typeof AuthenticatedDovizRoute
   '/ekipman': typeof AuthenticatedEkipmanRoute
   '/giderler': typeof AuthenticatedGiderlerRoute
-  '/randevu': typeof AuthenticatedRandevuRoute
+  '/hava': typeof AuthenticatedHavaRoute
   '/isler': typeof AuthenticatedIslerRoute
   '/panel': typeof AuthenticatedPanelRoute
+  '/randevu': typeof AuthenticatedRandevuRoute
   '/yevmiye': typeof AuthenticatedYevmiyeRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/auth/reset-password': typeof AuthResetPasswordRoute
   '/cari/$id': typeof AuthenticatedCariIdRoute
   '/cari': typeof AuthenticatedCariIndexRoute
 }
@@ -164,18 +184,23 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
-  '/auth': typeof AuthRoute
-  '/auth/callback': typeof AuthCallbackRoute
-  '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/auth': typeof AuthRouteWithChildren
   '/gizlilik': typeof GizlilikRoute
   '/kullanim-sartlari': typeof KullanimSartlariRoute
+  '/sss': typeof SssRoute
+  '/_authenticated/alim': typeof AuthenticatedAlimRoute
   '/_authenticated/ayarlar': typeof AuthenticatedAyarlarRoute
+  '/_authenticated/banka': typeof AuthenticatedBankaRoute
+  '/_authenticated/doviz': typeof AuthenticatedDovizRoute
   '/_authenticated/ekipman': typeof AuthenticatedEkipmanRoute
   '/_authenticated/giderler': typeof AuthenticatedGiderlerRoute
-  '/_authenticated/randevu': typeof AuthenticatedRandevuRoute
+  '/_authenticated/hava': typeof AuthenticatedHavaRoute
   '/_authenticated/isler': typeof AuthenticatedIslerRoute
   '/_authenticated/panel': typeof AuthenticatedPanelRoute
+  '/_authenticated/randevu': typeof AuthenticatedRandevuRoute
   '/_authenticated/yevmiye': typeof AuthenticatedYevmiyeRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/auth/reset-password': typeof AuthResetPasswordRoute
   '/_authenticated/cari/$id': typeof AuthenticatedCariIdRoute
   '/_authenticated/cari/': typeof AuthenticatedCariIndexRoute
 }
@@ -184,34 +209,44 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
-    | '/auth/callback'
-    | '/auth/reset-password'
     | '/gizlilik'
     | '/kullanim-sartlari'
+    | '/sss'
+    | '/alim'
     | '/ayarlar'
+    | '/banka'
+    | '/doviz'
     | '/ekipman'
     | '/giderler'
-    | '/randevu'
+    | '/hava'
     | '/isler'
     | '/panel'
+    | '/randevu'
     | '/yevmiye'
+    | '/auth/callback'
+    | '/auth/reset-password'
     | '/cari/$id'
     | '/cari/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
-    | '/auth/callback'
-    | '/auth/reset-password'
     | '/gizlilik'
     | '/kullanim-sartlari'
+    | '/sss'
+    | '/alim'
     | '/ayarlar'
+    | '/banka'
+    | '/doviz'
     | '/ekipman'
     | '/giderler'
-    | '/randevu'
+    | '/hava'
     | '/isler'
     | '/panel'
+    | '/randevu'
     | '/yevmiye'
+    | '/auth/callback'
+    | '/auth/reset-password'
     | '/cari/$id'
     | '/cari'
   id:
@@ -219,17 +254,22 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/auth'
-    | '/auth/callback'
-    | '/auth/reset-password'
     | '/gizlilik'
     | '/kullanim-sartlari'
+    | '/sss'
+    | '/_authenticated/alim'
     | '/_authenticated/ayarlar'
+    | '/_authenticated/banka'
+    | '/_authenticated/doviz'
     | '/_authenticated/ekipman'
     | '/_authenticated/giderler'
-    | '/_authenticated/randevu'
+    | '/_authenticated/hava'
     | '/_authenticated/isler'
     | '/_authenticated/panel'
+    | '/_authenticated/randevu'
     | '/_authenticated/yevmiye'
+    | '/auth/callback'
+    | '/auth/reset-password'
     | '/_authenticated/cari/$id'
     | '/_authenticated/cari/'
   fileRoutesById: FileRoutesById
@@ -237,11 +277,10 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
-  AuthRoute: typeof AuthRoute
-  AuthCallbackRoute: typeof AuthCallbackRoute
-  AuthResetPasswordRoute: typeof AuthResetPasswordRoute
+  AuthRoute: typeof AuthRouteWithChildren
   GizlilikRoute: typeof GizlilikRoute
   KullanimSartlariRoute: typeof KullanimSartlariRoute
+  SssRoute: typeof SssRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -267,20 +306,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/auth/callback': {
-      id: '/auth/callback'
-      path: '/auth/callback'
-      fullPath: '/auth/callback'
-      preLoaderRoute: typeof AuthCallbackRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/reset-password': {
-      id: '/auth/reset-password'
-      path: '/auth/reset-password'
-      fullPath: '/auth/reset-password'
-      preLoaderRoute: typeof AuthResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/gizlilik': {
       id: '/gizlilik'
       path: '/gizlilik'
@@ -295,11 +320,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KullanimSartlariRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sss': {
+      id: '/sss'
+      path: '/sss'
+      fullPath: '/sss'
+      preLoaderRoute: typeof SssRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/alim': {
+      id: '/_authenticated/alim'
+      path: '/alim'
+      fullPath: '/alim'
+      preLoaderRoute: typeof AuthenticatedAlimRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/ayarlar': {
       id: '/_authenticated/ayarlar'
       path: '/ayarlar'
       fullPath: '/ayarlar'
       preLoaderRoute: typeof AuthenticatedAyarlarRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/banka': {
+      id: '/_authenticated/banka'
+      path: '/banka'
+      fullPath: '/banka'
+      preLoaderRoute: typeof AuthenticatedBankaRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/doviz': {
+      id: '/_authenticated/doviz'
+      path: '/doviz'
+      fullPath: '/doviz'
+      preLoaderRoute: typeof AuthenticatedDovizRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/ekipman': {
@@ -309,18 +362,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedEkipmanRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/randevu': {
-      id: '/_authenticated/randevu'
-      path: '/randevu'
-      fullPath: '/randevu'
-      preLoaderRoute: typeof AuthenticatedRandevuRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/giderler': {
       id: '/_authenticated/giderler'
       path: '/giderler'
       fullPath: '/giderler'
       preLoaderRoute: typeof AuthenticatedGiderlerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/hava': {
+      id: '/_authenticated/hava'
+      path: '/hava'
+      fullPath: '/hava'
+      preLoaderRoute: typeof AuthenticatedHavaRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/isler': {
@@ -337,12 +390,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPanelRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/randevu': {
+      id: '/_authenticated/randevu'
+      path: '/randevu'
+      fullPath: '/randevu'
+      preLoaderRoute: typeof AuthenticatedRandevuRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/yevmiye': {
       id: '/_authenticated/yevmiye'
       path: '/yevmiye'
       fullPath: '/yevmiye'
       preLoaderRoute: typeof AuthenticatedYevmiyeRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof AuthRoute
+    }
+    '/auth/reset-password': {
+      id: '/auth/reset-password'
+      path: '/reset-password'
+      fullPath: '/auth/reset-password'
+      preLoaderRoute: typeof AuthResetPasswordRouteImport
+      parentRoute: typeof AuthRoute
     }
     '/_authenticated/cari/': {
       id: '/_authenticated/cari/'
@@ -358,71 +432,63 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCariIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/hava': {
-      id: '/_authenticated/hava'
-      path: '/hava'
-      fullPath: '/hava'
-      preLoaderRoute: typeof AuthenticatedHavaRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/banka': {
-      id: '/_authenticated/banka'
-      path: '/banka'
-      fullPath: '/banka'
-      preLoaderRoute: typeof AuthenticatedBankaRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/alim': {
-      id: '/_authenticated/alim'
-      path: '/alim'
-      fullPath: '/alim'
-      preLoaderRoute: typeof AuthenticatedAlimRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAlimRoute: typeof AuthenticatedAlimRoute
   AuthenticatedAyarlarRoute: typeof AuthenticatedAyarlarRoute
+  AuthenticatedBankaRoute: typeof AuthenticatedBankaRoute
+  AuthenticatedDovizRoute: typeof AuthenticatedDovizRoute
   AuthenticatedEkipmanRoute: typeof AuthenticatedEkipmanRoute
   AuthenticatedGiderlerRoute: typeof AuthenticatedGiderlerRoute
-  AuthenticatedRandevuRoute: typeof AuthenticatedRandevuRoute
+  AuthenticatedHavaRoute: typeof AuthenticatedHavaRoute
   AuthenticatedIslerRoute: typeof AuthenticatedIslerRoute
   AuthenticatedPanelRoute: typeof AuthenticatedPanelRoute
+  AuthenticatedRandevuRoute: typeof AuthenticatedRandevuRoute
   AuthenticatedYevmiyeRoute: typeof AuthenticatedYevmiyeRoute
   AuthenticatedCariIdRoute: typeof AuthenticatedCariIdRoute
   AuthenticatedCariIndexRoute: typeof AuthenticatedCariIndexRoute
-  AuthenticatedHavaRoute: typeof AuthenticatedHavaRoute
-  AuthenticatedBankaRoute: typeof AuthenticatedBankaRoute
-  AuthenticatedAlimRoute: typeof AuthenticatedAlimRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAlimRoute: AuthenticatedAlimRoute,
   AuthenticatedAyarlarRoute: AuthenticatedAyarlarRoute,
+  AuthenticatedBankaRoute: AuthenticatedBankaRoute,
+  AuthenticatedDovizRoute: AuthenticatedDovizRoute,
   AuthenticatedEkipmanRoute: AuthenticatedEkipmanRoute,
   AuthenticatedGiderlerRoute: AuthenticatedGiderlerRoute,
-  AuthenticatedRandevuRoute: AuthenticatedRandevuRoute,
+  AuthenticatedHavaRoute: AuthenticatedHavaRoute,
   AuthenticatedIslerRoute: AuthenticatedIslerRoute,
   AuthenticatedPanelRoute: AuthenticatedPanelRoute,
+  AuthenticatedRandevuRoute: AuthenticatedRandevuRoute,
   AuthenticatedYevmiyeRoute: AuthenticatedYevmiyeRoute,
   AuthenticatedCariIdRoute: AuthenticatedCariIdRoute,
   AuthenticatedCariIndexRoute: AuthenticatedCariIndexRoute,
-  AuthenticatedHavaRoute: AuthenticatedHavaRoute,
-  AuthenticatedBankaRoute: AuthenticatedBankaRoute,
-  AuthenticatedAlimRoute: AuthenticatedAlimRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
+interface AuthRouteChildren {
+  AuthCallbackRoute: typeof AuthCallbackRoute
+  AuthResetPasswordRoute: typeof AuthResetPasswordRoute
+}
+
+const AuthRouteChildren: AuthRouteChildren = {
+  AuthCallbackRoute: AuthCallbackRoute,
+  AuthResetPasswordRoute: AuthResetPasswordRoute,
+}
+
+const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
-  AuthRoute: AuthRoute,
-  AuthCallbackRoute: AuthCallbackRoute,
-  AuthResetPasswordRoute: AuthResetPasswordRoute,
+  AuthRoute: AuthRouteWithChildren,
   GizlilikRoute: GizlilikRoute,
   KullanimSartlariRoute: KullanimSartlariRoute,
+  SssRoute: SssRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
