@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Play, Pause, Check, Copy, ChevronDown, Clock, Download } from "lucide-react";
+import { Plus, Play, Pause, Check, Copy, ChevronDown, Clock, Download, Search, X, CalendarCheck, Activity, Phone, MessageCircle, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { FormDrawer } from "@/components/app/forms/FormDrawer";
@@ -30,6 +30,7 @@ import {
 } from "@/lib/work";
 import { todayISO, formatTL } from "@/lib/finance";
 import { applyVoiceJob, parseVoiceJob } from "@/lib/voice-job";
+import { whatsappLink } from "@/lib/templates";
 import { SwipeRow } from "@/components/app/SwipeRow";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -55,6 +56,7 @@ function Jobs() {
   const [editing, setEditing] = useState<WorkRecord>();
   const [form, setForm] = useState<Payload>({});
   const [filter, setFilter] = useState("Tümü");
+  const [searchQuery, setSearchQuery] = useState("");
   const [date, setDate] = useState(todayISO());
   const [showProgress, setShowProgress] = useState(true);
   const [expanded, setExpanded] = useState<string>();
@@ -126,7 +128,7 @@ function Jobs() {
     else if (m.level === "warn") toast.warning(`${String(eq.payload.name)}: bakıma ${m.remaining.toFixed(1)} saat kaldı`);
   }
 
-  async function downloadJobReport(job: WorkRecord) {
+  async function downloadJobReport(job: WorkRecord, share = false) {
     try {
       const [{ jsPDF }, customer] = await Promise.all([
         import("jspdf"),
@@ -159,6 +161,7 @@ function Jobs() {
       };
       section("İŞ BİLGİLERİ");
       field("İş", job.payload.title); field("Müşteri", customer?.name ?? "Kayıtlı müşteri yok");
+      if (customer?.phone) field("Telefon", customer.phone);
       field("Tarih", job.payload.date); field("Durum", job.payload.status);
       field("Adres", job.payload.address || customer?.address || "—");
       field("Ekipman", equipment.data?.find((item) => item.id === job.payload.equipment_id)?.payload.name ?? (job.payload.no_machine ? "Makinesiz" : "—"));
@@ -171,9 +174,20 @@ function Jobs() {
       if (job.payload["estimated_profit_margin"] != null) field("Tahmini kâr marjı", `%${Number(job.payload["estimated_profit_margin"]).toFixed(1)}`);
       doc.setFont("DejaVu", "normal"); doc.setFontSize(7.5); doc.setTextColor(115, 126, 141);
       doc.text("Bu rapor uygulamadaki iş kaydına dayanır; fatura veya resmi belge yerine geçmez.", margin, 282, { maxWidth: 175 });
-      doc.save(`saha-is-raporu-${String(job.payload.date ?? todayISO())}.pdf`);
-      toast.success("İş raporu PDF olarak indirildi.");
+      const filename = `saha-is-raporu-${String(job.payload.date ?? todayISO())}.pdf`;
+      const blob = doc.output("blob");
+      if (share && typeof File !== "undefined") {
+        const file = new File([blob], filename, { type: "application/pdf" });
+        if (navigator.canShare?.({ files: [file] }) && navigator.share) {
+          await navigator.share({ title: `İş raporu · ${String(job.payload.title ?? "Saha")}`, files: [file] });
+          toast.success("İş raporu paylaşım ekranında açıldı.");
+          return;
+        }
+      }
+      doc.save(filename);
+      toast.success(share ? "Bu cihazda doğrudan paylaşım desteklenmiyor; PDF indirildi." : "İş raporu PDF olarak indirildi.");
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
       console.error(error);
       toast.error("İş raporu oluşturulamadı. Yeniden deneyin.");
     }
@@ -204,9 +218,29 @@ function Jobs() {
     );
   }
 
-  const rows = (jobs.data ?? []).filter(
-    (j) => (filter === "Tümü" || j.payload.status === filter) && (!date || j.payload.date === date),
-  );
+  const dateRows = (jobs.data ?? []).filter((job) => !date || job.payload.date === date);
+  const statusCounts = Object.fromEntries(["Tümü", ...STATUSES].map((status) => [
+    status,
+    status === "Tümü" ? dateRows.length : dateRows.filter((job) => String(job.payload.status ?? "Bekliyor") === status).length,
+  ])) as Record<string, number>;
+  const normalizedQuery = searchQuery.trim().toLocaleLowerCase("tr-TR");
+  const rows = dateRows.filter((job) => {
+    if (filter !== "Tümü" && String(job.payload.status ?? "Bekliyor") !== filter) return false;
+    if (!normalizedQuery) return true;
+    const customer = customers.data?.find((item) => item.id === job.payload.customer_id);
+    const machine = equipment.data?.find((item) => item.id === job.payload.equipment_id);
+    const assigned = members.find((item) => item.id === job.owner_id);
+    const searchable = [job.payload.title, customer?.name, customer?.phone, job.payload.address, customer?.address, job.payload.notes, machine?.payload.name, assigned?.username]
+      .map((value) => String(value ?? "").toLocaleLowerCase("tr-TR"));
+    return searchable.some((value) => value.includes(normalizedQuery));
+  });
+  const runningCount = dateRows.filter((job) => Boolean(job.payload.started_at) && job.payload.status !== "Tamamlandı").length;
+  const completedCount = dateRows.filter((job) => job.payload.status === "Tamamlandı").length;
+  const dateOffset = (days: number) => {
+    const target = new Date(`${todayISO()}T12:00:00`);
+    target.setDate(target.getDate() + days);
+    return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, "0")}-${String(target.getDate()).padStart(2, "0")}`;
+  };
 
   return (
     <div className="space-y-4">
@@ -230,21 +264,26 @@ function Jobs() {
         <Button variant="ghost" size="sm" onClick={() => setDate("")}>
           Tüm tarihler
         </Button>
+        <Button variant={date === todayISO() ? "secondary" : "outline"} size="sm" onClick={() => setDate(todayISO())}><CalendarCheck className="size-4"/>Bugün</Button>
+        <Button variant={date === dateOffset(1) ? "secondary" : "outline"} size="sm" onClick={() => setDate(dateOffset(1))}>Yarın</Button>
         <Button variant="outline" size="sm" onClick={getWeather}>
           Hava durumu
         </Button>
       </div>
       {weather && <p className="text-sm text-muted-foreground">{weather}</p>}
-      <select
-        aria-label="İş durumu filtresi"
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        className="h-11 w-full rounded-md border bg-secondary px-3"
-      >
-        {["Tümü", ...STATUSES].map((s) => (
-          <option key={s}>{s}</option>
-        ))}
-      </select>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="flex items-center gap-2 rounded-xl border bg-card px-3 py-2.5"><Activity className="size-4 text-primary"/><span className="text-xs text-muted-foreground">Görünen tarihte</span><span className="ml-auto font-semibold">{dateRows.length}</span></div>
+        <div className="flex items-center gap-2 rounded-xl border bg-card px-3 py-2.5"><Play className="size-4 text-emerald-500"/><span className="text-xs text-muted-foreground">Çalışıyor</span><span className="ml-auto font-semibold">{runningCount}</span></div>
+        <div className="col-span-2 flex items-center gap-2 rounded-xl border bg-card px-3 py-2.5 sm:col-span-1"><Check className="size-4 text-sky-500"/><span className="text-xs text-muted-foreground">Tamamlandı</span><span className="ml-auto font-semibold">{completedCount}{dateRows.length ? ` / ${dateRows.length}` : ""}</span></div>
+      </div>
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/>
+        <Input aria-label="İşlerde ara" className="h-11 pl-9 pr-10" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="İş, müşteri, telefon, adres veya ekipman ara"/>
+        {searchQuery && <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 size-9 -translate-y-1/2" aria-label="Aramayı temizle" onClick={() => setSearchQuery("")}><X className="size-4"/></Button>}
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-1" role="group" aria-label="İş durumu filtresi">
+        {["Tümü", ...STATUSES].map((status) => <Button key={status} type="button" size="sm" variant={filter === status ? "default" : "outline"} className="shrink-0" aria-pressed={filter === status} onClick={() => setFilter(status)}>{status}<span className="ml-1 rounded-full bg-background/20 px-1.5 text-[10px]">{statusCounts[status] ?? 0}</span></Button>)}
+      </div>
       {me.data?.isUsta && !!templates.data?.length && (
         <div className="flex flex-wrap gap-2">
           {templates.data.map((t) => (
@@ -264,7 +303,7 @@ function Jobs() {
       {jobs.isLoading ? (
         <div className="space-y-3" aria-label="İşler yükleniyor" aria-busy="true">{[0, 1, 2].map((key) => <div key={key} className="space-y-3 rounded-2xl border bg-card p-4"><Skeleton className="h-5 w-2/5"/><Skeleton className="h-4 w-3/5"/><Skeleton className="h-10 w-full"/></div>)}</div>
       ) : rows.length === 0 ? (
-        <p className="py-8 text-center text-muted-foreground">Bu tarihte iş yok.</p>
+        <div className="rounded-2xl border border-dashed p-8 text-center"><Search className="mx-auto size-6 text-muted-foreground"/><p className="mt-2 text-sm font-medium">{normalizedQuery ? "Aramayla eşleşen iş bulunamadı." : filter !== "Tümü" ? `${filter} durumunda iş yok.` : "Bu tarihte iş yok."}</p>{(normalizedQuery || filter !== "Tümü") && <Button className="mt-3" size="sm" variant="secondary" onClick={() => { setSearchQuery(""); setFilter("Tümü"); }}>Filtreleri temizle</Button>}</div>
       ) : (
         rows.map((j, index) => {
           const p = j.payload;
@@ -280,7 +319,7 @@ function Jobs() {
                     {index + 1}. {p.title}
                   </h2>
                   <p className="text-xs text-muted-foreground">
-                    {customer?.name} · {p.date}
+                    {[customer?.name, p.date, p.time].filter(Boolean).join(" · ")}
                   </p>
                 </div>
                 <Button
@@ -312,6 +351,7 @@ function Jobs() {
                         : Number(p.price ?? 0),
                     )}
                   </p>
+                  {customer?.phone && <div className="flex flex-wrap gap-2"><Button asChild variant="outline" size="sm"><a href={`tel:${customer.phone}`} aria-label={`${customer.name} müşterisini ara`}><Phone className="size-4"/>Ara</a></Button><Button asChild variant="outline" size="sm"><a href={whatsappLink(customer.phone, `Merhaba ${customer.name}, ${String(p.title ?? "işiniz")} için iletişime geçiyorum.`)} target="_blank" rel="noreferrer"><MessageCircle className="size-4"/>WhatsApp</a></Button></div>}
                   <div className="flex flex-wrap gap-2">
                     <Button
                       variant="secondary"
@@ -420,7 +460,7 @@ function Jobs() {
                     </>
                   )}
                   <MediaTools record={j} readOnly={!me.data?.isUsta} onSave={(p) => change(j, p)} />
-                  {me.data?.isUsta && <Button variant="outline" size="sm" onClick={() => void downloadJobReport(j)}><Download className="size-4"/>İş raporunu indir (PDF)</Button>}
+                  {me.data?.isUsta && <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" onClick={() => void downloadJobReport(j)}><Download className="size-4"/>PDF indir</Button><Button variant="secondary" size="sm" onClick={() => void downloadJobReport(j, true)}><Share2 className="size-4"/>PDF paylaş</Button></div>}
                 </div>
               )}
             </article>
