@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { InstallButton } from "@/components/app/InstallButton";
 import { supabase } from "@/integrations/supabase/client";
 import { getRememberMe, setRememberMe } from "@/integrations/supabase/rememberedAuthStorage";
 import { normalizeUsername, USERNAME_RE, usernameToEmail } from "@/lib/username";
@@ -200,6 +201,7 @@ function AuthPage() {
                   {!resetMode && <label className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-3 text-sm transition-colors ${remember ? "border-primary/30 bg-primary/[0.07]" : "border-white/10 bg-white/[0.025] hover:bg-white/[0.045]"}`}><input type="checkbox" className="size-4 shrink-0 accent-primary" checked={remember} onChange={(e) => setRemember(e.target.checked)}/><span className="min-w-0 flex-1 font-medium">Beni hatırla</span><span className="shrink-0 text-[11px] text-muted-foreground">{remember ? "Bu cihazda açık kalır" : "Bu sekmede açık kalır"}</span></label>}
                   <Button type="submit" className="h-12 w-full rounded-xl bg-primary text-base font-semibold shadow-lg shadow-primary/10 transition hover:brightness-105" disabled={busy}>{busy ? <Loader2 className="animate-spin"/> : <>{resetMode ? "Yenileme bağlantısı gönder" : mode === "login" ? "Giriş yap" : "Hesap oluştur"}<ArrowRight/></>}</Button>
                 </form>
+                {!resetMode && <div className="mt-4"><InstallButton/></div>}
 
                 {resetMode ? <button type="button" onClick={() => setResetMode(false)} className="mt-4 w-full text-center text-sm font-medium text-primary hover:underline">Giriş ekranına dön</button> : <>
                   {mode === "login" && <button type="button" onClick={() => setLegacy((value) => !value)} className="mt-4 w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">{legacy ? "E-posta ile girişe dön" : "Eski kullanıcı adıyla açılmış hesabım var"}</button>}

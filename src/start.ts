@@ -32,7 +32,7 @@ const csrfMiddleware = createCsrfMiddleware({
 const canonicalHostMiddleware = createMiddleware().server(async ({ next }) => {
   const request = getRequest();
   const url = new URL(request.url);
-  if (url.hostname === "sahav2full-abdullah-6206.vercel.app") {
+  if (url.hostname !== "sahav2full.vercel.app" && /^sahav2full-.+-abdullah-6206\.vercel\.app$/i.test(url.hostname)) {
     url.hostname = "sahav2full.vercel.app";
     return Response.redirect(url, 308);
   }

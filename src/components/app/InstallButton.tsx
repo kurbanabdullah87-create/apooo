@@ -8,33 +8,46 @@ interface InstallEvent extends Event {
 export function InstallButton() {
   const [event, setEvent] = useState<InstallEvent>();
   const [help, setHelp] = useState(false);
+  const [installed, setInstalled] = useState(false);
   useEffect(() => {
     const listener = (e: Event) => {
       e.preventDefault();
       setEvent(e as InstallEvent);
     };
     window.addEventListener("beforeinstallprompt", listener);
-    return () => window.removeEventListener("beforeinstallprompt", listener);
+    const installedListener = () => { setInstalled(true); setEvent(undefined); };
+    const standalone = window.matchMedia("(display-mode: standalone)").matches || ("standalone" in navigator && Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
+    setInstalled(standalone);
+    window.addEventListener("appinstalled", installedListener);
+    return () => { window.removeEventListener("beforeinstallprompt", listener); window.removeEventListener("appinstalled", installedListener); };
   }, []);
+  if (installed) return <p className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] px-3 text-sm font-medium text-emerald-300">✓ Saha bu cihazda uygulama olarak yüklü</p>;
   return (
     <div className="space-y-2">
       <Button
         variant="outline"
-        className="w-full"
+        className="h-12 w-full rounded-xl"
         onClick={async () => {
           if (event) {
-            await event.prompt();
-            setEvent(undefined);
+            try {
+              await event.prompt();
+              const choice = await event.userChoice;
+              if (choice.outcome === "accepted") setInstalled(true);
+              else setHelp(true);
+            } catch {
+              setHelp(true);
+            } finally {
+              setEvent(undefined);
+            }
           } else setHelp(!help);
         }}
       >
         <Download />
-        Telefona yükle
+        Saha’yı telefona uygulama olarak ekle
       </Button>
       {help && (
-        <p className="text-sm text-muted-foreground">
-          Yayınlanan bağlantıyı açın. Android: tarayıcı menüsü → Uygulamayı yükle. iPhone: Safari →
-          Paylaş → Ana Ekrana Ekle.
+        <p className="rounded-xl border bg-card p-3 text-sm leading-relaxed text-muted-foreground">
+          Android: Chrome menüsü → <strong>Uygulamayı yükle</strong>. iPhone/iPad: Safari’de Paylaş → <strong>Ana Ekrana Ekle</strong> → Ekle. Sonra Saha simgesine dokun; uygulama tarayıcı çerçevesi olmadan açılır.
         </p>
       )}
     </div>

@@ -8,6 +8,31 @@ export function setRememberMe(enabled: boolean) {
   } catch {
     // Storage can be disabled by browser privacy settings; the session can still work in memory.
   }
+  // Move an already-issued Supabase session to the selected storage immediately.
+  // Otherwise a token created before the checkbox was applied can stay session-only.
+  if (typeof window === "undefined") return;
+  try {
+    const tokenSuffix = "-auth-token";
+    if (enabled) {
+      for (let index = sessionStorage.length - 1; index >= 0; index -= 1) {
+        const key = sessionStorage.key(index);
+        if (!key?.startsWith("sb-") || !key.endsWith(tokenSuffix)) continue;
+        const value = sessionStorage.getItem(key);
+        if (value) localStorage.setItem(key, value);
+        sessionStorage.removeItem(key);
+      }
+    } else {
+      for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+        const key = localStorage.key(index);
+        if (!key?.startsWith("sb-") || !key.endsWith(tokenSuffix)) continue;
+        const value = localStorage.getItem(key);
+        if (value) sessionStorage.setItem(key, value);
+        localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // Keep the auth attempt alive if a browser blocks one of its storage backends.
+  }
 }
 
 export function getRememberMe() {

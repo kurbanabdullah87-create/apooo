@@ -1,3 +1,5 @@
+import { getLiveCurrencyRates } from "@/lib/currency.functions";
+
 export const CURRENCY_OPTIONS = [
   { code: "USD", label: "ABD Doları" },
   { code: "TRY", label: "Türk Lirası" },
@@ -7,9 +9,9 @@ export const CURRENCY_OPTIONS = [
   { code: "CHF", label: "İsviçre Frangı" },
 ] as const;
 
-export type CurrencyCode = (typeof CURRENCY_OPTIONS)[number]["code"];
+export type CurrencyCode = string;
 export type RatePoint = { date: string; rate: number };
-export type PairRate = { base: string; quote: string; rate: number; date: string };
+export type PairRate = { base: string; quote: string; rate: number; date: string; live?: boolean; warning?: string; availableCurrencies?: string[] };
 
 const API = "https://api.frankfurter.dev/v2";
 const CACHE_PREFIX = "saha.currency.v1";
@@ -54,24 +56,29 @@ async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
 }
 
 export async function fetchPairRate(base: CurrencyCode, quote: CurrencyCode, signal?: AbortSignal) {
-  if (base === quote) return { base, quote, rate: 1, date: new Date().toISOString().slice(0, 10) } satisfies PairRate;
-  const key = `rate.${base}.${quote}`;
-  const cached = readCache<PairRate>(key);
-  if (cached && Date.now() - cached.savedAt < CACHE_TTL_MS) return cached.value;
-
+  if (signal?.aborted) throw new DOMException("İstek iptal edildi", "AbortError");
+  if (base === quote) return { base, quote, rate: 1, date: new Date().toISOString(), live: true } satisfies PairRate;
   try {
-    const row = await getJson<{ date: string; base: string; quote: string; rate: number }>(
-      `${API}/rate/${base.toLowerCase()}/${quote.toLowerCase()}`,
-      signal,
-    );
-    if (!Number.isFinite(row.rate) || row.rate <= 0) throw new Error("Kur verisi geçersiz.");
-    const result = { base, quote, rate: toGramRate(row.rate, base, quote), date: row.date };
-    writeCache(key, result);
-    return result;
+    const live = await getLiveCurrencyRates();
+    if (signal?.aborted) throw new DOMException("İstek iptal edildi", "AbortError");
+    const baseRate = live.rates[base];
+    const quoteRate = live.rates[quote];
+    if (!baseRate || !quoteRate) throw new Error(`${base} / ${quote} çifti canlı kur sağlayıcısında bulunamadı.`);
+    const rate = toGramRate(quoteRate / baseRate, base, quote);
+    if (!Number.isFinite(rate) || rate <= 0) throw new Error("Canlı kur verisi geçersiz.");
+    return { base, quote, rate, date: live.lastUpdatedAt, live: true, availableCurrencies: Object.keys(live.rates) } satisfies PairRate;
   } catch (error) {
     if (signal?.aborted) throw error;
-    if (cached) return cached.value;
-    throw error;
+    const fallback = await getJson<{ date: string; rate: number }>(`${API}/rate/${base.toLowerCase()}/${quote.toLowerCase()}`, signal);
+    if (!Number.isFinite(fallback.rate) || fallback.rate <= 0) throw new Error("Çevrimiçi kur alınamadı.");
+    return {
+      base,
+      quote,
+      rate: toGramRate(fallback.rate, base, quote),
+      date: `${fallback.date}T12:00:00Z`,
+      live: false,
+      warning: error instanceof Error ? error.message : "Canlı servis kullanılamıyor; günlük yedek kur gösteriliyor.",
+    } satisfies PairRate;
   }
 }
 
@@ -114,5 +121,21 @@ export function formatCurrency(value: number, code: CurrencyCode, maximumFractio
 }
 
 export function currencyLabel(code: CurrencyCode) {
-  return CURRENCY_OPTIONS.find((option) => option.code === code)?.label ?? code;
+  const fixed = CURRENCY_OPTIONS.find((option) => option.code === code)?.label;
+  if (fixed) return fixed;
+  try {
+    const label = new Intl.DisplayNames(["tr-TR"], { type: "currency" }).of(code);
+    return label && label !== code ? label : code;
+  } catch {
+    return code;
+  }
+}
+
+export function supportedCurrencyOptions(codes: string[]) {
+  const fixedCodes = new Set<string>(CURRENCY_OPTIONS.map((option) => option.code));
+  const displayNames = new Intl.DisplayNames(["tr-TR"], { type: "currency" });
+  const validFiatCodes = codes.filter((code) => /^[A-Z]{3}$/.test(code) && (fixedCodes.has(code) || displayNames.of(code) !== code));
+  return [...new Set([...CURRENCY_OPTIONS.map((option) => option.code), ...validFiatCodes])]
+    .map((code) => ({ code, label: currencyLabel(code) }))
+    .sort((a, b) => a.code === "TRY" ? -1 : b.code === "TRY" ? 1 : a.code.localeCompare(b.code));
 }

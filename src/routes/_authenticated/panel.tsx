@@ -1,11 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useMemo } from "react";
-import { fetchWeather, wmo, DEFAULT_LOCATION, type WeatherData } from "@/lib/weather";
-import { ChevronLeft, ChevronRight, AlertTriangle, MapPin, MessageCircle, Wallet, HardHat, CloudRainWind } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertTriangle, MapPin, MessageCircle, Wallet, HardHat } from "lucide-react";
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { useCustomers, useExpenses, useTransactions } from "@/lib/data";
 import { customerBalance, customerRestriction, EXPENSE_LABELS, formatTL, monthKey, monthSummary, overdueAmount, profitBreakdown, todayISO, type ExpenseCategory } from "@/lib/finance";
-import { pageHead, useRecords, useSaveRecord } from "@/lib/work";
+import { pageHead, useSaveRecord } from "@/lib/work";
 import { MaintenanceAlerts } from "@/components/app/MaintenanceAlerts";
 import { getPosition, coordsOf, distanceMeters } from "@/lib/geo";
 import { useMe } from "@/hooks/use-me";
@@ -28,49 +27,6 @@ function shiftMonth(m: string, d: number) {
 }
 
 
-function WeatherWidget({ onWeather }: { onWeather?: (weather: WeatherData) => void }) {
-  const [w, setW] = useState<WeatherData | null>(null);
-  useEffect(() => {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => void fetchWeather(pos.coords.latitude, pos.coords.longitude, "Konumum").then((data) => { setW(data); onWeather?.(data); }).catch(() => {}),
-        () => void fetchWeather(DEFAULT_LOCATION.lat, DEFAULT_LOCATION.lon, DEFAULT_LOCATION.name).then((data) => { setW(data); onWeather?.(data); }).catch(() => {}),
-        { timeout: 4000 }
-      );
-    } else {
-      void fetchWeather(DEFAULT_LOCATION.lat, DEFAULT_LOCATION.lon, DEFAULT_LOCATION.name).then((data) => { setW(data); onWeather?.(data); }).catch(() => {});
-    }
-  }, [onWeather]);
-  if (!w) return null;
-  return (
-    <Link to="/hava" className="block rounded-2xl overflow-hidden">
-      <div className={`bg-gradient-to-br ${w.current.isDay && w.current.weatherCode <= 1 ? "from-sky-400 to-blue-500" : w.current.isDay ? "from-slate-400 to-slate-500" : "from-indigo-900 to-blue-950"} p-4 text-white`}>
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-xs opacity-75 mb-1">🌍 {w.location}</div>
-            <div className="text-4xl font-thin">{w.current.temp}°</div>
-            <div className="text-sm mt-1">{w.current.desc}</div>
-            <div className="text-xs opacity-70 mt-0.5">↑{w.daily[0].maxTemp}° ↓{w.daily[0].minTemp}°</div>
-          </div>
-          <div className="text-right">
-            <div className="text-5xl">{w.current.icon}</div>
-            <div className="text-xs opacity-70 mt-2">💧{w.current.humidity}% 💨{w.current.windSpeed}km/s</div>
-          </div>
-        </div>
-        <div className="mt-3 flex gap-3 overflow-x-auto">
-          {w.daily.slice(1, 5).map((d, i) => (
-            <div key={i} className="text-center min-w-[52px]">
-              <div className="text-[11px] opacity-70">{d.dayName}</div>
-              <div className="text-lg">{wmo(d.code).icon}</div>
-              <div className="text-xs font-medium">{d.maxTemp}°/{d.minTemp}°</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </Link>
-  );
-}
-
 function Panel() {
   const [month, setMonth] = useState(monthKey(todayISO()));
   const [quickNote, setQuickNote] = useState(() => { try { return localStorage.getItem("panel_note") ?? ""; } catch { return ""; } });
@@ -78,11 +34,9 @@ function Panel() {
   const txs = useTransactions();
   const exps = useExpenses();
   const customers = useCustomers();
-  const appointments = useRecords("appointment");
   const saveJob = useSaveRecord("job");
   const me = useMe();
   const navigate = useNavigate();
-  const [weather, setWeather] = useState<WeatherData | null>(null);
   const [nearby, setNearby] = useState<{ customer: NonNullable<typeof customers.data>[number]; meters: number } | null>(null);
 
   const data = useMemo(() => {
@@ -123,10 +77,6 @@ function Panel() {
     }).catch(() => setNearby(null));
     return () => { active = false; };
   }, [customers.data]);
-  const outdoorWarnings = (appointments.data ?? []).filter((a) => a.payload.outdoor === true && String(a.payload.date ?? "") >= today && String(a.payload.date ?? "") <= shiftMonth(today.slice(0, 7), 1) + "-31").filter((a) => {
-    const forecast = weather?.daily.find((d) => d.date === a.payload.date);
-    return Boolean(forecast && (forecast.rain >= 5 || forecast.code >= 51 && forecast.code <= 99)) || Boolean(a.payload.date === today && weather && weather.current.windSpeed >= 40);
-  });
 
   function startNearbyJob(customer: NonNullable<typeof customers.data>[number]) {
     const related = (txs.data ?? []).filter((tx) => tx.customer_id === customer.id);
@@ -156,8 +106,6 @@ function Panel() {
 
       {nearby && <section className="rounded-2xl border-2 border-emerald-500/50 bg-emerald-500/10 p-4"><div className="flex items-start gap-3"><MapPin className="mt-0.5 size-5 shrink-0 text-emerald-700 dark:text-emerald-300"/><div className="min-w-0 flex-1"><p className="font-semibold">Şu an {nearby.customer.name} konumuna yakınsınız</p><p className="text-xs text-muted-foreground">Yaklaşık {Math.round(nearby.meters)} metre · konum yalnızca cihazda karşılaştırılır</p><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" disabled={saveJob.isPending} onClick={() => startNearbyJob(nearby.customer)}><HardHat/>Hızlı iş başlat</Button><Button asChild size="sm" variant="secondary"><Link to="/cari/$id" params={{ id: nearby.customer.id }}><Wallet/>Tahsilat al</Link></Button></div></div></div></section>}
       <MaintenanceAlerts />
-      <WeatherWidget onWeather={setWeather}/>
-      {outdoorWarnings.length > 0 && <section role="alert" className="rounded-2xl border border-warning/60 bg-warning/10 p-4"><div className="flex items-start gap-3"><CloudRainWind className="size-5 text-warning"/><div><p className="font-semibold">Açık alan randevusu için hava uyarısı</p>{outdoorWarnings.map((a) => <p className="mt-1 text-sm" key={a.id}>{String(a.payload.date)} {String(a.payload.time ?? "")} · {String(a.payload.name)} · {weather?.daily.find((d) => d.date === a.payload.date)?.desc} / yağış {weather?.daily.find((d) => d.date === a.payload.date)?.rain} mm</p>)}</div></div></section>}
       <section className="grid grid-cols-2 gap-3"><div className="rounded-2xl border bg-card p-4"><p className="text-xs text-muted-foreground">Bugünkü tahsilat</p><p className="mt-1 text-xl font-bold text-success">{formatTL(todayIncome)}</p></div><div className="rounded-2xl border bg-card p-4"><p className="text-xs text-muted-foreground">Bugünkü gider</p><p className="mt-1 text-xl font-bold text-destructive">{formatTL(todayExpense)}</p></div><div className="col-span-2 rounded-2xl bg-slate-950 p-4 text-white"><p className="text-xs text-slate-300">GÜNÜN NET NAKİT AKIŞI</p><p className={`mt-1 text-2xl font-bold ${todayIncome - todayExpense < 0 ? "text-rose-300" : "text-emerald-300"}`}>{formatTL(todayIncome - todayExpense)}</p></div></section>
       <div className="flex items-center justify-between">
         <button onClick={() => setMonth(shiftMonth(month, -1))} className="rounded-full p-2 hover:bg-secondary" aria-label="Önceki ay">

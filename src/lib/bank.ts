@@ -19,6 +19,10 @@ export interface BankMovement {
   reference?: string;
   status?: string;
   balance_after?: number;
+  counterparty_iban?: string;
+  transaction_reason?: string;
+  bank_name?: string;
+  raw_source_snippet?: string;
   source?: string | null;
   created_at: string;
 }
@@ -40,15 +44,73 @@ export interface BankDocument {
 }
 type BankVault = { accounts: BankAccountOption[]; transactions: BankMovement[]; documents?: BankDocument[] };
 type EncryptedVault = { version: 1; salt: string; iv: string; ciphertext: string };
+type EncryptedBiometricPassphrase = { credentialId: string; prfSalt: string; iv: string; ciphertext: string };
 
 const PBKDF2_ITERATIONS = 600_000;
 const vaultKey = (ownerId: string) => `saha-bank-vault-v1:${ownerId}`;
+const biometricVaultKey = (ownerId: string) => `saha-bank-vault-biometric-v1:${ownerId}`;
 const keyCache = new Map<string, CryptoKey>();
 const utf8 = new TextEncoder();
 const decoder = new TextDecoder();
 const vaultAad = (ownerId: string) => utf8.encode(`saha-bank-vault-v1:${ownerId}`);
 const bytesToBase64 = (bytes: Uint8Array) => btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(""));
 const base64ToBytes = (value: string) => Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
+const bytesToBuffer = (value: Uint8Array) => Uint8Array.from(value).buffer;
+type PrfOutput = { prf?: { enabled?: boolean; results?: { first?: ArrayBuffer | Uint8Array } } };
+const extensionOutput = (credential: PublicKeyCredential) => credential.getClientExtensionResults() as unknown as PrfOutput;
+
+async function biometricWrapKey(prfOutput: ArrayBuffer | Uint8Array) {
+  const raw = prfOutput instanceof Uint8Array ? bytesToBuffer(prfOutput) : prfOutput;
+  return crypto.subtle.importKey("raw", raw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+}
+
+async function requirePrfOutput(credential: PublicKeyCredential) {
+  const output = extensionOutput(credential).prf?.results?.first;
+  if (!output) throw new Error("Bu tarayıcı veya cihaz güvenli biyometrik kasa açma (WebAuthn PRF) özelliğini desteklemiyor. Kasa parolasıyla devam edebilirsin.");
+  return output;
+}
+
+async function openBiometricCredential(ownerId: string, saved: EncryptedBiometricPassphrase) {
+  if (!window.isSecureContext || !navigator.credentials || !window.PublicKeyCredential) throw new Error("Biyometrik kilit için HTTPS ve desteklenen bir cihaz gerekir.");
+  const credential = await navigator.credentials.get({ publicKey: {
+    challenge: crypto.getRandomValues(new Uint8Array(32)),
+    rpId: location.hostname,
+    allowCredentials: [{ type: "public-key", id: base64ToBytes(saved.credentialId) }],
+    userVerification: "required",
+    timeout: 60_000,
+    extensions: { prf: { eval: { first: base64ToBytes(saved.prfSalt) } } },
+  } as unknown as PublicKeyCredentialRequestOptions }) as PublicKeyCredential | null;
+  if (!credential) throw new Error("Biyometrik doğrulama tamamlanmadı.");
+  const key = await biometricWrapKey(await requirePrfOutput(credential));
+  const aad = utf8.encode(`${ownerId}:${saved.credentialId}:saha-bank-vault`);
+  const clear = await crypto.subtle.decrypt({ name: "AES-GCM", iv: base64ToBytes(saved.iv), additionalData: aad }, key, base64ToBytes(saved.ciphertext));
+  return decoder.decode(clear);
+}
+
+async function enableBiometricVault(ownerId: string, passphrase: string) {
+  if (!window.isSecureContext || !window.PublicKeyCredential || !navigator.credentials) throw new Error("Biyometrik kilit için HTTPS ve desteklenen bir cihaz gerekir.");
+  const encrypted = await get<EncryptedVault>(vaultKey(ownerId));
+  if (!encrypted) throw new Error("Bu cihazda şifreli kasa bulunamadı.");
+  await decryptVault(ownerId, passphrase, encrypted);
+  const prfSalt = crypto.getRandomValues(new Uint8Array(32));
+  const credential = await navigator.credentials.create({ publicKey: {
+    challenge: crypto.getRandomValues(new Uint8Array(32)),
+    rp: { name: "Saha Kasa", id: location.hostname },
+    user: { id: crypto.getRandomValues(new Uint8Array(32)), name: `saha-${ownerId}`, displayName: "Saha kişisel kasa" },
+    pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+    authenticatorSelection: { authenticatorAttachment: "platform", residentKey: "preferred", userVerification: "required" },
+    attestation: "none",
+    extensions: { prf: { eval: { first: prfSalt } } },
+    timeout: 60_000,
+  } as unknown as PublicKeyCredentialCreationOptions }) as PublicKeyCredential | null;
+  if (!credential) throw new Error("Biyometrik kayıt tamamlanmadı.");
+  const key = await biometricWrapKey(await requirePrfOutput(credential));
+  const credentialId = bytesToBase64(new Uint8Array(credential.rawId));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const aad = utf8.encode(`${ownerId}:${credentialId}:saha-bank-vault`);
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: aad }, key, utf8.encode(passphrase));
+  await set(biometricVaultKey(ownerId), { credentialId, prfSalt: bytesToBase64(prfSalt), iv: bytesToBase64(iv), ciphertext: bytesToBase64(new Uint8Array(ciphertext)) } satisfies EncryptedBiometricPassphrase);
+}
 
 async function deriveKey(passphrase: string, salt: Uint8Array) {
   const material = await crypto.subtle.importKey("raw", utf8.encode(passphrase), "PBKDF2", false, ["deriveKey"]);
@@ -118,6 +180,7 @@ export function useBankOwnerId() {
 export function useBankVault(ownerId: string | null | undefined) {
   const [exists, setExists] = useState<boolean | null>(null);
   const [unlocked, setUnlocked] = useState(false);
+  const [biometricReady, setBiometricReady] = useState(false);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let active = true;
@@ -125,6 +188,13 @@ export function useBankVault(ownerId: string | null | undefined) {
     setUnlocked(false);
     if (ownerId) void get<EncryptedVault>(vaultKey(ownerId)).then((saved) => { if (active) setExists(Boolean(saved)); });
     else setExists(false);
+    return () => { active = false; if (ownerId) keyCache.delete(ownerId); };
+  }, [ownerId]);
+
+  useEffect(() => {
+    let active = true;
+    if (ownerId) void get<EncryptedBiometricPassphrase>(biometricVaultKey(ownerId)).then((saved) => { if (active) setBiometricReady(Boolean(saved)); });
+    else setBiometricReady(false);
     return () => { active = false; };
   }, [ownerId]);
 
@@ -174,6 +244,32 @@ export function useBankVault(ownerId: string | null | undefined) {
     finally { setBusy(false); }
   }
 
+  async function unlockBiometric() {
+    if (!ownerId) throw new Error("Oturum gerekli.");
+    const saved = await get<EncryptedBiometricPassphrase>(biometricVaultKey(ownerId));
+    if (!saved) throw new Error("Bu cihazda kasa biyometrisi ayarlanmamış.");
+    setBusy(true);
+    try {
+      const passphrase = await openBiometricCredential(ownerId, saved);
+      const encrypted = await get<EncryptedVault>(vaultKey(ownerId));
+      if (!encrypted) throw new Error("Şifreli kasa bulunamadı.");
+      await decryptVault(ownerId, passphrase, encrypted);
+      setUnlocked(true);
+    } finally { setBusy(false); }
+  }
+
+  async function enableBiometric(passphrase: string) {
+    if (!ownerId || !unlocked) throw new Error("Önce kasayı parolanla aç.");
+    setBusy(true);
+    try { await enableBiometricVault(ownerId, passphrase); setBiometricReady(true); }
+    finally { setBusy(false); }
+  }
+
+  async function disableBiometric() {
+    if (ownerId) await del(biometricVaultKey(ownerId));
+    setBiometricReady(false);
+  }
+
   function lock() {
     if (ownerId) keyCache.delete(ownerId);
     setUnlocked(false);
@@ -185,7 +281,7 @@ export function useBankVault(ownerId: string | null | undefined) {
     setExists(false);
     setUnlocked(false);
   }
-  return { exists, unlocked, busy, create, unlock, lock, erase };
+  return { exists, unlocked, busy, biometricReady, create, unlock, unlockBiometric, enableBiometric, disableBiometric, lock, erase };
 }
 
 /** One-time user-triggered migration: encrypt legacy cloud rows locally, verify write, then delete plaintext cloud rows. */
@@ -300,6 +396,10 @@ export async function importBankStatementFile(ownerId: string, accountId: string
       counterparty: row.counterparty, description: row.description,
       ...(row.reference ? { reference: row.reference } : {}),
       ...(row.balance_after !== undefined ? { balance_after: row.balance_after } : {}),
+      ...(row.counterparty_iban ? { counterparty_iban: row.counterparty_iban } : {}),
+      ...(row.transaction_reason ? { transaction_reason: row.transaction_reason } : {}),
+      bank_name: row.bank_name || account.bank_name,
+      ...(row.raw_source_snippet ? { raw_source_snippet: row.raw_source_snippet } : {}),
       status: "completed", source: "email_attachment", created_at: now,
     });
     importedCount++;

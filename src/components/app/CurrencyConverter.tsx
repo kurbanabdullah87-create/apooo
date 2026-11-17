@@ -2,7 +2,7 @@ import { useEffect, useId, useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ArrowDownUp, CircleHelp, Loader2, RefreshCw, TrendingDown, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { CURRENCY_OPTIONS, currencyLabel, fetchPairHistory, fetchPairRate, formatCurrency, type CurrencyCode, type RatePoint } from "@/lib/currency";
+import { CURRENCY_OPTIONS, currencyLabel, fetchPairHistory, fetchPairRate, formatCurrency, supportedCurrencyOptions, type CurrencyCode, type RatePoint } from "@/lib/currency";
 
 const RANGES = [
   { label: "1G", days: 1 },
@@ -27,6 +27,8 @@ export function CurrencyConverter() {
   const [quote, setQuote] = useState<CurrencyCode>("TRY");
   const [rate, setRate] = useState<number | null>(null);
   const [rateDate, setRateDate] = useState("");
+  const [rateLive, setRateLive] = useState(false);
+  const [currencyOptions, setCurrencyOptions] = useState(() => supportedCurrencyOptions(CURRENCY_OPTIONS.map((option) => option.code)));
   const [points, setPoints] = useState<RatePoint[]>([]);
   const [rangeIndex, setRangeIndex] = useState(1);
   const [amount, setAmount] = useState("1");
@@ -44,14 +46,22 @@ export function CurrencyConverter() {
       setLoading(true);
       setError("");
       try {
-        const [current, history] = await Promise.all([
+        const [currentResult, historyResult] = await Promise.allSettled([
           fetchPairRate(base, quote, controller.signal),
           fetchPairHistory(base, quote, selectedRange.days, controller.signal),
         ]);
         if (!active) return;
-        setRate(current.rate);
-        setRateDate(current.date);
-        setPoints(history);
+        if (currentResult.status === "fulfilled") {
+          setRate(currentResult.value.rate);
+          setRateDate(currentResult.value.date);
+          const fresh = Date.now() - Date.parse(currentResult.value.date) <= 120_000;
+          setRateLive(Boolean(currentResult.value.live) && fresh);
+          setError(currentResult.value.warning ?? (fresh ? "" : "Kur sağlayıcısının güncelleme zamanı eski. Dakikalık veri için sağlayıcının 60 saniyelik planı gerekir."));
+          if (currentResult.value.availableCurrencies) setCurrencyOptions(supportedCurrencyOptions(currentResult.value.availableCurrencies));
+        } else {
+          setError(currentResult.reason instanceof Error ? currentResult.reason.message : "Canlı kur alınamadı.");
+        }
+        setPoints(historyResult.status === "fulfilled" ? historyResult.value : []);
       } catch (cause) {
         if (!active || controller.signal.aborted) return;
         setError(cause instanceof Error ? cause.message : "Kur bilgisi şu anda alınamıyor.");
@@ -61,7 +71,7 @@ export function CurrencyConverter() {
     };
 
     void load();
-    const interval = window.setInterval(() => setRefreshKey((key) => key + 1), 30 * 60 * 1000);
+    const interval = window.setInterval(() => setRefreshKey((key) => key + 1), 60 * 1000);
     return () => {
       active = false;
       controller.abort();
@@ -101,15 +111,15 @@ export function CurrencyConverter() {
     <section aria-labelledby="currency-title" className="overflow-hidden rounded-3xl border border-white/10 bg-zinc-900/90 p-4 shadow-xl shadow-black/10 sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Kur dönüştürücü</p>
-          <h2 id="currency-title" className="mt-1 font-display text-lg font-bold">Döviz ve altın referans kuru</h2>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Canlı kur dönüştürücü</p>
+          <h2 id="currency-title" className="mt-1 font-display text-lg font-bold">Döviz ve altın kurları</h2>
         </div>
         <Button type="button" variant="ghost" size="icon" aria-label="Kuru yenile" disabled={loading} onClick={() => setRefreshKey((key) => key + 1)}>
           {loading ? <Loader2 className="animate-spin"/> : <RefreshCw/>}
         </Button>
       </div>
 
-      <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+        <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="text-xs text-muted-foreground">1 {currencyLabel(base)} eşittir</p>
@@ -121,14 +131,14 @@ export function CurrencyConverter() {
           <Button type="button" variant="secondary" size="icon" className="mt-1 shrink-0 rounded-full" onClick={swap} aria-label="Para birimlerini değiştir"><ArrowDownUp/></Button>
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-3 text-[11px]">
-          <span className="inline-flex items-center gap-1.5 text-emerald-300"><span className="size-1.5 rounded-full bg-emerald-400"/>Referans kur</span>
+          <span className={`inline-flex items-center gap-1.5 ${rateLive ? "text-emerald-300" : "text-amber-300"}`}><span className={`size-1.5 rounded-full ${rateLive ? "animate-pulse bg-emerald-400" : "bg-amber-400"}`}/>{rateLive ? "Canlı çevrimiçi kur" : "Günlük/yedek kur"}</span>
           <span className={`inline-flex items-center gap-1 ${positiveTrend ? "text-emerald-300" : "text-rose-300"}`}>
             {positiveTrend ? <TrendingUp className="size-3.5"/> : <TrendingDown className="size-3.5"/>}
             {positiveTrend ? "+" : ""}{new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(changePercent)}%
           </span>
         </div>
         <p className="mt-2 text-[10px] leading-4 text-muted-foreground">
-          {rateDate ? `Veri tarihi ${new Date(`${rateDate}T12:00:00`).toLocaleDateString("tr-TR")} · Frankfurter resmi/karma referans verisi` : "Referans kur verisi yükleniyor"}
+          {rateDate ? `Kur zamanı: ${new Date(rateDate).toLocaleString("tr-TR")} · çevrimiçi kontrol 60 sn’de bir` : "Canlı kur verisi bekleniyor"}
         </p>
       </div>
 
@@ -155,7 +165,7 @@ export function CurrencyConverter() {
               />
               <span aria-hidden="true" className="h-7 w-px bg-white/10"/>
               <select aria-label={`${side === "base" ? "Kaynak" : "Hedef"} para birimi`} className="h-14 w-[8.6rem] shrink-0 border-0 bg-transparent pl-3 pr-2 text-sm font-medium outline-none focus:ring-0" value={code} onChange={(event) => setPairSide(side, event.target.value as CurrencyCode)}>
-                {CURRENCY_OPTIONS.map((option) => <option key={option.code} value={option.code} className="bg-zinc-900">{option.code} · {option.label}</option>)}
+                {currencyOptions.map((option) => <option key={option.code} value={option.code} className="bg-zinc-900">{option.code} · {option.label}</option>)}
               </select>
             </label>
           );
@@ -186,8 +196,8 @@ export function CurrencyConverter() {
         </ResponsiveContainer> : <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-white/10 px-4 text-center text-xs text-muted-foreground">{loading ? "Kur geçmişi yükleniyor…" : "Bu aralık için gün içi piyasa verisi bulunmuyor."}</div>}
       </div>
 
-      {error && <div role="status" className="mt-3 flex items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs leading-5 text-amber-100"><CircleHelp className="mt-0.5 size-4 shrink-0"/><span>{error} Daha önce kaydedilen değer varsa gösterilmeye devam eder.</span></div>}
-      <p className="mt-3 text-[10px] leading-4 text-muted-foreground">Bu, günlük referans kurudur; banka alış/satış fiyatı veya saniyelik işlem kotasyonu değildir. Gram altın hesabı, ons altın referansının 1 grama çevrilmiş yaklaşık karşılığıdır.</p>
+      {error && <div role="status" className="mt-3 flex items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs leading-5 text-amber-100"><CircleHelp className="mt-0.5 size-4 shrink-0"/><span>{error} Ekrandaki son değer sağlayıcının belirttiği zaman damgasına aittir.</span></div>}
+      <p className="mt-3 text-[10px] leading-4 text-muted-foreground">Kurlar sağlayıcının planına göre güncellenen çevrimiçi orta piyasa referans değerleridir; banka alış/satış fiyatı veya işlem kotasyonu değildir. Gram altın, ons altın değerinden hesaplanır.</p>
     </section>
   );
 }
