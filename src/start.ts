@@ -32,7 +32,12 @@ const csrfMiddleware = createCsrfMiddleware({
 const canonicalHostMiddleware = createMiddleware().server(async ({ next }) => {
   const request = getRequest();
   const url = new URL(request.url);
-  if (url.hostname !== "sahav2full.vercel.app" && /^sahav2full-.+-abdullah-6206\.vercel\.app$/i.test(url.hostname)) {
+  // All browser storage (including Supabase refresh tokens and OAuth PKCE
+  // verifiers) is origin-scoped. Normalize both the fixed project alias and
+  // generated production aliases before login starts, so OAuth returns to the
+  // same origin that stored its verifier/session.
+  const isSahaProjectHost = /^sahav2full(?:-[a-z0-9]+)*\.vercel\.app$/i.test(url.hostname);
+  if (url.hostname !== "sahav2full.vercel.app" && isSahaProjectHost) {
     url.hostname = "sahav2full.vercel.app";
     return Response.redirect(url, 308);
   }
