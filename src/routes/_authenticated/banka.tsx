@@ -51,6 +51,7 @@ function Bank() {
   const [search, setSearch] = useState("");
   const [vaultPassphrase, setVaultPassphrase] = useState("");
   const [vaultConfirm, setVaultConfirm] = useState("");
+  const [rememberVault, setRememberVault] = useState(false);
   const [vaultBusy, setVaultBusy] = useState(false);
   const [showVaultPassword, setShowVaultPassword] = useState(false);
   const [biometricSetupOpen, setBiometricSetupOpen] = useState(false);
@@ -327,7 +328,165 @@ function Bank() {
         doc.text(formatTL(value.amount), pageWidth - margin, lineY, { align: "right" });
       });
 
-      // Keep the detailed ledger on its own page after the visual summary.
+      // Analytics page: date trend, parties, categories and data provenance.
+      doc.addPage();
+      doc.setFillColor(...ink);
+      doc.rect(0, 0, pageWidth, 43, "F");
+      doc.setFillColor(16, 185, 129);
+      doc.rect(0, 41, pageWidth, 2, "F");
+      doc.setFont("Saha", "bold");
+      doc.setFontSize(16);
+      doc.setTextColor(255, 255, 255);
+      doc.text("Dönem analizi", margin, 19);
+      doc.setFont("Saha", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(203, 213, 225);
+      doc.text(`${monthLabel} · seçili hesaptaki kayıtların ayrıntılı kırılımı`, margin, 28);
+
+      const knownDescriptions = rows.filter((row) => row.description.trim() || row.transaction_reason?.trim()).length;
+      const knownBalances = rows.filter((row) => typeof row.balance_after === "number" && Number.isFinite(row.balance_after)).length;
+      const knownReferences = rows.filter((row) => row.reference?.trim()).length;
+      const sourceCounts = new Map<string, number>();
+      for (const row of rows) {
+        const label = row.source === "open_banking" ? "Banka bağlantısı" : row.source === "email_attachment" ? "E-posta ekstresi" : row.source === "email_auto" ? "Gmail taraması" : "Elle kayıt";
+        sourceCounts.set(label, (sourceCounts.get(label) ?? 0) + 1);
+      }
+      const detailMetrics = [
+        { label: "AÇIKLAMASI BULUNAN", value: `${knownDescriptions} / ${rows.length}` },
+        { label: "REFERANSI BULUNAN", value: `${knownReferences} / ${rows.length}` },
+        { label: "BAKİYESİ BULUNAN", value: `${knownBalances} / ${rows.length}` },
+        { label: "KAYIT KAYNAĞI", value: `${sourceCounts.size} farklı kaynak` },
+      ];
+      const detailMetricY = 51;
+      const detailMetricWidth = contentWidth / detailMetrics.length;
+      detailMetrics.forEach((metric, index) => {
+        const x = margin + index * detailMetricWidth;
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(x + 1, detailMetricY, detailMetricWidth - 3, 20, 2.5, 2.5, "F");
+        doc.setFont("Saha", "bold");
+        doc.setFontSize(6);
+        doc.setTextColor(...muted);
+        doc.text(metric.label, x + 4, detailMetricY + 7);
+        doc.setFontSize(8.5);
+        doc.setTextColor(...ink);
+        doc.text(metric.value, x + 4, detailMetricY + 15);
+      });
+
+      const trendGroups = new Map<string, { incoming: number; outgoing: number }>();
+      for (const row of rows) {
+        const period = month === "all" ? monthKey(row.date) : row.date.slice(0, 10);
+        const group = trendGroups.get(period) ?? { incoming: 0, outgoing: 0 };
+        group[row.direction] += row.amount;
+        trendGroups.set(period, group);
+      }
+      const trend = [...trendGroups.entries()].sort(([a], [b]) => a.localeCompare(b)).slice(-6);
+      const trendTop = 91;
+      doc.setFont("Saha", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(...ink);
+      doc.text(month === "all" ? "Son dönemlere göre para akışı" : "Günlere göre para akışı", margin, 83);
+      doc.setFont("Saha", "normal");
+      doc.setFontSize(6.5);
+      doc.setTextColor(...muted);
+      doc.text("Yeşil: gelen · Kırmızı: çıkan · Grafik seçili aralıkta kayıt bulunan en fazla 6 dönemi gösterir.", margin, 88);
+      const chartBottom = 128;
+      const chartHeight = 30;
+      const chartGap = 7;
+      const chartSlot = (contentWidth - chartGap * (trend.length - 1)) / Math.max(trend.length, 1);
+      const chartMax = Math.max(1, ...trend.flatMap(([, value]) => [value.incoming, value.outgoing]));
+      doc.setDrawColor(...line);
+      doc.line(margin, chartBottom, pageWidth - margin, chartBottom);
+      trend.forEach(([period, value], index) => {
+        const center = margin + index * (chartSlot + chartGap) + chartSlot / 2;
+        const barWidth = Math.min(9, chartSlot * 0.28);
+        const inHeight = chartHeight * value.incoming / chartMax;
+        const outHeight = chartHeight * value.outgoing / chartMax;
+        if (inHeight > 0) {
+          doc.setFillColor(16, 185, 129);
+          doc.roundedRect(center - barWidth - 1, chartBottom - inHeight, barWidth, inHeight, 1.2, 1.2, "F");
+        }
+        if (outHeight > 0) {
+          doc.setFillColor(244, 63, 94);
+          doc.roundedRect(center + 1, chartBottom - outHeight, barWidth, outHeight, 1.2, 1.2, "F");
+        }
+        const labelDate = new Date(`${period}${month === "all" ? "-01" : ""}T00:00:00`);
+        const label = Number.isNaN(labelDate.getTime()) ? period : month === "all"
+          ? labelDate.toLocaleDateString("tr-TR", { month: "short", year: "2-digit" })
+          : labelDate.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" });
+        doc.setFont("Saha", "normal");
+        doc.setFontSize(6.5);
+        doc.setTextColor(...muted);
+        doc.text(label, center, chartBottom + 7, { align: "center" });
+      });
+      if (!trend.length) {
+        doc.setFont("Saha", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(...muted);
+        doc.text("Grafik için kayıtlı hareket bulunmuyor.", margin, 108);
+      }
+
+      const drawPartyList = (title: string, entries: Array<[string, number]>, x: number, y: number, width: number, tone: readonly [number, number, number]) => {
+        doc.setFont("Saha", "bold");
+        doc.setFontSize(9);
+        doc.setTextColor(...ink);
+        doc.text(title, x, y);
+        if (!entries.length) {
+          doc.setFont("Saha", "normal");
+          doc.setFontSize(7);
+          doc.setTextColor(...muted);
+          doc.text("Bu aralıkta kayıt yok.", x, y + 9);
+          return;
+        }
+        const max = Math.max(...entries.map(([, total]) => total), 1);
+        entries.slice(0, 5).forEach(([name, total], index) => {
+          const rowY = y + 9 + index * 7;
+          doc.setFont("Saha", "normal");
+          doc.setFontSize(7);
+          doc.setTextColor(...ink);
+          const safeName = (doc.splitTextToSize(name || "Belirtilmemiş", width - 25) as string[])[0] ?? "Belirtilmemiş";
+          doc.text(safeName, x, rowY);
+          doc.setFillColor(226, 232, 240);
+          doc.roundedRect(x, rowY + 1.5, width - 25, 2, 1, 1, "F");
+          doc.setFillColor(tone[0], tone[1], tone[2]);
+          doc.roundedRect(x, rowY + 1.5, Math.max(1, (width - 25) * total / max), 2, 1, 1, "F");
+          doc.setFont("Saha", "bold");
+          doc.setTextColor(...ink);
+          doc.text(formatTL(total), x + width, rowY, { align: "right" });
+        });
+      };
+      const incomingParties = new Map<string, number>();
+      for (const row of incomingRows) {
+        const name = row.counterparty.trim() || "Gönderen belirtilmemiş";
+        incomingParties.set(name, (incomingParties.get(name) ?? 0) + row.amount);
+      }
+      const splitGap = 12;
+      const splitWidth = (contentWidth - splitGap) / 2;
+      drawPartyList("En yüksek alıcılar", topRecipients, margin, 151, splitWidth - 8, [99, 102, 241]);
+      drawPartyList("En yüksek gönderenler", [...incomingParties].sort((a, b) => b[1] - a[1]).slice(0, 5), margin + splitWidth + splitGap, 151, splitWidth - 8, [16, 185, 129]);
+
+      doc.setFont("Saha", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(...ink);
+      doc.text("Harcama türü ve kayıt kaynağı", margin, 204);
+      const sortedCategories = [...categoryTotals.entries()].sort((a, b) => b[1].amount - a[1].amount);
+      const categoryLimit = Math.min(6, sortedCategories.length);
+      sortedCategories.slice(0, categoryLimit).forEach(([category, value], index) => {
+        const rowY = 213 + index * 7;
+        doc.setFont("Saha", "normal");
+        doc.setFontSize(7);
+        doc.setTextColor(...ink);
+        doc.text(`${category} · ${value.count} işlem`, margin, rowY);
+        doc.setFont("Saha", "bold");
+        doc.text(formatTL(value.amount), pageWidth - margin, rowY, { align: "right" });
+      });
+      const sourceSummary = [...sourceCounts].map(([label, count]) => `${label}: ${count}`).join("  ·  ") || "Kayıt kaynağı bilgisi yok";
+      doc.setFont("Saha", "normal");
+      doc.setFontSize(6.5);
+      doc.setTextColor(...muted);
+      doc.text(doc.splitTextToSize(`Kaynak dağılımı: ${sourceSummary}`, contentWidth), margin, 261);
+      doc.text("Kategori eşleştirmesi açıklama ve taraf adına dayalı tahmindir. Eksik alanlar tamamlanmış veya banka tarafından doğrulanmış sayılmaz.", margin, 270);
+
+      // Keep the detailed ledger on its own page after the analytics.
       doc.addPage();
       doc.setFont("Saha", "bold");
       doc.setFontSize(11);
@@ -530,16 +689,28 @@ function Bank() {
     event.preventDefault();
     setVaultBusy(true);
     try {
+      const isNewVault = !vault.exists;
       if (!vault.exists) {
         if (vaultPassphrase !== vaultConfirm) throw new Error("Kasa parolaları eşleşmiyor.");
         await vault.create(vaultPassphrase);
-        toast.success("Bu cihazda şifreli kişisel kasa oluşturuldu.");
       } else {
         await vault.unlock(vaultPassphrase);
-        toast.success("Şifreli kişisel kasa açıldı.");
       }
+      let biometricEnabled = vault.biometricReady;
+      if (rememberVault && !biometricEnabled) {
+        try {
+          await vault.enableBiometric(vaultPassphrase);
+          biometricEnabled = true;
+        } catch (error) {
+          toast.error(error instanceof Error ? `Kasa açıldı; biyometrik hatırlama kurulamadı: ${error.message}` : "Kasa açıldı; biyometrik hatırlama bu cihazda kurulamadı.");
+        }
+      }
+      if (biometricEnabled && rememberVault) toast.success("Kasa açıldı. Bu cihazda bir sonraki girişte biyometri kullanabilirsin.");
+      else if (isNewVault) toast.success("Bu cihazda şifreli kişisel kasa oluşturuldu.");
+      else toast.success("Şifreli kişisel kasa açıldı.");
       setVaultPassphrase("");
       setVaultConfirm("");
+      setRememberVault(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Kasa açılamadı.");
     } finally { setVaultBusy(false); }
@@ -706,6 +877,7 @@ function Bank() {
       {(!vault.exists || !vault.biometricReady || showVaultPassword) && <form className="space-y-4 p-6 sm:p-8" onSubmit={(event) => void submitVault(event)}>
         <div className="space-y-2"><Label htmlFor="bank-vault-pass">{vault.exists ? "Kasa parolası" : "Yeni kasa parolası"}</Label><Input id="bank-vault-pass" type="password" autoComplete={vault.exists ? "current-password" : "new-password"} minLength={vault.exists ? undefined : 14} required value={vaultPassphrase} onChange={(event) => setVaultPassphrase(event.target.value)} placeholder={vault.exists ? "Parolanı gir" : "En az 14 karakter"}/></div>
         {!vault.exists && <><div className="space-y-2"><Label htmlFor="bank-vault-confirm">Parolayı tekrar gir</Label><Input id="bank-vault-confirm" type="password" autoComplete="new-password" minLength={14} required value={vaultConfirm} onChange={(event) => setVaultConfirm(event.target.value)} placeholder="Aynı parolayı tekrar yaz"/></div><p className="rounded-xl border border-amber-500/25 bg-amber-500/[0.06] p-3 text-xs leading-relaxed text-muted-foreground">Parolayı unutursan kasayı kurtarmak mümkün olmaz. Güvenli bir parola yöneticisinde sakla. Bu kasa bu tarayıcıya ve cihaza özeldir; cihazlar arası senkronize edilmez.</p></>}
+        {!vault.biometricReady ? <label htmlFor="bank-vault-remember" className="flex cursor-pointer items-start gap-3 rounded-xl border bg-muted/30 p-3"><input id="bank-vault-remember" type="checkbox" checked={rememberVault} onChange={(event) => setRememberVault(event.target.checked)} className="mt-0.5 size-4 accent-primary"/><span><span className="block text-sm font-medium">Beni hatırla</span><span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">Parolan kaydedilmez. Bu cihaz destekliyorsa Face ID, parmak izi veya cihaz PIN’i ile güvenli açma kurulur.</span></span></label> : <p className="rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] p-3 text-xs leading-relaxed text-muted-foreground"><Fingerprint className="mr-1 inline size-3.5"/>Bu cihazda biyometrik hatırlama zaten etkin. Parolan burada saklanmaz.</p>}
         <Button className="w-full" type="submit" disabled={vaultBusy}><LockKeyhole/>{vault.exists ? "Kasayı aç" : "Şifreli kasayı oluştur"}</Button>
         {vault.exists && vault.biometricReady && <Button type="button" variant="ghost" className="w-full" onClick={() => setShowVaultPassword(false)}>Biyometrik girişe dön</Button>}
       </form>}

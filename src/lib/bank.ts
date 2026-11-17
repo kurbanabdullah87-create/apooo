@@ -259,8 +259,10 @@ export function useBankVault(ownerId: string | null | undefined) {
   }
 
   async function enableBiometric(passphrase: string) {
-    if (!ownerId || !unlocked) throw new Error("Önce kasayı parolanla aç.");
+    if (!ownerId) throw new Error("Oturum gerekli.");
     setBusy(true);
+    // The passphrase is verified against the encrypted vault before registering
+    // WebAuthn, so this also works immediately after creating the vault.
     try { await enableBiometricVault(ownerId, passphrase); setBiometricReady(true); }
     finally { setBusy(false); }
   }
