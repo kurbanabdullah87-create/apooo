@@ -73,7 +73,7 @@ function AuthPage() {
     event.preventDefault();
     const address = email.trim().toLowerCase();
     if (resetMode) {
-      if (!/^\S+@\S+\.\S+$/.test(address)) return toast.error("E-posta adresini kontrol et.");
+      if (!/^\S+@\S+\.\S+$/.test(address)) { toast.error("E-posta adresini kontrol et."); return; }
       setBusy(true);
       try {
         const { error } = await supabase.auth.resetPasswordForEmail(address, { redirectTo: `${window.location.origin}/auth/reset-password` });
@@ -88,16 +88,16 @@ function AuthPage() {
       return;
     }
     if (mode === "signup") {
-      if (!/^\S+@\S+\.\S+$/.test(address)) return toast.error("Geçerli bir e-posta adresi girin.");
-      if (firstName.trim().length < 2 || lastName.trim().length < 2) return toast.error("Ad ve soyad alanlarını doldurun.");
-      if (password.length < 12) return toast.error("Şifren en az 12 karakter olmalı.");
+      if (!/^\S+@\S+\.\S+$/.test(address)) { toast.error("Geçerli bir e-posta adresi girin."); return; }
+      if (firstName.trim().length < 2 || lastName.trim().length < 2) { toast.error("Ad ve soyad alanlarını doldurun."); return; }
+      if (password.length < 12) { toast.error("Şifren en az 12 karakter olmalı."); return; }
     } else if (legacy) {
       const username = normalizeUsername(address);
-      if (!USERNAME_RE.test(username)) return toast.error("Geçerli kullanıcı adını girin.");
-      if (!password) return toast.error("Şifreni girin.");
+      if (!USERNAME_RE.test(username)) { toast.error("Geçerli kullanıcı adını girin."); return; }
+      if (!password) { toast.error("Şifreni girin."); return; }
     } else {
-      if (!/^\S+@\S+\.\S+$/.test(address)) return toast.error("Geçerli bir e-posta adresi girin.");
-      if (!password) return toast.error("Şifreni girin.");
+      if (!/^\S+@\S+\.\S+$/.test(address)) { toast.error("Geçerli bir e-posta adresi girin."); return; }
+      if (!password) { toast.error("Şifreni girin."); return; }
     }
 
     setBusy(true);

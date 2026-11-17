@@ -83,7 +83,7 @@ function AlimDefteri() {
   const totalDebt = useMemo(() => items.reduce((s, i) => s + (i.totalAmount - i.paidAmount), 0), [items]);
 
   function save() {
-    if (!form.name || !form.totalAmount) return toast.error("Ad ve tutar zorunludur");
+    if (!form.name || !form.totalAmount) { toast.error("Ad ve tutar zorunludur"); return; }
     const total = Number(form.totalAmount);
     const inst = Number(form.installments ?? 1);
     const monthly = form.method === "taksit" ? Math.ceil(total / inst) : total;

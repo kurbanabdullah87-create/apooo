@@ -78,7 +78,7 @@ export async function fetchWeather(lat: number, lon: number, locationName: strin
     const date = new Date(t + "T12:00:00");
     return {
       date: t,
-      dayName: i === 0 ? "Bugün" : i === 1 ? "Yarın" : DAYS[date.getDay()],
+      dayName: i === 0 ? "Bugün" : i === 1 ? "Yarın" : DAYS[date.getDay()] ?? "Gün",
       maxTemp: Math.round(d.daily.temperature_2m_max[i]),
       minTemp: Math.round(d.daily.temperature_2m_min[i]),
       code: d.daily.weather_code[i],

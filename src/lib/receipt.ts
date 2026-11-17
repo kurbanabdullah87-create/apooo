@@ -29,15 +29,15 @@ export function amountInWords(v: number) {
 }
 
 export interface BusinessProfile {
-  business?: string | number | boolean | null;
-  address?: string | number | boolean | null;
-  phone?: string | number | boolean | null;
-  tax?: string | number | boolean | null;
-  iban?: string | number | boolean | null;
-  taxNo?: string | number | boolean | null;
-  mersis?: string | number | boolean | null;
-  website?: string | number | boolean | null;
-  email?: string | number | boolean | null;
+  business?: string | number | boolean | null | undefined;
+  address?: string | number | boolean | null | undefined;
+  phone?: string | number | boolean | null | undefined;
+  tax?: string | number | boolean | null | undefined;
+  iban?: string | number | boolean | null | undefined;
+  taxNo?: string | number | boolean | null | undefined;
+  mersis?: string | number | boolean | null | undefined;
+  website?: string | number | boolean | null | undefined;
+  email?: string | number | boolean | null | undefined;
 }
 
 function qrPlaceholder(text: string): string {
@@ -48,7 +48,7 @@ function qrPlaceholder(text: string): string {
 /** Gelişmiş resmi A4 makbuz */
 export async function buildReceipt(opts: {
   business?: string;
-  profile?: BusinessProfile;
+  profile?: BusinessProfile | undefined;
   customer: Customer;
   tx: Tx;
   balance: number;

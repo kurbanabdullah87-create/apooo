@@ -2,11 +2,11 @@ import type { Customer } from "@/lib/data";
 import type { Payload } from "@/lib/work";
 
 export interface VoiceJobDraft {
-  customer?: Customer;
+  customer?: Customer | undefined;
   title: string;
-  plannedHours?: number;
-  price?: number;
-  paymentMethod?: string;
+  plannedHours?: number | undefined;
+  price?: number | undefined;
+  paymentMethod?: string | undefined;
   notes: string;
 }
 
@@ -29,16 +29,16 @@ export function parseVoiceJob(text: string, customers: Customer[]): VoiceJobDraf
   if (customer) remaining = remaining.replace(new RegExp(customer.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"), " ");
   let plannedHours: number | undefined;
   const duration = remaining.match(/\b(\d+(?:[.,]\d+)?)\s*(saat|sa|dakika|dk)\b/i);
-  if (duration) {
+  if (duration?.[1] && duration[2] && duration[0]) {
     plannedHours = Number(duration[1].replace(",", ".")) * (/^(dk|dakika)$/i.test(duration[2]) ? 1 / 60 : 1);
     remaining = remaining.replace(duration[0], " ");
   }
   let price: number | undefined;
   const money = remaining.match(/\b(\d[\d.,]*)\s*(?:₺|tl\b|lira\b)/i);
-  if (money) { price = parseAmount(money[1]); remaining = remaining.replace(money[0], " "); }
+  if (money?.[1] && money[0]) { price = parseAmount(money[1]); remaining = remaining.replace(money[0], " "); }
   let paymentMethod: string | undefined;
   const method = remaining.match(/\b(nakit|kart|kredi kartı|havale|eft|fast)\b/i);
-  if (method) { paymentMethod = method[1].toLocaleLowerCase("tr-TR"); remaining = remaining.replace(method[0], " "); }
+  if (method?.[1] && method[0]) { paymentMethod = method[1].toLocaleLowerCase("tr-TR"); remaining = remaining.replace(method[0], " "); }
   if (customer) remaining = remaining.replace(/\b(müşteri|bey|hanım|abi)\b/gi, " ");
   const title = remaining.replace(/[.,;]+/g, " ").replace(/\s+/g, " ").trim();
   return { customer, title: title || "Saha işi", plannedHours, price, paymentMethod, notes: text.trim() };

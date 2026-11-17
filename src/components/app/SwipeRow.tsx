@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 const THRESHOLD = 96;
 
-export function SwipeRow({ children, onDelete, onComplete, className }: { children: ReactNode; onDelete?: () => void; onComplete?: () => void; className?: string }) {
+export function SwipeRow({ children, onDelete, onComplete, className }: { children: ReactNode; onDelete?: (() => void) | undefined; onComplete?: (() => void) | undefined; className?: string | undefined }) {
   const start = useRef<{ x: number; y: number } | null>(null);
   const horizontal = useRef(false);
   const [dx, setDx] = useState(0);

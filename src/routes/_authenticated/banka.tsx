@@ -19,6 +19,17 @@ export const Route = createFileRoute("/_authenticated/banka")({
   component: Bank,
 });
 
+function classifyBankMovement(row: { type?: string; description?: string; transaction_reason?: string; counterparty?: string }) {
+  const source = `${row.type ?? ""} ${row.transaction_reason ?? ""} ${row.description ?? ""} ${row.counterparty ?? ""}`.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/ı/g, "i").toLocaleLowerCase("tr-TR");
+  if (/market|supermarket|grocery|bim|a101|migros|sok market|carrefour|file market/.test(source)) return "Market alışverişi";
+  if (/eft|fast|havale|iban|para transfer|virman|swift/.test(source)) return "Para transferi";
+  if (/fatura|elektrik|dogalgaz|su fatur|internet|telekom|gsm odeme|vergi odeme/.test(source)) return "Fatura / kamu ödemesi";
+  if (/atm|nakit cek|para cek|cash withdrawal/.test(source)) return "ATM / nakit çekim";
+  if (/akaryakit|benzin|petrol|fuel|opet|shell|bp istasyon/.test(source)) return "Akaryakıt";
+  if (/pos|kart harcama|kartli odeme|purchase|alisveris/.test(source)) return "Kart alışverişi";
+  return "Diğer / açıklama yetersiz";
+}
+
 function Bank() {
   const ownerId = useBankOwnerId();
   const vault = useBankVault(ownerId);
@@ -41,6 +52,7 @@ function Bank() {
   const [vaultPassphrase, setVaultPassphrase] = useState("");
   const [vaultConfirm, setVaultConfirm] = useState("");
   const [vaultBusy, setVaultBusy] = useState(false);
+  const [showVaultPassword, setShowVaultPassword] = useState(false);
   const [biometricSetupOpen, setBiometricSetupOpen] = useState(false);
   const [biometricPassphrase, setBiometricPassphrase] = useState("");
   const [smsImportOpen, setSmsImportOpen] = useState(false);
@@ -183,11 +195,11 @@ function Bank() {
       const cardWidth = (contentWidth - cardGap * 2) / 3;
       cards.forEach((card, index) => {
         const x = margin + index * (cardWidth + cardGap);
-        doc.setFillColor(...card.fill);
+        doc.setFillColor(card.fill[0], card.fill[1], card.fill[2]);
         doc.roundedRect(x, 81, cardWidth, 27, 3, 3, "F");
         doc.setFont("Saha", "bold");
         doc.setFontSize(7);
-        doc.setTextColor(...card.tone);
+        doc.setTextColor(card.tone[0], card.tone[1], card.tone[2]);
         doc.text(card.label, x + 4, 89);
         doc.setFontSize(10.5);
         doc.text(doc.splitTextToSize(formatTL(card.value), cardWidth - 8), x + 4, 100);
@@ -244,7 +256,7 @@ function Bank() {
         doc.setTextColor(...muted);
         doc.text(metric.label, x + 4, insightY + 7);
         doc.setFontSize(9);
-        doc.setTextColor(...metric.color);
+        doc.setTextColor(metric.color[0], metric.color[1], metric.color[2]);
         doc.text(doc.splitTextToSize(metric.value, metricWidth - 8), x + 4, insightY + 17);
       });
 
@@ -266,7 +278,8 @@ function Bank() {
           doc.setFontSize(7.5);
           doc.setTextColor(...ink);
           const recipientLines = doc.splitTextToSize(name, 55) as string[];
-          const recipientLabel = recipientLines.length > 1 ? `${recipientLines[0].slice(0, -1)}…` : recipientLines[0];
+          const recipientFirstLine = recipientLines[0] ?? name;
+          const recipientLabel = recipientLines.length > 1 ? `${recipientFirstLine.slice(0, -1)}…` : recipientFirstLine;
           doc.text(recipientLabel, margin, lineY);
           doc.setFillColor(226, 232, 240);
           doc.roundedRect(margin + 58, lineY - 3.5, barMax, 3, 1.5, 1.5, "F");
@@ -285,6 +298,34 @@ function Bank() {
         doc.setTextColor(...muted);
         doc.text("Bu ay için çıkış kaydı bulunmuyor.", margin, recipientY + 15);
       }
+
+      const categoryTotals = new Map<string, { amount: number; count: number }>();
+      for (const row of outgoingRows) {
+        const category = classifyBankMovement(row);
+        const current = categoryTotals.get(category) ?? { amount: 0, count: 0 };
+        current.amount += row.amount;
+        current.count += 1;
+        categoryTotals.set(category, current);
+      }
+      const categoryY = 231;
+      doc.setFont("Saha", "bold");
+      doc.setFontSize(8.5);
+      doc.setTextColor(...ink);
+      doc.text("Harcama türü dağılımı", margin, categoryY);
+      doc.setFont("Saha", "normal");
+      doc.setFontSize(6.5);
+      doc.setTextColor(...muted);
+      doc.text("Açıklama ve alıcı adına göre tahmini sınıflandırma; banka kategorisi değildir.", margin, categoryY + 5);
+      const categoryRows = [...categoryTotals.entries()].sort((a, b) => b[1].amount - a[1].amount).slice(0, 6);
+      categoryRows.forEach(([category, value], index) => {
+        const lineY = categoryY + 13 + index * 6.5;
+        doc.setFont("Saha", "normal");
+        doc.setFontSize(7);
+        doc.setTextColor(...ink);
+        doc.text(`${category} · ${value.count} işlem`, margin, lineY);
+        doc.setFont("Saha", "bold");
+        doc.text(formatTL(value.amount), pageWidth - margin, lineY, { align: "right" });
+      });
 
       // Keep the detailed ledger on its own page after the visual summary.
       doc.addPage();
@@ -319,7 +360,7 @@ function Bank() {
         const descriptionLines = doc.splitTextToSize(descriptionText, 59) as string[];
         const referenceText = row.reference?.trim() || "Referans yok";
         const statusText = row.status?.trim() || "Durum belirtilmedi";
-        const sourceText = row.source === "open_banking" ? "Banka bağlantısı" : row.source === "email_attachment" ? "E-posta ekstresi dosyasından aktarıldı" : "Elle kayıt";
+        const sourceText = row.source === "open_banking" ? "Banka bağlantısı" : row.source === "email_attachment" ? "E-posta ekstresi dosyasından aktarıldı" : row.source === "email_auto" ? "Gmail işlem bildiriminden aktarıldı" : "Elle kayıt";
         const typeText = row.type?.trim() || "Diğer";
         const referenceLines = doc.splitTextToSize(`${typeText} · ${statusText}\n${referenceText}\n${sourceText}`, 31) as string[];
         const rowHeight = Math.max(20, 5 + nameLines.length * 4 + descriptionLines.length * 3.5, referenceLines.length * 3.5 + 7);
@@ -336,11 +377,11 @@ function Bank() {
         const isIncoming = row.direction === "incoming";
         doc.setFont("Saha", "bold");
         doc.setFontSize(7.5);
-        doc.setTextColor(...(isIncoming ? [5, 150, 105] as const : [225, 29, 72] as const));
+        doc.setTextColor(isIncoming ? 5 : 225, isIncoming ? 150 : 29, isIncoming ? 105 : 72);
         doc.text(formatDate(row.date), margin + 3, y + 3);
         doc.setFont("Saha", "normal");
         doc.setFontSize(7);
-        doc.setTextColor(...(isIncoming ? [5, 150, 105] as const : [225, 29, 72] as const));
+        doc.setTextColor(isIncoming ? 5 : 225, isIncoming ? 150 : 29, isIncoming ? 105 : 72);
         doc.text(isIncoming ? "GELEN" : "GİDEN", margin + 3, y + 8);
         doc.setFont("Saha", "bold");
         doc.setFontSize(8);
@@ -356,7 +397,7 @@ function Bank() {
         doc.text(referenceLines, margin + 90, y + 4);
         doc.setFont("Saha", "bold");
         doc.setFontSize(8);
-        doc.setTextColor(...(isIncoming ? [5, 150, 105] as const : [225, 29, 72] as const));
+        doc.setTextColor(isIncoming ? 5 : 225, isIncoming ? 150 : 29, isIncoming ? 105 : 72);
         doc.text(`${isIncoming ? "+" : "−"}${formatTL(row.amount)}`, margin + 146, y + 4, { align: "right" });
         doc.setFont("Saha", "normal");
         doc.setFontSize(7);
@@ -377,7 +418,7 @@ function Bank() {
   }
 
   async function downloadSahaReceipt(row: (typeof rows)[number]) {
-    if (!ownerId || !activeAccount) return toast.error("Belge oluşturmak için hesap seçilmeli");
+    if (!ownerId || !activeAccount) { toast.error("Belge oluşturmak için hesap seçilmeli"); return; }
     try {
       const { jsPDF } = await import("jspdf");
       const doc = new jsPDF({ unit: "mm", format: "a5", compress: true });
@@ -405,7 +446,7 @@ function Bank() {
 
       doc.setFillColor(15, 23, 42);
       doc.rect(0, 0, pageWidth, 55, "F");
-      doc.setFillColor(...accent);
+      doc.setFillColor(accent[0], accent[1], accent[2]);
       doc.rect(0, 52, pageWidth, 3, "F");
       doc.setFillColor(255, 255, 255);
       doc.roundedRect(margin, 12, 11, 11, 3, 3, "F");
@@ -424,11 +465,12 @@ function Bank() {
       doc.setTextColor(203, 213, 225);
       doc.text(formatDate(row.date), pageWidth - margin, 37, { align: "right" });
 
-      doc.setFillColor(...(positive ? [236, 253, 245] as const : [255, 241, 242] as const));
+      const cardFill = positive ? [236, 253, 245] : [255, 241, 242];
+      doc.setFillColor(cardFill[0]!, cardFill[1]!, cardFill[2]!);
       doc.roundedRect(margin, 64, contentWidth, 34, 4, 4, "F");
       doc.setFont("Saha", "bold");
       doc.setFontSize(7);
-      doc.setTextColor(...accent);
+      doc.setTextColor(accent[0], accent[1], accent[2]);
       doc.text(positive ? "GELEN PARA" : "GİDEN PARA", margin + 5, 73);
       doc.setFontSize(18);
       doc.text(`${positive ? "+" : "−"}${formatTL(row.amount)}`, margin + 5, 88);
@@ -598,8 +640,8 @@ function Bank() {
   }
 
   async function scanGmailForMovements() {
-    if (!gmailConsent) return toast.error("Önce Gmail erişimi ve cihazda işleme onayını ver.");
-    if (!ownerId || !activeAccount) return toast.error("Önce şifreli kasayı açıp aktarım hesabını seç.");
+    if (!gmailConsent) { toast.error("Önce Gmail erişimi ve cihazda işleme onayını ver."); return; }
+    if (!ownerId || !activeAccount) { toast.error("Önce şifreli kasayı açıp aktarım hesabını seç."); return; }
     setGmailBusy(true);
     setGmailRows([]);
     try {
@@ -621,7 +663,10 @@ function Bank() {
     try {
       const result = await importEmailBankMovements(ownerId, activeAccount.id, gmailRows);
       await queryClient.invalidateQueries({ queryKey: ["bank-movements", ownerId] });
-      toast.success(`${result.importedCount} hareket cihazdaki şifreli kasaya kaydedildi; ${result.duplicateCount} tekrar veya geçersiz kayıt atlandı.`);
+      await queryClient.refetchQueries({ queryKey: ["bank-movements", ownerId, activeAccount.id, true], type: "active" });
+      setSearch("");
+      setMonth("all");
+      toast.success(`${result.importedCount} hareket kaydedildi; tüm zamanlar işlemlerine ve PDF özetine eklendi. ${result.duplicateCount} tekrar veya geçersiz kayıt atlandı.`);
       setGmailRows([]);
       setGmailScannedCount(0);
     } catch (error) {
@@ -657,12 +702,13 @@ function Bank() {
         <h1 className="mt-2 text-2xl font-bold">Banka verilerinin anahtarı sende</h1>
         <p className="mt-2 text-sm leading-relaxed text-slate-300">Hesap adları ve hareketler AES‑GCM ile tarayıcında şifrelenir. Kasa parolası ve açık kayıtlar Supabase’e gönderilmez.</p>
       </div>
-      <form className="space-y-4 p-6 sm:p-8" onSubmit={(event) => void submitVault(event)}>
+      {vault.exists && vault.biometricReady && !showVaultPassword && <div className="space-y-3 p-6 sm:p-8"><Button type="button" className="h-12 w-full" disabled={vaultBusy} onClick={() => { void vault.unlockBiometric().then(() => toast.success("Kasa biyometri ile açıldı.")).catch((error) => { setShowVaultPassword(true); toast.error(error instanceof Error ? `${error.message} Parolanla devam edebilirsin.` : "Biyometri kullanılamadı. Parolanla devam edebilirsin."); }); }}><Fingerprint/>Face ID / parmak izi ile aç</Button><Button type="button" variant="ghost" className="w-full" onClick={() => setShowVaultPassword(true)}>Parola kullan</Button><p className="text-center text-xs text-muted-foreground">Cihazın kayıtlı yüz tanıma veya parmak izi doğrulamasını kullanır.</p></div>}
+      {(!vault.exists || !vault.biometricReady || showVaultPassword) && <form className="space-y-4 p-6 sm:p-8" onSubmit={(event) => void submitVault(event)}>
         <div className="space-y-2"><Label htmlFor="bank-vault-pass">{vault.exists ? "Kasa parolası" : "Yeni kasa parolası"}</Label><Input id="bank-vault-pass" type="password" autoComplete={vault.exists ? "current-password" : "new-password"} minLength={vault.exists ? undefined : 14} required value={vaultPassphrase} onChange={(event) => setVaultPassphrase(event.target.value)} placeholder={vault.exists ? "Parolanı gir" : "En az 14 karakter"}/></div>
         {!vault.exists && <><div className="space-y-2"><Label htmlFor="bank-vault-confirm">Parolayı tekrar gir</Label><Input id="bank-vault-confirm" type="password" autoComplete="new-password" minLength={14} required value={vaultConfirm} onChange={(event) => setVaultConfirm(event.target.value)} placeholder="Aynı parolayı tekrar yaz"/></div><p className="rounded-xl border border-amber-500/25 bg-amber-500/[0.06] p-3 text-xs leading-relaxed text-muted-foreground">Parolayı unutursan kasayı kurtarmak mümkün olmaz. Güvenli bir parola yöneticisinde sakla. Bu kasa bu tarayıcıya ve cihaza özeldir; cihazlar arası senkronize edilmez.</p></>}
         <Button className="w-full" type="submit" disabled={vaultBusy}><LockKeyhole/>{vault.exists ? "Kasayı aç" : "Şifreli kasayı oluştur"}</Button>
-      </form>
-      {vault.exists && vault.biometricReady && <div className="px-6 pb-6 sm:px-8"><Button variant="secondary" className="w-full" disabled={vaultBusy} onClick={() => { void vault.unlockBiometric().catch((error) => toast.error(error instanceof Error ? error.message : "Biyometrik kilit açılamadı.")); }}><Fingerprint/>Face ID / parmak izi ile aç</Button></div>}
+        {vault.exists && vault.biometricReady && <Button type="button" variant="ghost" className="w-full" onClick={() => setShowVaultPassword(false)}>Biyometrik girişe dön</Button>}
+      </form>}
     </section>
     {vault.exists && <section className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.06] p-4"><p className="font-semibold">Eski sürümdeki bulut kayıtları</p><p className="mt-1 text-sm leading-relaxed text-muted-foreground">Önceki banka hareketleri ve PDF’ler Supabase’de açık metin olarak duruyor olabilir. Kasayı açtıktan sonra eski hareketleri şifreli olarak cihaza taşıyıp bulut kopyalarını silme işlemini başlatabilirsin.</p></section>}
   </div>;
@@ -745,8 +791,8 @@ function Bank() {
     {adding && <form className="space-y-3 rounded-2xl border bg-card p-4" onSubmit={(event) => {
       event.preventDefault();
       const value = Number(amount.replace(",", "."));
-      if (!(value > 0) || !Number.isFinite(value) || value > 99_999_999.99) return toast.error("Geçerli bir tutar girin");
-      if (!date || Number.isNaN(Date.parse(date))) return toast.error("Geçerli bir tarih ve saat seçin");
+      if (!(value > 0) || !Number.isFinite(value) || value > 99_999_999.99) { toast.error("Geçerli bir tutar girin"); return; }
+      if (!date || Number.isNaN(Date.parse(date))) { toast.error("Geçerli bir tarih ve saat seçin"); return; }
       add.mutate({ direction, amount: value, date, counterparty: counterparty.trim().slice(0, 120), description: description.trim().slice(0, 500) }, { onSuccess: () => { setAdding(false); setAmount(""); setCounterparty(""); setDescription(""); } });
     }}>
       <div className="flex items-center justify-between"><div><h2 className="font-semibold">Yeni hareket</h2><p className="text-xs text-muted-foreground">{activeAccount ? `${activeAccount.bank_name} · ${activeAccount.account_name}` : "Kişisel manuel kayıt hesabı"} için eklenir.</p></div><Button type="button" variant="ghost" size="sm" onClick={() => setAdding(false)}>Kapat</Button></div>
@@ -761,12 +807,12 @@ function Bank() {
     <div className="space-y-3"><div className="flex items-center justify-between px-1"><div><h2 className="font-semibold">İşlemler</h2><p className="text-xs text-muted-foreground">{rows.length} kayıt · {monthLabel}</p></div><span className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">{displayedRows.length} gösteriliyor</span></div>
     <div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/><Input aria-label="Hareketlerde ara" placeholder="Kişi veya açıklamada ara" value={search} onChange={(e) => setSearch(e.target.value)} className="h-11 rounded-xl pl-9"/></div>
     {displayedRows.map((row) => <article key={row.id} className="flex items-start justify-between gap-3 rounded-2xl border bg-card p-4 shadow-sm">
-      <div className="flex min-w-0 gap-3"><div className={"mt-0.5 rounded-xl p-2 " + (row.direction === "incoming" ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600")}>{row.direction === "incoming" ? <ArrowDownLeft className="size-4"/> : <ArrowUpRight className="size-4"/>}</div><div className="min-w-0"><p className="truncate font-medium">{row.counterparty || (row.source === "open_banking" ? "Karşı taraf banka verisinde yok" : row.direction === "incoming" ? "Gelen para" : "Çıkan para")}</p><p className="mt-1 text-xs text-muted-foreground">{formatDate(row.date)} · {row.direction === "incoming" ? "Kimden" : "Kime"}{row.status && row.status !== "completed" ? ` · ${row.status}` : ""}{row.source === "open_banking" ? " · Bankadan eşitlendi" : row.source === "email_attachment" ? " · Ekstre dosyasından" : ""}</p>{row.description && <p className="mt-2 break-words text-sm text-muted-foreground">{row.description}</p>}{row.reference && <p className="mt-1 truncate font-mono text-[10px] text-muted-foreground">Ref: {row.reference}</p>}</div></div>
+      <div className="flex min-w-0 gap-3"><div className={"mt-0.5 rounded-xl p-2 " + (row.direction === "incoming" ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600")}>{row.direction === "incoming" ? <ArrowDownLeft className="size-4"/> : <ArrowUpRight className="size-4"/>}</div><div className="min-w-0"><p className="truncate font-medium">{row.counterparty || (row.source === "open_banking" ? "Karşı taraf banka verisinde yok" : row.direction === "incoming" ? "Gelen para" : "Çıkan para")}</p><p className="mt-1 text-xs text-muted-foreground">{formatDate(row.date)} · {row.direction === "incoming" ? "Kimden" : "Kime"}{row.status && row.status !== "completed" ? ` · ${row.status}` : ""}{row.source === "open_banking" ? " · Bankadan eşitlendi" : row.source === "email_attachment" ? " · Ekstre dosyasından" : row.source === "email_auto" ? " · Gmail taraması" : ""}</p>{row.description && <p className="mt-2 break-words text-sm text-muted-foreground">{row.description}</p>}{row.reference && <p className="mt-1 truncate font-mono text-[10px] text-muted-foreground">Ref: {row.reference}</p>}</div></div>
       <div className="flex shrink-0 items-start gap-1"><span className={"num pt-1 text-right text-sm font-semibold " + (row.direction === "incoming" ? "text-emerald-600" : "text-rose-600")}>{row.direction === "incoming" ? "+" : "−"}{formatTL(row.amount)}</span><Button variant="ghost" size="icon" aria-label="Hareket ayrıntılarını aç" title="Hareket ayrıntıları" onClick={() => setSelectedMovementId(row.id)}><Eye className="size-4"/></Button><Button variant="ghost" size="icon" aria-label="SAHA hareket belgesini indir" title="SAHA belgesi (resmi banka dekontu değildir)" onClick={() => void downloadSahaReceipt(row)}><FileDown className="size-4"/></Button><Button variant="ghost" size="icon" aria-label="Hareketi kalıcı sil" title="Kalıcı sil" disabled={remove.isPending} onClick={() => remove.mutate(row.id)}><Trash2 className="size-4"/></Button></div>
     </article>)}
     {!displayedRows.length && !records.isLoading && !records.error && (rows.length ? <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">Aramanla eşleşen hareket yok.</p> : <div className="rounded-2xl border border-dashed bg-card/60 px-5 py-10 text-center"><div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary"><WalletCards className="size-6"/></div><p className="mt-3 font-semibold">Bu ay için hareket yok</p><p className="mt-1 text-sm text-muted-foreground">İlk gelen veya çıkan para kaydını ekleyebilirsin.</p><Button className="mt-4" variant="secondary" onClick={() => setAdding(true)}><Plus/>Hareket ekle</Button></div>)}
     </div>
-    {selectedMovementId && (() => { const row = records.data?.find((item) => item.id === selectedMovementId); if (!row) return null; const fields: Array<[string, string | undefined]> = [["Tarih ve saat", formatDate(row.date)], [row.direction === "incoming" ? "Gönderen" : "Alıcı", row.counterparty], ["Tutar", formatTL(row.amount)], ["İşlem nedeni", row.transaction_reason], ["Açıklama", row.description], ["Karşı taraf IBAN", row.counterparty_iban], ["Banka", row.bank_name ?? activeAccount?.bank_name], ["Referans / dekont no", row.reference], ["İşlem durumu", row.status], ["İşlem sonrası bakiye", row.balance_after === undefined ? undefined : formatTL(row.balance_after)], ["Kayıt kaynağı", row.source === "email_attachment" ? "Elle seçilen ekstre eki" : row.source === "manual" ? "Elle giriş" : row.source ?? "—"]]; return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedMovementId(null); }}><section role="dialog" aria-modal="true" aria-labelledby="movement-details-title" className="max-h-[88dvh] w-full max-w-xl space-y-4 overflow-y-auto rounded-t-3xl border bg-background p-5 shadow-2xl sm:rounded-3xl"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Hesap hareketi</p><h2 id="movement-details-title" className="mt-1 text-xl font-bold">{row.direction === "incoming" ? "Gelen transfer" : "Giden transfer"} · {formatTL(row.amount)}</h2></div><Button variant="outline" onClick={() => setSelectedMovementId(null)}>Kapat</Button></div><dl className="grid gap-2 sm:grid-cols-2">{fields.map(([label, value]) => <div key={label} className="min-w-0 rounded-xl border bg-card p-3"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 break-words text-sm font-medium">{value || "Dosyada belirtilmemiş"}</dd></div>)}</dl>{row.raw_source_snippet && <details className="rounded-xl border p-3"><summary className="cursor-pointer text-sm font-medium">Ekstredeki kaynak satırını göster</summary><pre className="mt-2 whitespace-pre-wrap break-words text-xs text-muted-foreground">{row.raw_source_snippet}</pre></details>}<p className="text-xs leading-relaxed text-muted-foreground">Gösterilen bilgiler içe aktarılan dosyada bulunan alanlardır. Eksik bilgiler tahmin edilmez. Bu kayıt banka tarafından doğrulanmış resmi dekont değildir.</p></section></div>; })()}
+    {selectedMovementId && (() => { const row = records.data?.find((item) => item.id === selectedMovementId); if (!row) return null; const fields: Array<[string, string | undefined]> = [["Tarih ve saat", formatDate(row.date)], [row.direction === "incoming" ? "Gönderen" : "Alıcı", row.counterparty], ["Tutar", formatTL(row.amount)], ["İşlem nedeni", row.transaction_reason], ["Açıklama", row.description], ["Karşı taraf IBAN", row.counterparty_iban], ["Banka", row.bank_name ?? activeAccount?.bank_name], ["Referans / dekont no", row.reference], ["İşlem durumu", row.status], ["İşlem sonrası bakiye", row.balance_after === undefined ? undefined : formatTL(row.balance_after)], ["Kayıt kaynağı", row.source === "email_attachment" ? "Elle seçilen ekstre eki" : row.source === "email_auto" ? "Google Gmail taraması" : row.source === "manual" ? "Elle giriş" : row.source ?? "—"]]; return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedMovementId(null); }}><section role="dialog" aria-modal="true" aria-labelledby="movement-details-title" className="max-h-[88dvh] w-full max-w-xl space-y-4 overflow-y-auto rounded-t-3xl border bg-background p-5 shadow-2xl sm:rounded-3xl"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Hesap hareketi</p><h2 id="movement-details-title" className="mt-1 text-xl font-bold">{row.direction === "incoming" ? "Gelen transfer" : "Giden transfer"} · {formatTL(row.amount)}</h2></div><Button variant="outline" onClick={() => setSelectedMovementId(null)}>Kapat</Button></div><dl className="grid gap-2 sm:grid-cols-2">{fields.map(([label, value]) => <div key={label} className="min-w-0 rounded-xl border bg-card p-3"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 break-words text-sm font-medium">{value || "Dosyada belirtilmemiş"}</dd></div>)}</dl>{row.raw_source_snippet && <details className="rounded-xl border p-3"><summary className="cursor-pointer text-sm font-medium">Kaynak iletinin göndereni ve konusu</summary><pre className="mt-2 whitespace-pre-wrap break-words text-xs text-muted-foreground">{row.raw_source_snippet}</pre></details>}<p className="text-xs leading-relaxed text-muted-foreground">Gösterilen bilgiler içe aktarılan dosyada veya taranan e-postadaki metinde bulunan alanlardır. Eksik bilgiler tahmin edilmez. Bu kayıt banka tarafından doğrulanmış resmi dekont değildir.</p></section></div>; })()}
     {biometricSetupOpen && <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) { setBiometricSetupOpen(false); setBiometricPassphrase(""); } }}><section role="dialog" aria-modal="true" aria-labelledby="vault-biometric-title" className="w-full max-w-sm space-y-4 rounded-2xl border bg-background p-5 shadow-2xl"><div className="flex items-center gap-3"><span className="rounded-xl bg-primary/10 p-2 text-primary"><Fingerprint/></span><div><h2 id="vault-biometric-title" className="font-semibold">Biyometrik kasa açma</h2><p className="text-xs text-muted-foreground">Bu cihazda güvenli biçimde etkinleştir</p></div></div><p className="text-sm leading-relaxed text-muted-foreground">Parolan WebAuthn PRF ile üretilen cihaz anahtarı altında şifrelenir. Biyometri, bu anahtarı cihazda serbest bırakır; parolan sunucuya gönderilmez.</p><div className="space-y-2"><Label htmlFor="vault-bio-pass">Kasa parolanı doğrula</Label><Input id="vault-bio-pass" type="password" autoComplete="current-password" value={biometricPassphrase} onChange={(event) => setBiometricPassphrase(event.target.value)} /></div><div className="flex gap-2"><Button variant="outline" className="flex-1" onClick={() => { setBiometricSetupOpen(false); setBiometricPassphrase(""); }}>İptal</Button><Button className="flex-1" disabled={vaultBusy || !biometricPassphrase} onClick={() => { void vault.enableBiometric(biometricPassphrase).then(() => { toast.success("Bu cihaz için biyometrik kasa açma etkinleştirildi."); setBiometricSetupOpen(false); setBiometricPassphrase(""); }).catch((error) => toast.error(error instanceof Error ? error.message : "Biyometri etkinleştirilemedi.")); }}><Fingerprint/>Etkinleştir</Button></div></section></div>}
   </div>;
 }

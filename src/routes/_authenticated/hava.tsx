@@ -209,7 +209,7 @@ function HavaDurumu() {
         <div className="text-8xl font-thin mb-1 leading-none">{data.current.temp}°</div>
         <div className="text-xl font-medium mb-1">{data.current.desc}</div>
         <div className="text-sm opacity-80">
-          En yüksek: {data.daily[0].maxTemp}° · En düşük: {data.daily[0].minTemp}°
+          En yüksek: {data.daily[0]?.maxTemp ?? "—"}° · En düşük: {data.daily[0]?.minTemp ?? "—"}°
         </div>
       </div>
 

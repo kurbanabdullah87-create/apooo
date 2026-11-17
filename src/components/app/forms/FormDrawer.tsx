@@ -18,11 +18,11 @@ export function FormDrawer({
   open: boolean;
   onOpenChange: (o: boolean) => void;
   title: string;
-  onSubmit: () => void;
+  onSubmit: () => void | Promise<void>;
   busy?: boolean;
   submitLabel?: string;
   canSubmit?: boolean;
-  submitHint?: string;
+  submitHint?: string | undefined;
   children: ReactNode;
 }) {
   return (

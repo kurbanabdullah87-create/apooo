@@ -1,6 +1,9 @@
 import { useEffect } from "react";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useRecords, type Payload } from "@/lib/work";
+import { formatTL, todayISO } from "@/lib/finance";
 
 export const REMIND_OPTIONS = [
   { value: "0", label: "Tam zamanında" },
@@ -28,7 +31,7 @@ function vibrate(pattern: number[] = [300, 100, 300, 100, 500]) {
 
 async function show(title: string, body: string, tag: string, urgent = false) {
   if (!notifySupported() || Notification.permission !== "granted") return;
-  const opts: NotificationOptions = {
+  const opts: NotificationOptions & { vibrate?: number[] } = {
     body,
     tag,
     icon: "/icon-192.png",
@@ -91,4 +94,55 @@ export function useAppointmentReminders(enabled: boolean, onOpen: () => void) {
     document.addEventListener("visibilitychange", tick);
     return () => { clearInterval(t); document.removeEventListener("visibilitychange", tick); };
   }, [enabled, recs.data, onOpen]);
+}
+
+/** Taksit vadelerini uygulama açıkken kontrol eder; ayrıntılı bildirim merkezinde ayrıca listelenir. */
+export function useDebtReminders(enabled: boolean, onOpen: () => void) {
+  const installments = useQuery({
+    queryKey: ["debt-installments"], enabled,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("debt_installments").select("id,debt_id,installment_no,amount,paid_amount,due_on");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const debts = useQuery({
+    queryKey: ["debt-records"], enabled,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("debt_records").select("id,name,direction");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  useEffect(() => {
+    if (!enabled) return;
+    const tick = () => {
+      const today = todayISO();
+      const names = new Map((debts.data ?? []).map((d) => [d.id, d]));
+      for (const installment of installments.data ?? []) {
+        if (installment.due_on !== today || Number(installment.amount) <= Number(installment.paid_amount)) continue;
+        const key = `debt-due:${installment.id}:${today}`;
+        if (seen(key)) continue;
+        mark(key);
+        const debt = names.get(installment.debt_id);
+        const detail = `${debt?.name ?? "Borç / alacak"} · ${debt?.direction === "payable" ? "ödenecek" : "tahsil edilecek"} · ${installment.installment_no}. taksit · kalan ${formatTL(Number(installment.amount) - Number(installment.paid_amount))}`;
+        const title = "🔔 Taksit vadesi bugün";
+        void (async () => {
+          if (notifySupported() && Notification.permission === "granted") {
+            try {
+              const options: NotificationOptions = { body: detail, tag: key, icon: "/icon-192.png", data: { url: "/borc" }, requireInteraction: true };
+              const registration = await navigator.serviceWorker?.getRegistration();
+              if (registration) await registration.showNotification(title, options);
+              else new Notification(title, options).onclick = () => { window.focus(); location.assign("/borc"); };
+            } catch { /* bildirim izni veya platform desteği olmayabilir */ }
+          }
+        })();
+        toast(title, { description: detail, duration: 20_000, action: { label: "Aç", onClick: onOpen } });
+      }
+    };
+    tick();
+    const timer = setInterval(tick, 30_000);
+    document.addEventListener("visibilitychange", tick);
+    return () => { clearInterval(timer); document.removeEventListener("visibilitychange", tick); };
+  }, [debts.data, enabled, installments.data, onOpen]);
 }

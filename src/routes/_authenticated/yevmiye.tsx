@@ -182,7 +182,7 @@ function Payroll() {
       y += 4; doc.setFont("DejaVu", "bold"); doc.setFontSize(12); doc.setTextColor(15, 31, 54); doc.text("GÜNLÜK ÇALIŞMA VE HAREKETLER", margin, y); y += 8;
       const cols = [margin, 43, 87, 116, 146, 176];
       const drawTableHead = () => { doc.setFillColor(31, 55, 83); doc.rect(margin, y - 5, 180, 9, "F"); doc.setFont("DejaVu", "bold"); doc.setFontSize(7.5); doc.setTextColor(255, 255, 255);
-        ["TARİH", "İŞYERİ / TÜR", "DURUM", "MESAİ", "TUTAR", "PARA"].forEach((t, i) => doc.text(t, cols[i] + 1, y)); y += 7; };
+        ["TARİH", "İŞYERİ / TÜR", "DURUM", "MESAİ", "TUTAR", "PARA"].forEach((t, i) => doc.text(t, (cols[i] ?? margin) + 1, y)); y += 7; };
       drawTableHead();
       const reportRows = [
         ...rows.map((r) => ({ date: String(r.payload.date ?? ""), name: String(r.payload.workplace_name ?? r.payload.site ?? "İşyeri"), status: String(r.payload.status ?? "Çalışma"), overtime: n(r.payload.overtime_hours) ? `${n(r.payload.overtime_hours)} sa` : "—", amount: payrollEntryAmount(r.payload), currency: String(r.payload.currency ?? "TRY"), kind: "payroll" })),
@@ -194,7 +194,7 @@ function Payroll() {
         if (index % 2 === 0) { doc.setFillColor(246, 248, 251); doc.rect(margin, y - 5, 180, 9, "F"); }
         doc.setFont("DejaVu", "normal"); doc.setFontSize(7.4); doc.setTextColor(42, 52, 67);
         const vals = [formatDate(row.date), row.name.slice(0, 20), row.status, row.overtime, amountText(row.amount, row.currency), row.currency];
-        vals.forEach((value, i) => doc.text(String(value), cols[i] + 1, y, { maxWidth: i === 1 ? 42 : i === 4 ? 30 : 25 })); y += 9;
+        vals.forEach((value, i) => doc.text(String(value), (cols[i] ?? margin) + 1, y, { maxWidth: i === 1 ? 42 : i === 4 ? 30 : 25 })); y += 9;
       }
       if (!reportRows.length) { doc.setFont("DejaVu", "normal"); doc.setFontSize(9); doc.text("Bu ay için kayıt bulunmuyor.", margin, y); y += 10; }
       const pageCount = doc.getNumberOfPages();

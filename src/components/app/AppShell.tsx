@@ -1,7 +1,7 @@
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
-import { LayoutDashboard, Users, Receipt, Settings, Plus, Search, Loader2, ArrowDown, HardHat, CalendarDays, Wrench, CalendarClock, Cloud, CloudUpload, Landmark, Coins } from "lucide-react";
+import { LayoutDashboard, Users, Receipt, Settings, Plus, Search, Loader2, ArrowDown, HardHat, CalendarDays, Wrench, CalendarClock, Cloud, CloudUpload, Landmark, Coins, HandCoins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DeviceLock } from "./DeviceLock";
 import { useEffect } from "react";
@@ -11,7 +11,7 @@ import { haptic } from "@/lib/haptic";
 import { useMe } from "@/hooks/use-me";
 import { GlobalSearch } from "./GlobalSearch";
 import { QuickAdd } from "./QuickAdd";
-import { useAppointmentReminders } from "@/lib/reminders";
+import { useAppointmentReminders, useDebtReminders } from "@/lib/reminders";
 import { NotificationCenter } from "@/components/app/NotificationCenter";
 
 const NAV = [
@@ -37,6 +37,7 @@ export function AppShell() {
 
   const isUsta = me.data?.isUsta ?? false;
   useAppointmentReminders(isUsta, () => void navigate({ to: "/randevu" }));
+  useDebtReminders(isUsta, () => void navigate({ to: "/borc" }));
   useEffect(() => {
     const sync = () => void flushQueue();
     const refresh = () => void qc.invalidateQueries();
@@ -70,7 +71,7 @@ export function AppShell() {
           className="flex h-11 min-w-0 flex-1 justify-start gap-3 px-3 text-sm text-muted-foreground"
         >
           <Search className="size-4" /><span className="truncate">Saha · Ara</span>
-        </Button>{isUsta&&<NotificationCenter/>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Randevular"><Link to="/randevu"><CalendarClock/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Hava Durumu"><Link to="/hava"><Cloud/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Hesap hareketleri"><Link to="/banka"><Landmark/></Link></Button>{isUsta&&<Button asChild variant="ghost" size="icon" title="Giderler"><Link to="/giderler"><Receipt/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Ayarlar"><Link to="/ayarlar"><Settings/></Link></Button></div>
+        </Button>{isUsta&&<NotificationCenter/>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Randevular"><Link to="/randevu"><CalendarClock/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Hava Durumu"><Link to="/hava"><Cloud/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Borç ve alacak"><Link to="/borc"><HandCoins/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Hesap hareketleri"><Link to="/banka"><Landmark/></Link></Button>{isUsta&&<Button asChild variant="ghost" size="icon" title="Giderler"><Link to="/giderler"><Receipt/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Ayarlar"><Link to="/ayarlar"><Settings/></Link></Button></div>
         {queuedWrites > 0 && <div className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-warning" role="status"><CloudUpload className="size-3.5"/>{queuedWrites} çevrimdışı kayıt senkronizasyon bekliyor</div>}
       </header>
 

@@ -8,6 +8,7 @@ import { RecordFields, type Field } from "@/components/app/RecordFields";
 import { MediaTools } from "@/components/app/MediaTools";
 import { CodeScanner } from "@/components/app/CodeScanner";
 import { useUndoableDelete } from "@/lib/data";
+import { useMe } from "@/hooks/use-me";
 import {
   useRecords,
   useSaveRecord,
@@ -40,6 +41,7 @@ export const Route = createFileRoute("/_authenticated/ekipman")({
 });
 
 function Equipment() {
+  const me = useMe();
   const items = useRecords("equipment");
   const jobs = useRecords("job");
   const maintenance = useRecords("maintenance");
@@ -164,7 +166,7 @@ function Equipment() {
         </div>
       </div>
       <div className="grid grid-cols-4 gap-1">
-        {["Ekipman", "Emanet", "Alınacaklar", "Stok"].map((t) => (
+        {["Ekipman", "Emanet", "Alınacaklar", ...(me.data?.isUsta ? ["Stok"] : [])].map((t) => (
           <Button
             size="sm"
             key={t}
@@ -471,14 +473,14 @@ function Equipment() {
         onSubmit={() => {
           const name = stockForm.name.trim();
           if (!name) return void toast.error("Malzeme adı gerekli.");
-          if (stockForm.quantity < 0 || stockForm.minimum < 0 || stockForm.unit_cost < 0) return void toast.error("Stok ve maliyet değerleri negatif olamaz.");
+          if (stockForm.minimum < 0 || stockForm.unit_cost < 0) return void toast.error("Asgari stok ve birim maliyet negatif olamaz.");
           const old = inventory.data?.find((item) => item.id === stockForm.id);
-          saveInventory.mutate({ id: stockForm.id || undefined, payload: { ...old?.payload, _t: "inventory_item", name, sku: stockForm.sku.trim(), unit: stockForm.unit.trim() || "adet", quantity: stockForm.quantity, minimum: stockForm.minimum, unit_cost: stockForm.unit_cost, notes: stockForm.notes.trim() } }, { onSuccess: () => setStockItemOpen(false) });
+          saveInventory.mutate({ id: stockForm.id || undefined, payload: { ...old?.payload, _t: "inventory_item", name, sku: stockForm.sku.trim(), unit: stockForm.unit.trim() || "adet", quantity: old ? Number(old.payload.quantity ?? 0) : 0, minimum: stockForm.minimum, unit_cost: stockForm.unit_cost, notes: stockForm.notes.trim() } }, { onSuccess: () => setStockItemOpen(false) });
         }}
       >
         <div className="space-y-2"><Label htmlFor="stock-name">Malzeme adı</Label><Input id="stock-name" required maxLength={120} value={stockForm.name} onChange={(event) => setStockForm({ ...stockForm, name: event.target.value })}/></div>
         <div className="grid grid-cols-2 gap-3"><div className="space-y-2"><Label htmlFor="stock-sku">Stok kodu</Label><Input id="stock-sku" maxLength={50} value={stockForm.sku} onChange={(event) => setStockForm({ ...stockForm, sku: event.target.value })}/></div><div className="space-y-2"><Label htmlFor="stock-unit">Birim</Label><Input id="stock-unit" maxLength={20} placeholder="adet, kg, litre…" value={stockForm.unit} onChange={(event) => setStockForm({ ...stockForm, unit: event.target.value })}/></div></div>
-        <div className="grid grid-cols-3 gap-2"><div className="space-y-2"><Label htmlFor="stock-quantity">Başlangıç</Label><Input id="stock-quantity" type="number" min="0" step="0.001" inputMode="decimal" value={stockForm.quantity} onChange={(event) => setStockForm({ ...stockForm, quantity: Number(event.target.value) })}/></div><div className="space-y-2"><Label htmlFor="stock-min">Asgari</Label><Input id="stock-min" type="number" min="0" step="0.001" inputMode="decimal" value={stockForm.minimum} onChange={(event) => setStockForm({ ...stockForm, minimum: Number(event.target.value) })}/></div><div className="space-y-2"><Label htmlFor="stock-cost">Birim ₺</Label><Input id="stock-cost" type="number" min="0" step="0.01" inputMode="decimal" value={stockForm.unit_cost} onChange={(event) => setStockForm({ ...stockForm, unit_cost: Number(event.target.value) })}/></div></div>
+        <div className="grid grid-cols-2 gap-2">{stockForm.id ? <div className="space-y-2"><Label>Mevcut stok</Label><p className="flex h-11 items-center rounded-xl border bg-muted px-3 text-sm">{stockForm.quantity} {stockForm.unit}</p><p className="text-xs text-muted-foreground">Stok miktarını değiştirmek için stok girişi, sahaya çıkarma veya iade hareketi kullanın.</p></div> : <div className="flex min-h-11 items-center rounded-xl bg-secondary/60 px-3 text-xs text-muted-foreground">Yeni malzeme 0 stokla açılır. Kaydedince stok girişi ekleyin.</div>}<div className="space-y-2"><Label htmlFor="stock-min">Asgari stok</Label><Input id="stock-min" type="number" min="0" step="0.001" inputMode="decimal" value={stockForm.minimum} onChange={(event) => setStockForm({ ...stockForm, minimum: Number(event.target.value) })}/></div><div className="space-y-2"><Label htmlFor="stock-cost">Birim ₺</Label><Input id="stock-cost" type="number" min="0" step="0.01" inputMode="decimal" value={stockForm.unit_cost} onChange={(event) => setStockForm({ ...stockForm, unit_cost: Number(event.target.value) })}/></div></div>
         <div className="space-y-2"><Label htmlFor="stock-notes">Not</Label><Textarea id="stock-notes" maxLength={500} value={stockForm.notes} onChange={(event) => setStockForm({ ...stockForm, notes: event.target.value })}/></div>
       </FormDrawer>
       <FormDrawer

@@ -8,6 +8,10 @@ export interface ImportedBankMovement {
   description: string;
   reference?: string;
   balance_after?: number;
+  counterparty_iban?: string;
+  transaction_reason?: string;
+  bank_name?: string;
+  raw_source_snippet?: string;
 }
 
 const normalize = (value: string) => value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/ı/g, "i").toLocaleLowerCase("tr-TR").replace(/[^a-z0-9]+/g, " ").trim();
@@ -79,6 +83,9 @@ function parseCsv(text: string): ImportedBankMovement[] {
   const creditIndex = find("alacak", "credit", "gelen");
   const balanceIndex = find("bakiye", "balance");
   const referenceIndex = find("referans", "dekont no", "islem no", "reference", "ref no");
+  const ibanIndex = find("karsi taraf iban", "gonderen iban", "alici iban", "iban", "account number");
+  const reasonIndex = find("islem nedeni", "transfer nedeni", "odeme nedeni", "payment reason", "reason");
+  const bankIndex = find("banka", "bank name", "financial institution");
   if (dateIndex < 0 || (amountIndex < 0 && debitIndex < 0 && creditIndex < 0)) return [];
   const rows: ImportedBankMovement[] = [];
   for (const line of lines.slice(1)) {
@@ -98,7 +105,8 @@ function parseCsv(text: string): ImportedBankMovement[] {
     const explicitlyIncoming = /\b(gelen|giris|tahsil|alacak|credit|incoming)\b/.test(directionText);
     const balance = parseAmount(get(balanceIndex));
     const direction = rawAmount < 0 || (explicitlyOutgoing && !explicitlyIncoming) ? "outgoing" : "incoming";
-    rows.push({ direction, amount: Math.abs(rawAmount), date, counterparty, description, ...(get(referenceIndex) ? { reference: get(referenceIndex).slice(0, 120) } : {}), ...(balance !== null ? { balance_after: balance } : {}) });
+    const iban = get(ibanIndex) || /\bTR\d{24}\b/i.exec(line)?.[0] || "";
+    rows.push({ direction, amount: Math.abs(rawAmount), date, counterparty, description, ...(get(referenceIndex) ? { reference: get(referenceIndex).slice(0, 120) } : {}), ...(balance !== null ? { balance_after: balance } : {}), ...(iban ? { counterparty_iban: iban.slice(0, 64) } : {}), ...(get(reasonIndex) ? { transaction_reason: get(reasonIndex).slice(0, 300) } : {}), ...(get(bankIndex) ? { bank_name: get(bankIndex).slice(0, 120) } : {}), raw_source_snippet: line.slice(0, 1000) });
   }
   return rows;
 }
@@ -115,7 +123,7 @@ function parseOfx(text: string): ImportedBankMovement[] {
     const description = (value("NAME") || value("MEMO")).slice(0, 500);
     const fitid = value("FITID");
     const balance = parseAmount(value("LEDGERBAL"));
-    return [{ direction: amount > 0 ? "incoming" as const : "outgoing" as const, amount: Math.abs(amount), date, counterparty: value("NAME").slice(0, 120), description, ...(fitid ? { reference: fitid.slice(0, 120) } : {}), ...(balance !== null ? { balance_after: balance } : {}) }];
+    return [{ direction: amount > 0 ? "incoming" as const : "outgoing" as const, amount: Math.abs(amount), date, counterparty: value("NAME").slice(0, 120), description, ...(fitid ? { reference: fitid.slice(0, 120) } : {}), ...(balance !== null ? { balance_after: balance } : {}), ...(value("MEMO") ? { transaction_reason: value("MEMO").slice(0, 300) } : {}), raw_source_snippet: block.replace(/\s+/g, " ").slice(0, 1000) }];
   });
 }
 
@@ -129,7 +137,7 @@ function parseQif(text: string): ImportedBankMovement[] {
     const reference = field("N");
     const payee = field("P");
     const memo = field("M");
-    return [{ direction: rawAmount > 0 ? "incoming" as const : "outgoing" as const, amount: Math.abs(rawAmount), date, counterparty: payee.slice(0, 120), description: memo.slice(0, 500), ...(reference ? { reference: reference.slice(0, 120) } : {}) }];
+    return [{ direction: rawAmount > 0 ? "incoming" as const : "outgoing" as const, amount: Math.abs(rawAmount), date, counterparty: payee.slice(0, 120), description: memo.slice(0, 500), ...(reference ? { reference: reference.slice(0, 120) } : {}), ...(memo ? { transaction_reason: memo.slice(0, 300) } : {}), raw_source_snippet: block.replace(/\s+/g, " ").slice(0, 1000) }];
   });
 }
 
@@ -202,7 +210,9 @@ export async function parseBankStatementFile(file: File): Promise<ImportedBankMo
     for (const amount of amounts) description = description.replace(amount.value, " ");
     description = description.replace(/\s+/g, " ").trim().slice(0, 500);
     const balance = amounts.length > 1 ? parseAmount(amounts[amounts.length - 1]?.value ?? "") : null;
-    rows.push({ direction, amount: Math.abs(signed), date, counterparty: sender.slice(0, 120), description, ...(balance !== null ? { balance_after: balance } : {}) });
+    const iban = /\bTR\d{24}\b/i.exec(line)?.[0];
+    const reference = /(?:referans|dekont|islem no)\s*[:：-]\s*([\w/-]+)/i.exec(line)?.[1];
+    rows.push({ direction, amount: Math.abs(signed), date, counterparty: sender.slice(0, 120), description, ...(balance !== null ? { balance_after: balance } : {}), ...(iban ? { counterparty_iban: iban } : {}), ...(reference ? { reference: reference.slice(0, 120) } : {}), transaction_reason: description.slice(0, 300), raw_source_snippet: line.slice(0, 1000) });
   }
   await pdf.cleanup();
   return rows;

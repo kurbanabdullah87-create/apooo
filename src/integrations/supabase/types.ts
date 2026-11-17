@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      debt_records: {
+        Row: { id: string; team_id: string; owner_id: string; direction: string; name: string; description: string; total_amount: number; acquired_on: string; installment_count: number; interval_months: number; first_due_on: string; created_at: string; updated_at: string }
+        Insert: { id?: string; team_id?: string; owner_id?: string; direction: string; name: string; description?: string; total_amount: number; acquired_on?: string; installment_count?: number; interval_months?: number; first_due_on?: string; created_at?: string; updated_at?: string }
+        Update: { id?: string; team_id?: string; owner_id?: string; direction?: string; name?: string; description?: string; total_amount?: number; acquired_on?: string; installment_count?: number; interval_months?: number; first_due_on?: string; created_at?: string; updated_at?: string }
+        Relationships: []
+      }
+      debt_installments: {
+        Row: { id: string; team_id: string; owner_id: string; debt_id: string; installment_no: number; amount: number; due_on: string; paid_amount: number; paid_at: string | null }
+        Insert: { id?: string; team_id?: string; owner_id?: string; debt_id: string; installment_no: number; amount: number; due_on: string; paid_amount?: number; paid_at?: string | null }
+        Update: { id?: string; team_id?: string; owner_id?: string; debt_id?: string; installment_no?: number; amount?: number; due_on?: string; paid_amount?: number; paid_at?: string | null }
+        Relationships: [{ foreignKeyName: "debt_installments_debt_id_fkey"; columns: ["debt_id"]; isOneToOne: false; referencedRelation: "debt_records"; referencedColumns: ["id"] }]
+      }
+      debt_payments: {
+        Row: { id: string; team_id: string; owner_id: string; debt_id: string; installment_id: string | null; amount: number; paid_on: string; note: string; created_at: string }
+        Insert: { id?: string; team_id?: string; owner_id?: string; debt_id: string; installment_id?: string | null; amount: number; paid_on?: string; note?: string; created_at?: string }
+        Update: { id?: string; team_id?: string; owner_id?: string; debt_id?: string; installment_id?: string | null; amount?: number; paid_on?: string; note?: string; created_at?: string }
+        Relationships: [{ foreignKeyName: "debt_payments_debt_id_fkey"; columns: ["debt_id"]; isOneToOne: false; referencedRelation: "debt_records"; referencedColumns: ["id"] }, { foreignKeyName: "debt_payments_installment_id_fkey"; columns: ["installment_id"]; isOneToOne: false; referencedRelation: "debt_installments"; referencedColumns: ["id"] }]
+      }
       bank_accounts: {
         Row: {
           created_at: string
@@ -478,6 +496,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      record_debt_payment: { Args: { _debt_id: string; _installment_id: string; _amount: number; _paid_on: string; _note?: string }; Returns: string }
       bill_job: { Args: { _job_id: string }; Returns: string }
       complete_appointment: { Args: { _appointment_id: string }; Returns: string }
       customer_credit_status: { Args: { _customer_id: string }; Returns: Json }

@@ -18,6 +18,7 @@ import { Route as SssRouteImport } from './routes/sss'
 import { Route as AuthenticatedAlimRouteImport } from './routes/_authenticated/alim'
 import { Route as AuthenticatedAyarlarRouteImport } from './routes/_authenticated/ayarlar'
 import { Route as AuthenticatedBankaRouteImport } from './routes/_authenticated/banka'
+import { Route as AuthenticatedBorcRouteImport } from './routes/_authenticated/borc'
 import { Route as AuthenticatedDovizRouteImport } from './routes/_authenticated/doviz'
 import { Route as AuthenticatedEkipmanRouteImport } from './routes/_authenticated/ekipman'
 import { Route as AuthenticatedGiderlerRouteImport } from './routes/_authenticated/giderler'
@@ -74,6 +75,11 @@ const AuthenticatedAyarlarRoute = AuthenticatedAyarlarRouteImport.update({
 const AuthenticatedBankaRoute = AuthenticatedBankaRouteImport.update({
   id: '/banka',
   path: '/banka',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedBorcRoute = AuthenticatedBorcRouteImport.update({
+  id: '/borc',
+  path: '/borc',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedDovizRoute = AuthenticatedDovizRouteImport.update({
@@ -151,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/alim': typeof AuthenticatedAlimRoute
   '/ayarlar': typeof AuthenticatedAyarlarRoute
   '/banka': typeof AuthenticatedBankaRoute
+  '/borc': typeof AuthenticatedBorcRoute
   '/doviz': typeof AuthenticatedDovizRoute
   '/ekipman': typeof AuthenticatedEkipmanRoute
   '/giderler': typeof AuthenticatedGiderlerRoute
@@ -174,6 +181,7 @@ export interface FileRoutesByTo {
   '/alim': typeof AuthenticatedAlimRoute
   '/ayarlar': typeof AuthenticatedAyarlarRoute
   '/banka': typeof AuthenticatedBankaRoute
+  '/borc': typeof AuthenticatedBorcRoute
   '/doviz': typeof AuthenticatedDovizRoute
   '/ekipman': typeof AuthenticatedEkipmanRoute
   '/giderler': typeof AuthenticatedGiderlerRoute
@@ -199,6 +207,7 @@ export interface FileRoutesById {
   '/_authenticated/alim': typeof AuthenticatedAlimRoute
   '/_authenticated/ayarlar': typeof AuthenticatedAyarlarRoute
   '/_authenticated/banka': typeof AuthenticatedBankaRoute
+  '/_authenticated/borc': typeof AuthenticatedBorcRoute
   '/_authenticated/doviz': typeof AuthenticatedDovizRoute
   '/_authenticated/ekipman': typeof AuthenticatedEkipmanRoute
   '/_authenticated/giderler': typeof AuthenticatedGiderlerRoute
@@ -224,6 +233,7 @@ export interface FileRouteTypes {
     | '/alim'
     | '/ayarlar'
     | '/banka'
+    | '/borc'
     | '/doviz'
     | '/ekipman'
     | '/giderler'
@@ -247,6 +257,7 @@ export interface FileRouteTypes {
     | '/alim'
     | '/ayarlar'
     | '/banka'
+    | '/borc'
     | '/doviz'
     | '/ekipman'
     | '/giderler'
@@ -271,6 +282,7 @@ export interface FileRouteTypes {
     | '/_authenticated/alim'
     | '/_authenticated/ayarlar'
     | '/_authenticated/banka'
+    | '/_authenticated/borc'
     | '/_authenticated/doviz'
     | '/_authenticated/ekipman'
     | '/_authenticated/giderler'
@@ -358,6 +370,13 @@ declare module '@tanstack/react-router' {
       path: '/banka'
       fullPath: '/banka'
       preLoaderRoute: typeof AuthenticatedBankaRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/borc': {
+      id: '/_authenticated/borc'
+      path: '/borc'
+      fullPath: '/borc'
+      preLoaderRoute: typeof AuthenticatedBorcRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/doviz': {
@@ -458,6 +477,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAlimRoute: typeof AuthenticatedAlimRoute
   AuthenticatedAyarlarRoute: typeof AuthenticatedAyarlarRoute
   AuthenticatedBankaRoute: typeof AuthenticatedBankaRoute
+  AuthenticatedBorcRoute: typeof AuthenticatedBorcRoute
   AuthenticatedDovizRoute: typeof AuthenticatedDovizRoute
   AuthenticatedEkipmanRoute: typeof AuthenticatedEkipmanRoute
   AuthenticatedGiderlerRoute: typeof AuthenticatedGiderlerRoute
@@ -475,6 +495,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAlimRoute: AuthenticatedAlimRoute,
   AuthenticatedAyarlarRoute: AuthenticatedAyarlarRoute,
   AuthenticatedBankaRoute: AuthenticatedBankaRoute,
+  AuthenticatedBorcRoute: AuthenticatedBorcRoute,
   AuthenticatedDovizRoute: AuthenticatedDovizRoute,
   AuthenticatedEkipmanRoute: AuthenticatedEkipmanRoute,
   AuthenticatedGiderlerRoute: AuthenticatedGiderlerRoute,

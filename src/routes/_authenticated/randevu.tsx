@@ -22,6 +22,8 @@ import { customerRestriction } from "@/lib/finance";
 import { Textarea } from "@/components/ui/textarea";
 import { buildReceipt, shareOrDownload } from "@/lib/receipt";
 import { pageHead, useRecords, useSaveRecord, validateJobForm, type Payload, type WorkRecord } from "@/lib/work";
+import { supabase } from "@/integrations/supabase/client";
+import type { BusinessProfile } from "@/lib/receipt";
 
 export const Route = createFileRoute("/_authenticated/randevu")({
   head: () => pageHead("Randevular", "İsme göre randevu takibi."),
@@ -226,7 +228,7 @@ function Appointments() {
       if (txError) throw txError;
       const tx = { ...row, amount: Number(row.amount), material_cost: Number(row.material_cost), vat_rate: Number(row.vat_rate) } as Tx;
       const customerRows = (transactions.data ?? []).filter((item) => item.customer_id === customer.id);
-      const file = await buildReceipt({ profile: profile ?? {}, customer, tx, balance: customerBalance([...customerRows, tx]) });
+      const file = await buildReceipt({ profile: (profile ?? {}) as BusinessProfile, customer, tx, balance: customerBalance([...customerRows, tx]) });
       setReceiptFile(file);
       toast.success("İş tamamlandı ve müşteri carisine işlendi. Makbuz hazır.");
     } catch (error) {

@@ -33,8 +33,8 @@ function ResetPassword() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (password.length < 12) return toast.error("Şifren en az 12 karakter olmalı.");
-    if (password !== confirm) return toast.error("Şifreler eşleşmiyor.");
+    if (password.length < 12) { toast.error("Şifren en az 12 karakter olmalı."); return; }
+    if (password !== confirm) { toast.error("Şifreler eşleşmiyor."); return; }
     setBusy(true);
     const { error } = await supabase.auth.updateUser({ password });
     if (error) {
