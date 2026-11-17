@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Play, Pause, Check, Copy, ChevronDown, Clock } from "lucide-react";
+import { Plus, Play, Pause, Check, Copy, ChevronDown, Clock, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { FormDrawer } from "@/components/app/forms/FormDrawer";
@@ -30,6 +30,8 @@ import {
 } from "@/lib/work";
 import { todayISO, formatTL } from "@/lib/finance";
 import { applyVoiceJob, parseVoiceJob } from "@/lib/voice-job";
+import { SwipeRow } from "@/components/app/SwipeRow";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_authenticated/isler")({
   head: () => pageHead("İşler", "İş planı, çalışma süreleri ve saha kayıtları."),
@@ -124,6 +126,59 @@ function Jobs() {
     else if (m.level === "warn") toast.warning(`${String(eq.payload.name)}: bakıma ${m.remaining.toFixed(1)} saat kaldı`);
   }
 
+  async function downloadJobReport(job: WorkRecord) {
+    try {
+      const [{ jsPDF }, customer] = await Promise.all([
+        import("jspdf"),
+        Promise.resolve(customers.data?.find((item) => item.id === job.payload.customer_id)),
+      ]);
+      const doc = new jsPDF({ unit: "mm", format: "a4", compress: true });
+      const loadFont = async (path: string) => {
+        const bytes = new Uint8Array(await (await fetch(path)).arrayBuffer());
+        let binary = "";
+        for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+        return btoa(binary);
+      };
+      doc.addFileToVFS("DejaVuSans.ttf", await loadFont("/fonts/DejaVuSans.ttf"));
+      doc.addFileToVFS("DejaVuSans-Bold.ttf", await loadFont("/fonts/DejaVuSans-Bold.ttf"));
+      doc.addFont("DejaVuSans.ttf", "DejaVu", "normal");
+      doc.addFont("DejaVuSans-Bold.ttf", "DejaVu", "bold");
+      const margin = 18;
+      let y = 22;
+      doc.setFillColor(15, 31, 54); doc.rect(0, 0, 210, 42, "F");
+      doc.setFont("DejaVu", "bold"); doc.setFontSize(19); doc.setTextColor(255, 255, 255); doc.text("SAHA · İŞ RAPORU", margin, y);
+      y += 10; doc.setFont("DejaVu", "normal"); doc.setFontSize(9); doc.setTextColor(205, 219, 235); doc.text(`Rapor tarihi: ${new Date().toLocaleString("tr-TR")}`, margin, y);
+      y = 56;
+      const section = (title: string) => { doc.setFont("DejaVu", "bold"); doc.setFontSize(11); doc.setTextColor(15, 31, 54); doc.text(title, margin, y); y += 3; doc.setDrawColor(220, 227, 236); doc.line(margin, y, 192, y); y += 8; };
+      const field = (label: string, value: unknown) => {
+        const val = String(value ?? "—").trim() || "—";
+        doc.setFont("DejaVu", "bold"); doc.setFontSize(8.5); doc.setTextColor(88, 101, 119); doc.text(label, margin, y);
+        doc.setFont("DejaVu", "normal"); doc.setTextColor(25, 35, 48);
+        const lines = doc.splitTextToSize(val, 125) as string[];
+        doc.text(lines, 63, y); y += Math.max(7, lines.length * 4.5);
+      };
+      section("İŞ BİLGİLERİ");
+      field("İş", job.payload.title); field("Müşteri", customer?.name ?? "Kayıtlı müşteri yok");
+      field("Tarih", job.payload.date); field("Durum", job.payload.status);
+      field("Adres", job.payload.address || customer?.address || "—");
+      field("Ekipman", equipment.data?.find((item) => item.id === job.payload.equipment_id)?.payload.name ?? (job.payload.no_machine ? "Makinesiz" : "—"));
+      field("Açıklama", job.payload.notes);
+      y += 3; section("SÜRE VE ÜCRET");
+      const seconds = elapsedSeconds(job.payload, Date.now());
+      field("Çalışma süresi", `${Math.floor(seconds / 3600)} sa ${Math.floor((seconds % 3600) / 60)} dk`);
+      field("Ücret", formatTL(Number(job.payload.hourly_rate) > 0 ? hourlyCharge(seconds, Number(job.payload.hourly_rate)) : Number(job.payload.price ?? 0)));
+      field("Malzeme maliyeti", formatTL(Number(job.payload.material_cost ?? 0)));
+      if (job.payload["estimated_profit_margin"] != null) field("Tahmini kâr marjı", `%${Number(job.payload["estimated_profit_margin"]).toFixed(1)}`);
+      doc.setFont("DejaVu", "normal"); doc.setFontSize(7.5); doc.setTextColor(115, 126, 141);
+      doc.text("Bu rapor uygulamadaki iş kaydına dayanır; fatura veya resmi belge yerine geçmez.", margin, 282, { maxWidth: 175 });
+      doc.save(`saha-is-raporu-${String(job.payload.date ?? todayISO())}.pdf`);
+      toast.success("İş raporu PDF olarak indirildi.");
+    } catch (error) {
+      console.error(error);
+      toast.error("İş raporu oluşturulamadı. Yeniden deneyin.");
+    }
+  }
+
   function getWeather() {
     if (!navigator.geolocation) {
       setWeather("Konum desteklenmiyor");
@@ -207,7 +262,7 @@ function Jobs() {
       )}
       {jobs.error && <p className="text-destructive">İşler yüklenemedi.</p>}
       {jobs.isLoading ? (
-        <p className="text-muted-foreground">Yükleniyor…</p>
+        <div className="space-y-3" aria-label="İşler yükleniyor" aria-busy="true">{[0, 1, 2].map((key) => <div key={key} className="space-y-3 rounded-2xl border bg-card p-4"><Skeleton className="h-5 w-2/5"/><Skeleton className="h-4 w-3/5"/><Skeleton className="h-10 w-full"/></div>)}</div>
       ) : rows.length === 0 ? (
         <p className="py-8 text-center text-muted-foreground">Bu tarihte iş yok.</p>
       ) : (
@@ -217,7 +272,8 @@ function Jobs() {
           const customer = customers.data?.find((c) => c.id === p.customer_id);
           const address = String(p.address || customer?.address || "");
           return (
-            <article key={j.id} className="space-y-3 rounded-lg border bg-card p-4">
+            <SwipeRow key={j.id} {...(me.data?.isUsta && p.status !== "Tamamlandı" ? { onComplete: () => void complete(j, seconds) } : {})}>
+            <article className="space-y-3 rounded-lg border bg-card p-4">
               <div className="flex justify-between gap-2">
                 <div className="min-w-0">
                   <h2 className="font-semibold break-words">
@@ -364,9 +420,11 @@ function Jobs() {
                     </>
                   )}
                   <MediaTools record={j} readOnly={!me.data?.isUsta} onSave={(p) => change(j, p)} />
+                  {me.data?.isUsta && <Button variant="outline" size="sm" onClick={() => void downloadJobReport(j)}><Download className="size-4"/>İş raporunu indir (PDF)</Button>}
                 </div>
               )}
             </article>
+            </SwipeRow>
           );
         })
       )}
@@ -381,9 +439,9 @@ function Jobs() {
           if (v.error) return void toast.error(v.error);
           v.warnings.forEach((w) => toast.warning(w));
           const quote = Number(form.price ?? 0) || Number(form.hourly_rate ?? 0) * Number(form.planned_hours ?? 0);
-          const linkedLabor = editing ? (payrollRows.data ?? []).filter((r) => r.payload.job_id === editing.id).reduce((sum, r) => sum + payrollEntryAmount(r.payload), 0) : 0;
+          const linkedLabor = editing ? (payrollRows.data ?? []).filter((r) => r.payload["job_id"] === editing.id).reduce((sum, r) => sum + payrollEntryAmount(r.payload), 0) : 0;
           const linkedExpense = editing ? (expenses.data ?? []).filter((r) => r.job_record_id === editing.id).reduce((sum, r) => sum + r.amount, 0) : 0;
-          const costs = Number(form.material_cost ?? 0) + (linkedLabor || Number(form.estimated_labor_cost ?? 0)) + (linkedExpense || Number(form.estimated_expense_cost ?? 0));
+          const costs = Number(form.material_cost ?? 0) + (linkedLabor || Number(form["estimated_labor_cost"] ?? 0)) + (linkedExpense || Number(form["estimated_expense_cost"] ?? 0));
           const estimated_profit_margin = quote > 0 ? Math.round(((quote - costs) / quote) * 10000) / 100 : null;
           const { owner_id, ...payload } = form;
           save.mutate(

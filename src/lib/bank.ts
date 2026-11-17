@@ -409,6 +409,37 @@ export async function importBankStatementFile(ownerId: string, accountId: string
   return { importedCount, duplicateCount: parsedRows.length - importedCount, documentId };
 }
 
+/** Store only extracted transaction fields in the already encrypted, device-local vault. */
+export async function importEmailBankMovements(ownerId: string, accountId: string, rows: ImportedBankMovement[]) {
+  const { data: auth, error } = await supabase.auth.getUser();
+  if (error || auth.user?.id !== ownerId) throw new Error("Oturum değişti. Yeniden giriş yap.");
+  if (rows.length === 0) return { importedCount: 0, duplicateCount: 0 };
+  const vault = await readVault(ownerId);
+  const account = vault.accounts.find((candidate) => candidate.id === accountId);
+  if (!account) throw new Error("Aktarım hesabı bulunamadı.");
+  const existing = new Set(vault.transactions.map((row) => row.reference?.trim().toLocaleLowerCase("tr-TR")).filter(Boolean));
+  const now = new Date().toISOString();
+  let importedCount = 0;
+  for (const row of rows) {
+    const reference = row.reference?.trim().toLocaleLowerCase("tr-TR");
+    if (!reference || existing.has(reference)) continue;
+    if (!(row.amount > 0) || !Number.isFinite(row.amount) || !row.date || !["incoming", "outgoing"].includes(row.direction)) continue;
+    existing.add(reference);
+    vault.transactions.unshift({
+      id: crypto.randomUUID(), owner_id: ownerId, account_id: account.id,
+      direction: row.direction, amount: row.amount, date: row.date,
+      counterparty: row.counterparty.slice(0, 120), description: row.description.slice(0, 500),
+      reference: reference!.slice(0, 120),
+      ...(row.transaction_reason ? { transaction_reason: row.transaction_reason.slice(0, 300) } : {}),
+      ...(row.raw_source_snippet ? { raw_source_snippet: row.raw_source_snippet.slice(0, 1000) } : {}),
+      bank_name: account.bank_name, status: "completed", source: "email_auto", created_at: now,
+    });
+    importedCount++;
+  }
+  if (importedCount) await writeVault(ownerId, vault);
+  return { importedCount, duplicateCount: rows.length - importedCount };
+}
+
 export async function getBankDocumentFile(ownerId: string, documentId: string) {
   const document = (await readVault(ownerId)).documents?.find((item) => item.id === documentId);
   if (!document) throw new Error("Ekstre dosyası bulunamadı.");
