@@ -3,7 +3,7 @@
   "name": "Saha Operasyon ve Finans",
   "short_name": "Saha",
   "description": "Saha iş yönetimi, cari takip ve finans sistemi",
-  "start_url": "/",
+  "start_url": "/auth",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",

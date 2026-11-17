@@ -41,6 +41,13 @@ const canonicalHostMiddleware = createMiddleware().server(async ({ next }) => {
     url.hostname = "sahav2full.vercel.app";
     return Response.redirect(url, 308);
   }
+  // The product opens directly in its sign-in flow. Authenticated users are
+  // sent onward by the /auth route guard, so the public marketing page is not
+  // part of the app's startup experience.
+  if (url.pathname === "/") {
+    url.pathname = "/auth";
+    return Response.redirect(url, 307);
+  }
   return next();
 });
 

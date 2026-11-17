@@ -43,8 +43,10 @@ function shouldRemember() {
   try {
     const setting = localStorage.getItem(REMEMBER_KEY);
     if (setting !== null) return setting === "true";
-    // Keep pre-existing remembered sessions working once after this update.
-    return Object.keys(localStorage).some((key) => key.startsWith("sb-") && key.endsWith("-auth-token") && Boolean(localStorage.getItem(key)));
+    // This is an installable, account-based field app. Persist new sessions by
+    // default so closing the browser or PWA does not silently sign the user out.
+    // An explicit false value still opts out for users who share their device.
+    return true;
   } catch {
     return false;
   }

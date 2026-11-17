@@ -1,6 +1,6 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import { ArrowRight, BarChart3, Check, HardHat, Loader2, LockKeyhole, Mail, ShieldCheck, Sparkles, UsersRound } from "lucide-react";
+import { ArrowRight, BarChart3, Check, HardHat, Loader2, LockKeyhole, Mail, ShieldCheck, Sparkles, UsersRound, Eye, EyeOff, CalendarDays, WalletCards } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +47,7 @@ function AuthPage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(getRememberMe);
   const [busy, setBusy] = useState(false);
   const [confirmationSent, setConfirmationSent] = useState(false);
@@ -142,36 +143,39 @@ function AuthPage() {
   }
 
   return (
-    <main className="relative isolate min-h-dvh overflow-hidden bg-[#080a0e] text-foreground selection:bg-primary/30">
-      <div aria-hidden="true" className="pointer-events-none absolute -left-48 -top-56 size-[34rem] rounded-full bg-primary/10 blur-[110px]" />
-      <div aria-hidden="true" className="pointer-events-none absolute -bottom-64 right-0 size-[36rem] rounded-full bg-sky-500/[0.07] blur-[130px]" />
-      <div className="relative mx-auto grid min-h-dvh w-full max-w-[1440px] lg:grid-cols-[minmax(0,1.05fr)_minmax(460px,0.95fr)]">
-        <aside className="relative hidden flex-col justify-between overflow-hidden px-12 py-12 lg:flex xl:px-20">
-          <div aria-hidden="true" className="absolute inset-10 rounded-[3rem] border border-white/[0.035]" />
+    <main className="relative isolate min-h-dvh overflow-hidden bg-[#07090c] text-foreground selection:bg-primary/30">
+      <div aria-hidden="true" className="pointer-events-none absolute -left-48 -top-56 size-[38rem] rounded-full bg-primary/[0.13] blur-[125px]" />
+      <div aria-hidden="true" className="pointer-events-none absolute -bottom-72 right-[-8rem] size-[42rem] rounded-full bg-sky-500/[0.08] blur-[145px]" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.018)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.018)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:linear-gradient(to_bottom,black,transparent_80%)]" />
+      <div className="relative mx-auto grid min-h-dvh w-full max-w-[1480px] lg:grid-cols-[minmax(0,1.08fr)_minmax(430px,0.92fr)]">
+        <aside className="relative hidden flex-col justify-between overflow-hidden px-12 py-10 lg:flex xl:px-20 xl:py-12">
+          <div aria-hidden="true" className="absolute inset-8 rounded-[3rem] border border-white/[0.045]" />
           <div className="relative flex items-center gap-3">
             <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20"><HardHat className="size-6" /></div>
             <div><p className="text-xl font-bold tracking-tight">Saha</p><p className="text-xs text-muted-foreground">Operasyon ve finans yönetimi</p></div>
           </div>
           <div className="relative max-w-xl py-12">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/[0.07] px-3 py-1.5 text-xs font-medium text-primary"><Sparkles className="size-3.5"/>Sahadaki işin için tek merkez</div>
-            <h2 className="font-display text-5xl font-bold leading-[1.08] tracking-tight xl:text-6xl">İşini yönet.<br/><span className="bg-gradient-to-r from-primary to-cyan-200 bg-clip-text text-transparent">Günün sende kalsın.</span></h2>
-            <p className="mt-6 max-w-lg text-base leading-7 text-muted-foreground">Müşterilerini, işleri, tahsilatları ve giderlerini düzenli bir yerde takip et. Nerede olursan ol, kontrol elinde olsun.</p>
-            <div className="mt-10 grid max-w-lg grid-cols-2 gap-3">
-              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4 backdrop-blur"><div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><UsersRound className="size-4.5"/></div><p className="mt-4 text-sm font-semibold">Müşteri takibi</p><p className="mt-1 text-xs text-muted-foreground">Kayıtlar, işler ve cari hareketler</p></div>
-              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4 backdrop-blur"><div className="flex size-9 items-center justify-center rounded-xl bg-sky-400/10 text-sky-300"><BarChart3 className="size-4.5"/></div><p className="mt-4 text-sm font-semibold">Finans özeti</p><p className="mt-1 text-xs text-muted-foreground">Tahsilat, gider ve kişisel kayıtlar</p></div>
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/[0.08] px-3.5 py-2 text-xs font-semibold text-primary"><Sparkles className="size-3.5"/>SAHA · OPERASYON VE FİNANS</div>
+            <h2 className="font-display text-5xl font-bold leading-[1.06] tracking-tight xl:text-[4.25rem]">İşin sahada.<br/><span className="bg-gradient-to-r from-primary via-emerald-200 to-cyan-200 bg-clip-text text-transparent">Kontrolün sende.</span></h2>
+            <p className="mt-6 max-w-lg text-base leading-7 text-slate-300">İşlerini, müşterilerini ve günlük finansını tek bir sade çalışma alanında yönet. Günün yoğunluğunda aradığın bilgi hep elinin altında olsun.</p>
+            <div className="mt-9 grid max-w-lg grid-cols-2 gap-3">
+              <div className="group rounded-2xl border border-white/[0.09] bg-gradient-to-br from-white/[0.065] to-white/[0.02] p-4 shadow-xl shadow-black/10 backdrop-blur transition hover:border-primary/25"><div className="flex size-10 items-center justify-center rounded-xl border border-primary/15 bg-primary/10 text-primary"><UsersRound className="size-4.5"/></div><p className="mt-4 text-sm font-semibold">Müşteri ve işler</p><p className="mt-1 text-xs leading-5 text-slate-400">Cari hareketler, iş geçmişi ve saha takibi</p></div>
+              <div className="group rounded-2xl border border-white/[0.09] bg-gradient-to-br from-white/[0.065] to-white/[0.02] p-4 shadow-xl shadow-black/10 backdrop-blur transition hover:border-sky-400/25"><div className="flex size-10 items-center justify-center rounded-xl border border-sky-400/15 bg-sky-400/10 text-sky-300"><BarChart3 className="size-4.5"/></div><p className="mt-4 text-sm font-semibold">Finans ve raporlar</p><p className="mt-1 text-xs leading-5 text-slate-400">Tahsilat, gider, yevmiye ve dönem özeti</p></div>
             </div>
+            <div className="mt-5 flex max-w-lg items-center gap-3 rounded-2xl border border-white/[0.08] bg-black/20 px-4 py-3"><div className="flex -space-x-2"><span className="flex size-8 items-center justify-center rounded-full border-2 border-[#101419] bg-primary/15 text-primary"><CalendarDays className="size-3.5"/></span><span className="flex size-8 items-center justify-center rounded-full border-2 border-[#101419] bg-sky-400/15 text-sky-300"><WalletCards className="size-3.5"/></span></div><p className="text-xs leading-5 text-slate-300">Takviminden hesap hareketlerine kadar<br/><strong className="font-semibold text-white">günlük iş akışın tek yerde.</strong></p><span className="ml-auto hidden rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-2.5 py-1 text-[10px] font-medium text-emerald-300 xl:inline-flex">Saha için tasarlandı</span></div>
           </div>
           <div className="relative flex items-center gap-2 text-xs text-muted-foreground"><ShieldCheck className="size-4 text-emerald-400"/>Güvenli oturum · Kayıtların hesabına özel</div>
         </aside>
 
-        <div className="flex min-h-dvh items-center justify-center px-3 py-5 sm:px-8 sm:py-8 lg:px-10">
-          <section className="relative w-full max-w-[500px] rounded-[1.5rem] border border-white/[0.1] bg-gradient-to-b from-[#141820]/95 to-[#0e1116]/95 p-4 shadow-[0_32px_100px_-35px_rgba(0,0,0,0.85)] backdrop-blur-xl sm:rounded-[2rem] sm:p-9">
-            <div aria-hidden="true" className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent" />
-            <div className="mb-7 flex flex-col items-start gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between lg:hidden">
-              <div className="flex items-center gap-3"><div className="flex size-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/15"><HardHat className="size-5" /></div><div><p className="text-lg font-bold">Saha</p><p className="text-xs text-muted-foreground">Operasyon ve finans</p></div></div>
+        <div className="flex min-h-dvh items-center justify-center px-3 py-5 sm:px-8 sm:py-8 lg:px-10 xl:px-14">
+          <section className="relative w-full max-w-[470px] overflow-hidden rounded-[1.5rem] border border-white/[0.11] bg-[#101419]/95 p-4 shadow-[0_40px_120px_-35px_rgba(0,0,0,0.95)] backdrop-blur-2xl sm:rounded-[2rem] sm:p-9">
+            <div aria-hidden="true" className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-primary to-cyan-300/70" />
+            <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-28 size-64 rounded-full bg-primary/[0.08] blur-3xl" />
+            <div className="relative mb-7 flex flex-col items-start gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between lg:hidden">
+              <div className="flex items-center gap-3"><div className="flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-emerald-400 text-primary-foreground shadow-lg shadow-primary/20"><HardHat className="size-5" /></div><div><p className="text-lg font-bold tracking-tight">Saha</p><p className="text-xs text-muted-foreground">Operasyon ve finans</p></div></div>
               <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-2.5 py-1.5 text-[10px] font-medium text-emerald-300"><ShieldCheck className="size-3.5"/>Güvenli oturum</span>
             </div>
-            <div className="mb-8 hidden items-center justify-end lg:flex"><span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-2.5 py-1.5 text-[10px] font-medium text-emerald-300"><ShieldCheck className="size-3.5"/>Güvenli oturum</span></div>
+            <div className="relative mb-8 hidden items-center justify-end lg:flex"><span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-2.5 py-1.5 text-[10px] font-medium text-emerald-300"><ShieldCheck className="size-3.5"/>Güvenli oturum</span></div>
 
             {confirmationSent ? (
               <div className="space-y-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-5 text-center">
@@ -182,11 +186,11 @@ function AuthPage() {
               </div>
             ) : (
               <>
-                <div className="mb-7"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{resetMode ? "Hesap kurtarma" : mode === "login" ? "Hesabına güvenle eriş" : "Yeni bir başlangıç"}</p><h1 className="mt-2 font-display text-3xl font-bold tracking-tight sm:text-[2.1rem]">{resetMode ? "Şifreni yenile" : mode === "login" ? "Tekrar hoş geldin" : "Saha'ya katıl"}</h1><p className="mt-2 text-sm leading-6 text-muted-foreground">{resetMode ? "Kayıtlı e-posta adresine güvenli bir bağlantı göndereceğiz." : mode === "login" ? "İşlerine kaldığın yerden devam et." : "Hesabını oluşturup işlerini tek yerden yönet."}</p></div>
+                <div className="relative mb-7"><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">{resetMode ? "HESAP KURTARMA" : mode === "login" ? "HESABINA GÜVENLE ERİŞ" : "SAHA'YA KATIL"}</p><h1 className="mt-2 font-display text-3xl font-bold tracking-tight sm:text-[2.1rem]">{resetMode ? "Şifreni yenile" : mode === "login" ? "Tekrar hoş geldin" : "Saha'ya katıl"}</h1><p className="mt-2 text-sm leading-6 text-slate-400">{resetMode ? "Kayıtlı e-posta adresine güvenli bir bağlantı göndereceğiz." : mode === "login" ? "Hesabına giriş yap, işlerine kaldığın yerden devam et." : "Hesabını oluştur, işlerini tek yerden yönet."}</p></div>
 
                 {!resetMode && <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                  <Button type="button" variant="outline" className="h-12 w-full min-w-0 rounded-xl border-white/10 bg-white/[0.035] text-[13px] leading-tight hover:bg-white/[0.07] sm:text-sm" onClick={() => void continueWith("google")} disabled={busy}><GoogleMark/><span>Google ile devam et</span></Button>
-                  <Button type="button" variant="outline" className="h-12 w-full min-w-0 rounded-xl border-white/10 bg-white/[0.035] text-[13px] leading-tight hover:bg-white/[0.07] sm:text-sm" onClick={() => void continueWith("apple")} disabled={busy}><AppleMark/><span>Apple ile devam et</span></Button>
+                  <Button type="button" variant="outline" className="h-12 w-full min-w-0 rounded-xl border-white/10 bg-white/[0.045] text-[13px] leading-tight transition hover:border-white/20 hover:bg-white/[0.08] sm:text-sm" onClick={() => void continueWith("google")} disabled={busy}><GoogleMark/><span>Google ile devam et</span></Button>
+                  <Button type="button" variant="outline" className="h-12 w-full min-w-0 rounded-xl border-white/10 bg-white/[0.045] text-[13px] leading-tight transition hover:border-white/20 hover:bg-white/[0.08] sm:text-sm" onClick={() => void continueWith("apple")} disabled={busy}><AppleMark/><span>Apple ile devam et</span></Button>
                 </div>}
                 {!resetMode && <div className="my-6 flex items-center gap-3"><span className="h-px flex-1 bg-white/10"/><span className="text-[11px] font-medium text-muted-foreground">veya e-posta ile</span><span className="h-px flex-1 bg-white/10"/></div>}
 
@@ -196,10 +200,10 @@ function AuthPage() {
                     <div className="space-y-2"><Label htmlFor="last-name">Soyad</Label><Input id="last-name" autoComplete="family-name" maxLength={80} value={lastName} onChange={(e) => setLastName(e.target.value)} required className="h-12 rounded-xl border-white/10 bg-black/20 focus-visible:ring-primary/40"/></div>
                   </div>}
                   <div className="space-y-2"><Label htmlFor="email">{legacy && mode === "login" && !resetMode ? "Eski kullanıcı adı" : "E-posta adresi"}</Label><div className="relative"><Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/><Input id="email" type={mode === "signup" || resetMode ? "email" : "text"} inputMode={legacy && !resetMode ? "text" : "email"} autoCapitalize="none" autoComplete={mode === "login" ? "username" : "email"} placeholder={legacy && mode === "login" && !resetMode ? "eski kullanıcı adın" : "adiniz@gmail.com"} maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} required className="h-12 rounded-xl border-white/10 bg-black/20 pl-11 focus-visible:ring-primary/40"/></div></div>
-                  {!resetMode && <div className="space-y-2"><div className="flex items-center justify-between"><Label htmlFor="password">Şifre</Label>{mode === "signup" && <span className="text-[11px] text-muted-foreground">En az 12 karakter</span>}</div><div className="relative"><LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/><Input id="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "signup" ? 12 : undefined} value={password} onChange={(e) => setPassword(e.target.value)} required className="h-12 rounded-xl border-white/10 bg-black/20 pl-11 focus-visible:ring-primary/40"/></div></div>}
+                  {!resetMode && <div className="space-y-2"><div className="flex items-center justify-between"><Label htmlFor="password">Şifre</Label>{mode === "signup" && <span className="text-[11px] text-muted-foreground">En az 12 karakter</span>}</div><div className="relative"><LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/><Input id="password" type={showPassword ? "text" : "password"} autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "signup" ? 12 : undefined} value={password} onChange={(e) => setPassword(e.target.value)} required className="h-12 rounded-xl border-white/10 bg-black/20 pl-11 pr-11 focus-visible:ring-primary/40"/><button type="button" aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"} aria-pressed={showPassword} onClick={() => setShowPassword((visible) => !visible)} className="absolute right-2 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-white/[0.07] hover:text-foreground">{showPassword ? <EyeOff className="size-4"/> : <Eye className="size-4"/>}</button></div></div>}
                   {!resetMode && mode === "login" && !legacy && <button type="button" onClick={() => setResetMode(true)} className="-mt-1 text-left text-xs font-medium text-primary hover:underline">Şifremi unuttum</button>}
-                  {!resetMode && <label className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-3 text-sm transition-colors ${remember ? "border-primary/30 bg-primary/[0.07]" : "border-white/10 bg-white/[0.025] hover:bg-white/[0.045]"}`}><input type="checkbox" className="size-4 shrink-0 accent-primary" checked={remember} onChange={(e) => setRemember(e.target.checked)}/><span className="min-w-0 flex-1 font-medium">Beni hatırla</span><span className="shrink-0 text-[11px] text-muted-foreground">{remember ? "Bu cihazda açık kalır" : "Bu sekmede açık kalır"}</span></label>}
-                  <Button type="submit" className="h-12 w-full rounded-xl bg-primary text-base font-semibold shadow-lg shadow-primary/10 transition hover:brightness-105" disabled={busy}>{busy ? <Loader2 className="animate-spin"/> : <>{resetMode ? "Yenileme bağlantısı gönder" : mode === "login" ? "Giriş yap" : "Hesap oluştur"}<ArrowRight/></>}</Button>
+                  {!resetMode && <label className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-3 text-sm transition-colors ${remember ? "border-primary/30 bg-primary/[0.07]" : "border-white/10 bg-white/[0.025] hover:bg-white/[0.045]"}`}><input type="checkbox" className="size-4 shrink-0 accent-primary" checked={remember} onChange={(e) => setRemember(e.target.checked)}/><span className="min-w-0 flex-1 font-medium">Beni hatırla</span><span className="shrink-0 text-[11px] text-muted-foreground">{remember ? "Bu cihazda açık kal" : "Bu oturumda açık kal"}</span></label>}
+                  <Button type="submit" className="h-12 w-full rounded-xl bg-gradient-to-r from-primary to-emerald-400 text-base font-semibold text-slate-950 shadow-lg shadow-primary/20 transition hover:-translate-y-0.5 hover:brightness-105" disabled={busy}>{busy ? <Loader2 className="animate-spin"/> : <>{resetMode ? "Yenileme bağlantısı gönder" : mode === "login" ? "Giriş yap" : "Hesap oluştur"}<ArrowRight/></>}</Button>
                 </form>
                 {!resetMode && <div className="mt-4"><InstallButton/></div>}
 
