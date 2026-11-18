@@ -137,19 +137,6 @@ function Bank() {
         doc.text(`Oluşturulma: ${generatedAt}`, pageWidth / 2, 290, { align: "center" });
         doc.text(`${page} / ${totalPages}`, pageWidth - margin, 290, { align: "right" });
       };
-      const drawTableHeading = (y: number) => {
-        doc.setFillColor(241, 245, 249);
-        doc.roundedRect(margin, y - 5, contentWidth, 10, 2, 2, "F");
-        doc.setFont("Saha", "bold");
-        doc.setFontSize(6.5);
-        doc.setTextColor(...muted);
-        doc.text("TARİH", margin + 3, y + 1);
-        doc.text("İŞLEM / AÇIKLAMA", margin + 27, y + 1);
-        doc.text("REFERANS / DURUM", margin + 90, y + 1);
-        doc.text("TUTAR", margin + 146, y + 1, { align: "right" });
-        doc.text("BAKİYE", pageWidth - margin - 3, y + 1, { align: "right" });
-      };
-
       // Editorial cover and monthly summary.
       doc.setFillColor(...ink);
       doc.rect(0, 0, pageWidth, 70, "F");
@@ -486,23 +473,25 @@ function Bank() {
       doc.text(doc.splitTextToSize(`Kaynak dağılımı: ${sourceSummary}`, contentWidth), margin, 261);
       doc.text("Kategori eşleştirmesi açıklama ve taraf adına dayalı tahmindir. Eksik alanlar tamamlanmış veya banka tarafından doğrulanmış sayılmaz.", margin, 270);
 
-      // Keep the detailed ledger on its own page after the analytics.
-      doc.addPage();
-      doc.setFont("Saha", "bold");
-      doc.setFontSize(11);
-      doc.setTextColor(...ink);
-      doc.text("İşlem dökümü", margin, 19);
-      doc.setFont("Saha", "normal");
-      doc.setFontSize(7.5);
-      doc.setTextColor(...muted);
-      doc.text("Tarih, yön, taraf, işlem türü, açıklama, referans, tutar, bakiye ve kayıt kaynağı.", margin, 25);
-      doc.setFont("Saha", "bold");
-      doc.setFontSize(7.5);
-      doc.setTextColor(...muted);
-      doc.text(`${rows.length} hareket  ·  Gelen ${formatTL(incoming)}  ·  Giden ${formatTL(outgoing)}`, pageWidth - margin, 25, { align: "right" });
-      let y = 36;
-      drawTableHeading(y);
-      y += 10;
+      // Full-width transaction cards replace the cramped multi-column table.
+      // Text height is measured first and long records flow to continuation cards.
+      const drawLedgerPage = (continued = false) => {
+        doc.addPage();
+        doc.setFillColor(...ink);
+        doc.rect(0, 0, pageWidth, 32, "F");
+        doc.setFillColor(16, 185, 129);
+        doc.rect(0, 30, pageWidth, 2, "F");
+        doc.setFont("Saha", "bold");
+        doc.setFontSize(11);
+        doc.setTextColor(255, 255, 255);
+        doc.text(continued ? "İşlem dökümü · devam" : "İşlem dökümü", margin, 15);
+        doc.setFont("Saha", "normal");
+        doc.setFontSize(7);
+        doc.setTextColor(203, 213, 225);
+        doc.text(`${monthLabel} · ${rows.length} hareket · Gelen ${formatTL(incoming)} · Çıkan ${formatTL(outgoing)}`, margin, 24);
+        return 40;
+      };
+      let y = drawLedgerPage();
       const orderedRows = [...rows].sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at));
       if (!orderedRows.length) {
         doc.setFont("Saha", "normal");
@@ -510,59 +499,77 @@ function Bank() {
         doc.setTextColor(...muted);
         doc.text(month === "all" ? "Kayıtlı hesap hareketi bulunmuyor." : "Seçilen ayda kayıtlı hesap hareketi bulunmuyor.", margin + 2, y + 8);
       }
-      for (const [index, row] of orderedRows.entries()) {
-        const counterparty = row.counterparty.trim() || (row.source === "open_banking" ? "Karşı taraf banka verisinde yok" : "Taraf belirtilmedi");
-        const descriptionText = row.description.trim() || "Açıklama eklenmemiş";
-        doc.setFont("Saha", "normal");
-        doc.setFontSize(7.5);
-        const nameLines = doc.splitTextToSize(counterparty, 59) as string[];
-        const descriptionLines = doc.splitTextToSize(descriptionText, 59) as string[];
-        const referenceText = row.reference?.trim() || "Referans yok";
-        const statusText = row.status?.trim() || "Durum belirtilmedi";
-        const sourceText = row.source === "open_banking" ? "Banka bağlantısı" : row.source === "email_attachment" ? "E-posta ekstresi dosyasından aktarıldı" : row.source === "email_auto" ? "Gmail işlem bildiriminden aktarıldı" : "Elle kayıt";
-        const typeText = row.type?.trim() || "Diğer";
-        const referenceLines = doc.splitTextToSize(`${typeText} · ${statusText}\n${referenceText}\n${sourceText}`, 31) as string[];
-        const rowHeight = Math.max(20, 5 + nameLines.length * 4 + descriptionLines.length * 3.5, referenceLines.length * 3.5 + 7);
-        if (y + rowHeight > pageHeight - 21) {
-          doc.addPage();
-          y = 18;
-          drawTableHeading(y);
-          y += 10;
-        }
-        if (index % 2 === 0) {
-          doc.setFillColor(250, 251, 253);
-          doc.roundedRect(margin, y - 3, contentWidth, rowHeight, 2, 2, "F");
-        }
+      const ledgerLineHeight = 3.8;
+      const detailWidth = contentWidth - 10;
+      for (const row of orderedRows) {
         const isIncoming = row.direction === "incoming";
+        const accent = isIncoming ? [5, 150, 105] as const : [225, 29, 72] as const;
+        const dateValue = new Date(row.date);
+        const dateLabel = Number.isNaN(dateValue.getTime()) ? row.date : dateValue.toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" });
+        const timeLabel = row.date.length > 10 && !Number.isNaN(dateValue.getTime()) ? dateValue.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }) : "Saat belirtilmemiş";
+        const counterparty = row.counterparty.trim() || (row.source === "open_banking" ? "Karşı taraf banka verisinde yok" : "Taraf belirtilmedi");
         doc.setFont("Saha", "bold");
-        doc.setFontSize(7.5);
-        doc.setTextColor(isIncoming ? 5 : 225, isIncoming ? 150 : 29, isIncoming ? 105 : 72);
-        doc.text(formatDate(row.date), margin + 3, y + 3);
-        doc.setFont("Saha", "normal");
-        doc.setFontSize(7);
-        doc.setTextColor(isIncoming ? 5 : 225, isIncoming ? 150 : 29, isIncoming ? 105 : 72);
-        doc.text(isIncoming ? "GELEN" : "GİDEN", margin + 3, y + 8);
-        doc.setFont("Saha", "bold");
-        doc.setFontSize(8);
-        doc.setTextColor(...ink);
-        doc.text(nameLines, margin + 27, y + 3);
-        doc.setFont("Saha", "normal");
-        doc.setFontSize(7);
-        doc.setTextColor(...muted);
-        doc.text(descriptionLines, margin + 27, y + 3 + nameLines.length * 4);
-        doc.setFont("Saha", "normal");
-        doc.setFontSize(6.5);
-        doc.setTextColor(...muted);
-        doc.text(referenceLines, margin + 90, y + 4);
-        doc.setFont("Saha", "bold");
-        doc.setFontSize(8);
-        doc.setTextColor(isIncoming ? 5 : 225, isIncoming ? 150 : 29, isIncoming ? 105 : 72);
-        doc.text(`${isIncoming ? "+" : "−"}${formatTL(row.amount)}`, margin + 146, y + 4, { align: "right" });
-        doc.setFont("Saha", "normal");
-        doc.setFontSize(7);
-        doc.setTextColor(...ink);
-        doc.text(typeof row.balance_after === "number" && Number.isFinite(row.balance_after) ? formatTL(row.balance_after) : "—", pageWidth - margin - 3, y + 4, { align: "right" });
-        y += rowHeight;
+        doc.setFontSize(9);
+        const counterpartyLines = doc.splitTextToSize(counterparty, detailWidth) as string[];
+        const sourceText = row.source === "open_banking" ? "Banka bağlantısı" : row.source === "email_attachment" ? "E-posta ekstresi dosyasından aktarıldı" : row.source === "email_auto" ? "Gmail işlem bildiriminden aktarıldı" : "Elle kayıt";
+        const detailFields: Array<[string, string]> = [
+          ["Açıklama", row.description.trim() || "Belirtilmemiş"],
+          ["İşlem nedeni", row.transaction_reason?.trim() || "Belirtilmemiş"],
+          ["İşlem türü", row.type?.trim() || "Belirtilmemiş"],
+          ["Durum", row.status?.trim() || "Belirtilmemiş"],
+          ["Banka", row.bank_name?.trim() || activeAccount?.bank_name || "Belirtilmemiş"],
+          ["Karşı taraf IBAN", row.counterparty_iban?.trim() || "Kayıtta yok"],
+          ["Referans / dekont no", row.reference?.trim() || "Kayıtta yok"],
+          ["İşlem sonrası bakiye", typeof row.balance_after === "number" && Number.isFinite(row.balance_after) ? formatTL(row.balance_after) : "Kayıtta yok"],
+          ["Kayıt kaynağı", sourceText],
+        ];
+        if (row.raw_source_snippet?.trim()) detailFields.push(["Kaynak e-posta konusu / gönderen", row.raw_source_snippet.trim()]);
+        const detailLines = detailFields.flatMap(([label, value]) => {
+          doc.setFont("Saha", "normal");
+          doc.setFontSize(7.2);
+          return (doc.splitTextToSize(`${label}: ${value}`, detailWidth) as string[]).map((text) => ({ text, bold: false }));
+        });
+        const contentLines = [...counterpartyLines.map((text) => ({ text, bold: true })), ...detailLines];
+        const cardHeaderHeight = 10;
+        const cardPadding = 7;
+        const maxCardHeight = pageHeight - 23 - 43;
+        const maxLinesPerCard = Math.max(1, Math.floor((maxCardHeight - cardHeaderHeight - cardPadding) / ledgerLineHeight));
+        const chunks: Array<typeof contentLines> = [];
+        for (let offset = 0; offset < contentLines.length; offset += maxLinesPerCard) chunks.push(contentLines.slice(offset, offset + maxLinesPerCard));
+        if (!chunks.length) chunks.push([]);
+        for (const [chunkIndex, chunk] of chunks.entries()) {
+          const cardHeight = cardHeaderHeight + chunk.length * ledgerLineHeight + cardPadding;
+          if (y + cardHeight > pageHeight - 18) y = drawLedgerPage(true);
+          doc.setFillColor(250, 251, 253);
+          doc.roundedRect(margin, y, contentWidth, cardHeight, 2.5, 2.5, "F");
+          doc.setFillColor(accent[0], accent[1], accent[2]);
+          doc.roundedRect(margin, y, 1.5, cardHeight, 0.75, 0.75, "F");
+          if (chunkIndex === 0) {
+            doc.setFont("Saha", "bold");
+            doc.setFontSize(6.8);
+            doc.setTextColor(...muted);
+            doc.text(dateLabel, margin + 5, y + 4.4);
+            doc.setFont("Saha", "normal");
+            doc.setFontSize(6.3);
+            doc.text(timeLabel, margin + 5, y + 8.3);
+            doc.setFont("Saha", "bold");
+            doc.setFontSize(8.5);
+            doc.setTextColor(accent[0], accent[1], accent[2]);
+            doc.text(`${isIncoming ? "GELEN  +" : "GİDEN  −"}${formatTL(row.amount)}`, pageWidth - margin - 5, y + 6.2, { align: "right" });
+          } else {
+            doc.setFont("Saha", "bold");
+            doc.setFontSize(7);
+            doc.setTextColor(...muted);
+            doc.text(`${dateLabel} · ${timeLabel} · işlem ayrıntısı (devam)`, margin + 5, y + 6.2);
+          }
+          chunk.forEach((line, lineIndex) => {
+            doc.setFont("Saha", line.bold ? "bold" : "normal");
+            doc.setFontSize(line.bold ? 8 : 7.2);
+            doc.setTextColor(...(line.bold ? ink : muted));
+            doc.text(line.text, margin + 5, y + cardHeaderHeight + lineIndex * ledgerLineHeight);
+          });
+          y += cardHeight + 3;
+        }
       }
       const pages = doc.getNumberOfPages();
       for (let page = 1; page <= pages; page++) {
@@ -955,7 +962,7 @@ function Bank() {
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
           <p className="flex items-center gap-2 text-xs text-muted-foreground"><LockKeyhole className="size-3.5"/>PDF bu cihazda oluşturulur, Supabase’e yüklenmez.</p>
-          <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setSmsImportOpen((value) => !value)} disabled={accounts.isLoading || Boolean(accounts.error)}><MessageSquareText/>SMS’ten aktar</Button><Button variant="secondary" onClick={() => void downloadReport()} disabled={records.isLoading || accounts.isLoading || Boolean(accounts.error)}><Download/>PDF raporunu indir</Button><Button onClick={() => setAdding((value) => !value)} disabled={accounts.isLoading || Boolean(accounts.error)}><Plus/>Hareket ekle</Button></div>
+      <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setSmsImportOpen((value) => !value)} disabled={accounts.isLoading || Boolean(accounts.error)}><MessageSquareText/>SMS’ten aktar</Button><Button variant="secondary" onClick={() => void downloadReport()} disabled={records.isLoading || accounts.isLoading || Boolean(accounts.error)}><Download/>Detaylı PDF raporunu indir</Button><Button onClick={() => setAdding((value) => !value)} disabled={accounts.isLoading || Boolean(accounts.error)}><Plus/>Hareket ekle</Button></div>
         </div>
       </div>
     </section>
