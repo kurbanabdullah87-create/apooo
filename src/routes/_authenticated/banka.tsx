@@ -583,6 +583,31 @@ function Bank() {
     }
   }
 
+  function downloadAccountingCsv() {
+    if (!rows.length) { toast.error("Dışa aktarılacak hareket bulunamadı."); return; }
+    const escape = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const header = ["Tarih", "Saat", "Hesap", "Yön", "Kategori", "Karşı taraf", "Açıklama", "Tutar", "Para birimi", "Referans"];
+    const lines = rows.map((row) => {
+      const stamp = new Date(row.date);
+      return [
+        Number.isNaN(stamp.getTime()) ? row.date.slice(0, 10) : stamp.toLocaleDateString("sv-SE"),
+        Number.isNaN(stamp.getTime()) ? "" : stamp.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }),
+        activeAccount?.account_name ?? "",
+        row.direction === "incoming" ? "Gelen" : "Giden",
+        classifyBankMovement(row), row.counterparty, row.description,
+        Number(row.amount).toFixed(2), activeAccount?.currency ?? "TRY", row.reference ?? "",
+      ].map(escape).join(";");
+    });
+    const blob = new Blob(["\uFEFF", [header.map(escape).join(";"), ...lines].join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `saha-muhasebe-aktarimi-${month === "all" ? "tum-zamanlar" : month}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${rows.length} hareket muhasebe CSV dosyası olarak indirildi.`);
+  }
+
   async function downloadSahaReceipt(row: (typeof rows)[number]) {
     if (!ownerId || !activeAccount) { toast.error("Belge oluşturmak için hesap seçilmeli"); return; }
     try {
@@ -962,7 +987,7 @@ function Bank() {
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
           <p className="flex items-center gap-2 text-xs text-muted-foreground"><LockKeyhole className="size-3.5"/>PDF bu cihazda oluşturulur, Supabase’e yüklenmez.</p>
-      <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setSmsImportOpen((value) => !value)} disabled={accounts.isLoading || Boolean(accounts.error)}><MessageSquareText/>SMS’ten aktar</Button><Button variant="secondary" onClick={() => void downloadReport()} disabled={records.isLoading || accounts.isLoading || Boolean(accounts.error)}><Download/>Detaylı PDF raporunu indir</Button><Button onClick={() => setAdding((value) => !value)} disabled={accounts.isLoading || Boolean(accounts.error)}><Plus/>Hareket ekle</Button></div>
+      <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setSmsImportOpen((value) => !value)} disabled={accounts.isLoading || Boolean(accounts.error)}><MessageSquareText/>SMS’ten aktar</Button><Button variant="outline" onClick={downloadAccountingCsv} disabled={!rows.length || records.isLoading || accounts.isLoading || Boolean(accounts.error)}><Download/>Muhasebe CSV aktar</Button><Button variant="secondary" onClick={() => void downloadReport()} disabled={records.isLoading || accounts.isLoading || Boolean(accounts.error)}><Download/>Detaylı PDF raporunu indir</Button><Button onClick={() => setAdding((value) => !value)} disabled={accounts.isLoading || Boolean(accounts.error)}><Plus/>Hareket ekle</Button></div>
         </div>
       </div>
     </section>

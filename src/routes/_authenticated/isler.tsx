@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Play, Pause, Check, Copy, ChevronDown, Clock, Download, Search, X, CalendarCheck, Activity, Phone, MessageCircle, Share2, FileText, ClipboardCheck } from "lucide-react";
+import { Plus, Play, Pause, Check, Copy, ChevronDown, Clock, Download, Search, X, CalendarCheck, Activity, Phone, MessageCircle, Share2, FileText, ClipboardCheck, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { FormDrawer } from "@/components/app/forms/FormDrawer";
@@ -24,6 +24,7 @@ import {
   hourlyCharge,
   payrollEntryAmount,
   maintenanceStatus,
+  jobPriorityScore,
   validateJobForm,
   pageHead,
   type Payload,
@@ -34,6 +35,7 @@ import { applyVoiceJob, parseVoiceJob } from "@/lib/voice-job";
 import { whatsappLink } from "@/lib/templates";
 import { SwipeRow } from "@/components/app/SwipeRow";
 import { Skeleton } from "@/components/ui/skeleton";
+import { scanJobRequestEmails, type GmailJobRequest } from "@/lib/gmail-bank";
 
 export const Route = createFileRoute("/_authenticated/isler")({
   head: () => pageHead("İşler", "İş planı, çalışma süreleri ve saha kayıtları."),
@@ -73,6 +75,10 @@ function Jobs() {
   const [billing, setBilling] = useState(false);
   const [weather, setWeather] = useState("");
   const [dur, setDur] = useState<{ job: WorkRecord; h: string; m: string } | null>(null);
+  const [emailPanel, setEmailPanel] = useState(false);
+  const [emailConsent, setEmailConsent] = useState(false);
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailRequests, setEmailRequests] = useState<GmailJobRequest[]>([]);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -126,6 +132,11 @@ function Jobs() {
   /** İşi tamamlar (cariden bağımsız). Süreyi makine sayacına ekleme işini veritabanı tetikleyicisi bir kez yapar. */
   async function complete(j: WorkRecord, seconds: number) {
     const p = j.payload;
+    const prerequisite = (jobs.data ?? []).find((candidate) => candidate.id === String(p.depends_on_job_id ?? ""));
+    if (prerequisite && prerequisite.payload.status !== "Tamamlandı") {
+      toast.error(`Önce “${String(prerequisite.payload.title)}” işinin tamamlanması gerekiyor.`);
+      return;
+    }
     const checklist = checklistFor(p);
     if (p.checklist_required === true && checklist.some((item) => !item.done)) {
       toast.error("İş kapatılamadı. Önce kontrol listesindeki bütün adımları tamamlayın.");
@@ -133,9 +144,15 @@ function Jobs() {
       return;
     }
     const secs = Math.round(seconds);
+    let delayReason = String(p.delay_reason ?? "");
+    if (p.promised_date && String(p.promised_date) < todayISO() && !delayReason.trim()) {
+      const reason = window.prompt("Teslim tarihi geçti. Gecikme nedenini kaydedin:");
+      if (!reason?.trim()) { toast.error("Gecikme nedeni girilmeden iş tamamlanamaz."); return; }
+      delayReason = reason.trim().slice(0, 500);
+    }
     const eq = equipment.data?.find((e) => e.id === p.equipment_id);
     if (eq && secs < 60 && !confirm("Bu işin süresi 0. Makine sayacına süre eklenmeyecek. Yine de tamamlansın mı? (Süreyi sonradan 'Süreyi düzenle' ile girebilirsiniz.)")) return;
-    await change(j, { ...p, seconds: secs, started_at: null, status: "Tamamlandı", completed_at: new Date().toISOString() });
+    await change(j, { ...p, seconds: secs, started_at: null, status: "Tamamlandı", completed_at: new Date().toISOString(), ...(delayReason ? { delay_reason: delayReason } : {}) });
     if (!eq) return;
     const applied = p.machine_applied_to === eq.id ? Number(p.machine_applied_seconds ?? 0) : 0;
     const m = maintenanceStatus(eq.payload, Date.now(), secs - applied);
@@ -211,6 +228,18 @@ function Jobs() {
     }
   }
 
+  async function scanRequestsFromGmail() {
+    if (!emailConsent) { toast.error("Önce e-posta içeriğinin bu cihazda geçici işlenmesine izin ver."); return; }
+    setEmailBusy(true);
+    try {
+      const requests = await scanJobRequestEmails();
+      setEmailRequests(requests);
+      toast.success(`${requests.length} olası iş talebi bulundu. Hiçbiri otomatik kaydedilmedi.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gmail taraması başarısız.");
+    } finally { setEmailBusy(false); }
+  }
+
   function getWeather() {
     if (!navigator.geolocation) {
       setWeather("Konum desteklenmiyor");
@@ -251,7 +280,9 @@ function Jobs() {
     const searchable = [job.payload.title, customer?.name, customer?.phone, job.payload.address, customer?.address, job.payload.notes, machine?.payload.name, assigned?.username]
       .map((value) => String(value ?? "").toLocaleLowerCase("tr-TR"));
     return searchable.some((value) => value.includes(normalizedQuery));
-  });
+  }).sort((a, b) => jobPriorityScore(b.payload) - jobPriorityScore(a.payload) || String(a.payload.time ?? "").localeCompare(String(b.payload.time ?? "")));
+  const capacityRows = (jobs.data ?? []).filter((job) => job.payload.date === date && job.payload.status !== "Tamamlandı" && job.payload.status !== "İptal");
+  const capacity = members.map((member) => ({ member, count: capacityRows.filter((job) => job.owner_id === member.id).length })).filter((row) => row.count > 0).sort((a, b) => b.count - a.count);
   const runningCount = dateRows.filter((job) => Boolean(job.payload.started_at) && job.payload.status !== "Tamamlandı").length;
   const completedCount = dateRows.filter((job) => job.payload.status === "Tamamlandı").length;
   const dateOffset = (days: number) => {
@@ -264,8 +295,9 @@ function Jobs() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">İşler</h1>
-        {me.data?.isUsta && <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => edit(undefined, { status: "Teklif" })}><FileText className="size-4"/>Teklif hazırla</Button><Button onClick={() => edit()}><Plus/>İş ekle</Button></div>}
+        {me.data?.isUsta && <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => edit(undefined, { status: "Teklif" })}><FileText className="size-4"/>Teklif hazırla</Button><Button variant="outline" onClick={() => { setEmailPanel((open) => !open); setEmailRequests([]); }}><Mail className="size-4"/>E-postadan talep</Button><Button onClick={() => edit()}><Plus/>İş ekle</Button></div>}
       </div>
+      {emailPanel && <section className="space-y-3 rounded-2xl border border-primary/20 bg-card p-4"><div><h2 className="font-semibold">Gmail’den iş talebi taslakları</h2><p className="mt-1 text-xs leading-relaxed text-muted-foreground">Son 90 günde konu satırında servis, bakım, arıza, onarım veya teklif geçen en fazla 30 ileti aranır. Gmail izni teknik olarak iletileri okuyabilir; içerik yalnızca tarayıcı belleğinde geçici işlenir ve aşağıdaki düğmeye basmadıkça iş kaydı oluşturulmaz.</p></div><label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1 size-4 accent-primary" checked={emailConsent} onChange={(event) => { setEmailConsent(event.target.checked); if (!event.target.checked) setEmailRequests([]); }}/><span>Bu Gmail taramasını başlatmama ve bulunan ileti metnini taslakta göstermeme izin veriyorum.</span></label><div className="flex flex-wrap gap-2"><Button onClick={() => void scanRequestsFromGmail()} disabled={!emailConsent || emailBusy}>{emailBusy ? "Gmail taranıyor…" : "Google ile izin ver ve tara"}</Button>{emailRequests.length > 0 && <Button variant="ghost" onClick={() => setEmailRequests([])}>Sonuçları temizle</Button>}</div>{emailRequests.map((request) => <article key={request.id} className="space-y-2 rounded-xl border bg-background p-3"><div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><h3 className="font-medium">{request.subject}</h3><p className="text-xs text-muted-foreground">{request.sender}{request.receivedAt ? ` · ${new Date(request.receivedAt).toLocaleString("tr-TR")}` : ""}</p></div><Button size="sm" variant="secondary" onClick={() => { edit(undefined, { title: request.subject, notes: [`E-posta göndereni: ${request.sender}`, request.excerpt].filter(Boolean).join("\n"), status: "Teklif", date: todayISO() }); setEmailPanel(false); setEmailRequests([]); }}>Taslağa aktar</Button></div><p className="max-h-24 overflow-auto whitespace-normal text-xs text-muted-foreground">{request.excerpt || "İleti gövdesi boş."}</p></article>)}</section>}
       <div className="flex flex-wrap items-center gap-2">
         <input
           aria-label="İş günü"
@@ -297,6 +329,7 @@ function Jobs() {
       <div className="flex gap-2 overflow-x-auto pb-1" role="group" aria-label="İş durumu filtresi">
         {["Tümü", ...STATUSES].map((status) => <Button key={status} type="button" size="sm" variant={filter === status ? "default" : "outline"} className="shrink-0" aria-pressed={filter === status} onClick={() => setFilter(status)}>{status}<span className="ml-1 rounded-full bg-background/20 px-1.5 text-[10px]">{statusCounts[status] ?? 0}</span></Button>)}
       </div>
+      {date && capacity.length > 0 && <section className="space-y-2 rounded-2xl border bg-card p-3" aria-label="Ekip kapasitesi"><div className="flex items-center justify-between"><h2 className="text-sm font-semibold">Ekip kapasitesi · {date}</h2><span className="text-xs text-muted-foreground">Açık iş sayısı</span></div><div className="flex flex-wrap gap-2">{capacity.map(({ member, count }) => <span key={member.id} className={`rounded-full border px-3 py-1 text-xs ${count >= 4 ? "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200" : "bg-secondary"}`}>{member.username} · {count} iş{count >= 4 ? " · yoğun" : ""}</span>)}</div></section>}
       {me.data?.isUsta && !!templates.data?.length && (
         <div className="flex flex-wrap gap-2">
           {templates.data.map((t) => (
@@ -321,8 +354,13 @@ function Jobs() {
         rows.map((j, index) => {
           const p = j.payload;
           const seconds = elapsedSeconds(p, now);
+          const score = jobPriorityScore(p);
           const customer = customers.data?.find((c) => c.id === p.customer_id);
           const address = String(p.address || customer?.address || "");
+          const prerequisite = (jobs.data ?? []).find((candidate) => candidate.id === String(p.depends_on_job_id ?? ""));
+          const plannedSeconds = Math.max(0, Number(p.planned_hours ?? 0)) * 3600;
+          const promiseDate = String(p.promised_date ?? "");
+          const promiseDaysLeft = promiseDate ? Math.ceil((Date.parse(`${promiseDate}T12:00:00`) - Date.parse(`${todayISO()}T12:00:00`)) / 86400000) : null;
           return (
             <SwipeRow key={j.id} {...(me.data?.isUsta && p.status !== "Tamamlandı" ? { onComplete: () => void complete(j, seconds) } : {})}>
             <article className="space-y-3 rounded-lg border bg-card p-4">
@@ -355,6 +393,9 @@ function Jobs() {
                   {String(Math.floor(seconds) % 60).padStart(2, "0")}
                 </span>
               </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs"><span className={`rounded-full px-2.5 py-1 font-semibold ${score >= 50 ? "bg-destructive/10 text-destructive" : score >= 25 ? "bg-amber-500/10 text-amber-800 dark:text-amber-200" : "bg-secondary text-muted-foreground"}`}>Öncelik {score}</span>{Number(p.planned_hours) > 0 && <span className="rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">Tahmin {Number(p.planned_hours)} sa · gerçekleşen {(seconds / 3600).toFixed(1)} sa{seconds > plannedSeconds ? ` · +${((seconds - plannedSeconds) / 3600).toFixed(1)} sa sapma` : ""}</span>}</div>
+              {promiseDaysLeft !== null && p.status !== "Tamamlandı" && promiseDaysLeft <= 2 && <p role="status" className={`rounded-lg border p-2 text-xs ${promiseDaysLeft < 0 ? "border-destructive/40 bg-destructive/10 text-destructive" : "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-200"}`}>{promiseDaysLeft < 0 ? `Teslim taahhüdü ${Math.abs(promiseDaysLeft)} gün gecikti.` : promiseDaysLeft === 0 ? "Müşteriye verilen teslim tarihi bugün." : "Müşteriye verilen teslim tarihine 1 gün kaldı."}{p.delay_reason ? ` Neden: ${String(p.delay_reason)}` : ""}</p>}
+              {prerequisite && prerequisite.payload.status !== "Tamamlandı" && <p role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-800 dark:text-amber-200">Bağımlı iş bekliyor: önce “{String(prerequisite.payload.title)}” tamamlanmalı.</p>}
               {me.data?.isUsta && (
                 <>
                   <p className="num text-primary">
@@ -370,14 +411,15 @@ function Jobs() {
                       variant="secondary"
                       size="sm"
                       disabled={save.isPending || Boolean(p.billed) || p.status === "Tamamlandı" || p.status === "Teklif"}
-                      onClick={() =>
+                      onClick={() => {
+                        if (!p.started_at && prerequisite && prerequisite.payload.status !== "Tamamlandı") { toast.error(`Önce “${String(prerequisite.payload.title)}” işini tamamlayın.`); return; }
                         void change(j, {
                           ...p,
                           seconds,
                           started_at: p.started_at ? null : new Date().toISOString(),
                           status: p.started_at ? "Bekliyor" : "Devam Ediyor",
                         })
-                      }
+                      }}
                     >
                       {p.started_at ? <Pause /> : <Play />}
                       {p.started_at ? "Duraklat" : "Başlat"}
@@ -446,7 +488,18 @@ function Jobs() {
                         className="w-full rounded-md border bg-secondary p-2"
                         disabled={Boolean(p.billed)}
                         value={String(p.status)}
-                        onChange={(e) => (e.target.value === "Tamamlandı" ? void complete(j, seconds) : void change(j, { ...p, status: e.target.value }))}
+                        onChange={(e) => {
+                          const nextStatus = e.target.value;
+                          if (nextStatus === "Tamamlandı") { void complete(j, seconds); return; }
+                          if (nextStatus === "Devam Ediyor" && prerequisite && prerequisite.payload.status !== "Tamamlandı") { toast.error(`Önce “${String(prerequisite.payload.title)}” işini tamamlayın.`); return; }
+                          if (nextStatus === "Ertelendi") {
+                            const reason = window.prompt("Erteleme nedenini yazın:", String(p.delay_reason ?? ""));
+                            if (!reason?.trim()) { toast.error("Erteleme nedeni zorunludur."); return; }
+                            void change(j, { ...p, status: nextStatus, delay_reason: reason.trim().slice(0, 500) });
+                            return;
+                          }
+                          void change(j, { ...p, status: nextStatus });
+                        }}
                       >
                         {STATUSES.map((s) => (
                           <option key={s}>{s}</option>

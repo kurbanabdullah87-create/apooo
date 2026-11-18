@@ -10,6 +10,8 @@ type GoogleTokenClient = { requestAccessToken: (options?: { prompt?: string }) =
 type GmailHeader = { name?: string; value?: string };
 type GmailPart = { mimeType?: string; filename?: string; body?: { data?: string; attachmentId?: string }; parts?: GmailPart[] };
 type GmailMessage = { id: string; internalDate?: string; payload?: { headers?: GmailHeader[]; mimeType?: string; body?: { data?: string }; parts?: GmailPart[] } };
+type GmailApiError = { error?: { status?: string; message?: string; errors?: Array<{ reason?: string }> } };
+export type GmailJobRequest = { id: string; subject: string; sender: string; receivedAt: string; excerpt: string };
 
 declare global {
   interface Window {
@@ -152,9 +154,19 @@ function parseTransactionMessage(message: GmailMessage): ImportedBankMovement[] 
 async function gmailGet<T>(url: string, token: string): Promise<T> {
   const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store", referrerPolicy: "no-referrer" });
   if (!response.ok) {
-    if (response.status === 401) throw new Error("Google izninin süresi doldu. Yeniden bağlanıp tekrar dene.");
-    if (response.status === 403) throw new Error("Gmail API izni etkin değil veya Google test kullanıcısı listesinde bu hesap yok.");
-    throw new Error("Gmail iletileri alınamadı. İzinleri ve bağlantıyı kontrol et.");
+    let apiError: GmailApiError | undefined;
+    try { apiError = await response.json() as GmailApiError; } catch { /* Google response may have no JSON body. */ }
+    const reason = apiError?.error?.errors?.[0]?.reason ?? apiError?.error?.status ?? "";
+    if (response.status === 401) throw new Error("Google erişim izni geçersiz veya süresi dolmuş. Banka ekranında Google ile yeniden onay ver.");
+    if (response.status === 403) {
+      if (["accessNotConfigured", "SERVICE_DISABLED"].includes(reason)) throw new Error("Gmail API bu Google Cloud projesinde kapalı. APIs & Services → Library → Gmail API → Enable ile etkinleştir.");
+      if (["insufficientPermissions", "PERMISSION_DENIED"].includes(reason)) throw new Error("Google hesabı Gmail okuma iznini vermemiş. Google hesabındaki Saha iznini kaldırıp banka ekranından yeniden onayla.");
+      if (["userRateLimitExceeded", "rateLimitExceeded", "quotaExceeded"].includes(reason)) throw new Error("Google Gmail API kullanım sınırına ulaşıldı. Bir süre bekleyip yeniden dene.");
+      if (reason === "domainPolicy") throw new Error("Google Workspace yöneticin bu uygulamanın Gmail erişimini engelliyor. Yönetici izin vermeli.");
+      throw new Error(`Google Gmail erişimini reddetti (${reason || "403"}). Gmail API etkinliğini, OAuth izin kapsamını ve hesabın test listesinde olup olmadığını kontrol et.`);
+    }
+    if (response.status === 404) throw new Error("Google hesabında istenen Gmail iletisi bulunamadı. Tarama sorgusunu yeniden çalıştır.");
+    throw new Error(`Gmail iletileri alınamadı (HTTP ${response.status}). Bağlantıyı kontrol edip yeniden dene.`);
   }
   return response.json() as Promise<T>;
 }
@@ -176,4 +188,26 @@ export async function scanBankEmails(): Promise<{ rows: ImportedBankMovement[]; 
     for (const row of parseTransactionMessage(message)) unique.set(row.reference!, row);
   }
   return { rows: [...unique.values()], scanned: messages.length };
+}
+
+/** Read candidate service requests into an in-memory draft list; raw message text is never saved by this function. */
+export async function scanJobRequestEmails(): Promise<GmailJobRequest[]> {
+  await loadGoogleIdentity();
+  const token = await requestAccessToken(GOOGLE_GMAIL_CLIENT_ID);
+  const query = new URLSearchParams({ q: 'newer_than:90d {subject:servis subject:"iş talebi" subject:bakım subject:arıza subject:onarım subject:teklif}', maxResults: "30" });
+  const list = await gmailGet<{ messages?: Array<{ id: string }> }>(`https://gmail.googleapis.com/gmail/v1/users/me/messages?${query}`, token);
+  const messages: GmailMessage[] = [];
+  const ids = (list.messages ?? []).slice(0, 30);
+  for (let offset = 0; offset < ids.length; offset += 10) {
+    messages.push(...await Promise.all(ids.slice(offset, offset + 10).map(({ id }) => gmailGet<GmailMessage>(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(id)}?format=full`, token))));
+  }
+  return messages.map((message) => {
+    const subject = header(message, "Subject").replace(/\s+/g, " ").trim().slice(0, 180) || "E-posta iş talebi";
+    const sender = header(message, "From").replace(/<[^>]*>/g, "").replace(/[<>"']/g, "").trim().slice(0, 120);
+    const payload: GmailPart = { ...(message.payload?.mimeType ? { mimeType: message.payload.mimeType } : {}), ...(message.payload?.body ? { body: message.payload.body } : {}), ...(message.payload?.parts ? { parts: message.payload.parts } : {}) };
+    const textParts = collectMimeText(payload, "text/plain");
+    const body = (textParts.length ? textParts : collectMimeText(payload, "text/html")).join("\n").replace(/<[^>]*>/g, " ").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim().slice(0, 4000);
+    const time = message.internalDate ? new Date(Number(message.internalDate)).toISOString() : "";
+    return { id: message.id, subject, sender, receivedAt: time, excerpt: body };
+  });
 }

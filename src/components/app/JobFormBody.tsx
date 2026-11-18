@@ -172,6 +172,7 @@ export function JobFormBody({
       )
     : [];
   const done = form.status === "Tamamlandı";
+  const prerequisite = jobs.find((job) => job.id === String(form.depends_on_job_id ?? ""));
   const customer = customers.find((c) => c.id === form.customer_id);
   const customerTxs = (txs.data ?? []).filter((t) => t.customer_id === customer?.id);
   const credit = customer ? customerRestriction(customer, customerTxs) : null;
@@ -214,6 +215,13 @@ export function JobFormBody({
           )}
           <h3 className="pt-1 text-sm font-semibold">2 · İş bilgileri</h3>
           <RecordFields fields={jobFields(customers, members)} value={form} onChange={onChange} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2"><Label htmlFor="job-urgency">Aciliyet</Label><select id="job-urgency" className="h-11 w-full rounded-md border bg-secondary px-3 text-sm" value={String(form.urgency ?? "normal")} onChange={(event) => onChange({ ...form, urgency: event.target.value })}><option value="normal">Normal</option><option value="urgent">Acil</option><option value="critical">Çok acil</option></select></div>
+            <div className="space-y-2"><Label htmlFor="job-customer-importance">Müşteri önemi</Label><select id="job-customer-importance" className="h-11 w-full rounded-md border bg-secondary px-3 text-sm" value={String(form.customer_importance ?? "normal")} onChange={(event) => onChange({ ...form, customer_importance: event.target.value })}><option value="normal">Standart</option><option value="important">Önemli</option><option value="strategic">Öncelikli müşteri</option></select></div>
+            <div className="space-y-2"><Label htmlFor="job-promised-date">Müşteriye verilen teslim tarihi</Label><input id="job-promised-date" type="date" className="h-11 w-full rounded-md border bg-secondary px-3 text-sm" value={String(form.promised_date ?? "")} onChange={(event) => onChange({ ...form, promised_date: event.target.value })}/></div>
+            <div className="space-y-2"><Label htmlFor="job-dependency">Önce tamamlanması gereken iş</Label><select id="job-dependency" className="h-11 w-full rounded-md border bg-secondary px-3 text-sm" value={String(form.depends_on_job_id ?? "")} onChange={(event) => onChange({ ...form, depends_on_job_id: event.target.value || null })}><option value="">Bağımlılık yok</option>{jobs.filter((job) => job.id !== selfId && job.payload.status !== "Tamamlandı" && (!form.customer_id || job.payload.customer_id === form.customer_id)).map((job) => <option key={job.id} value={job.id}>{String(job.payload.title ?? "İş")} · {String(job.payload.date ?? "tarihsiz")}</option>)}</select></div>
+          </div>
+          {prerequisite && prerequisite.payload.status !== "Tamamlandı" && <p role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-800 dark:text-amber-200">Bu iş, “{String(prerequisite.payload.title)}” tamamlanana kadar başlatılamaz.</p>}
           {hasRestrictedCustomer && <div role="alert" className="space-y-2 rounded-xl border-2 border-destructive/70 bg-destructive/10 p-3 text-sm"><p className="font-semibold text-destructive">Cari kilidi · {customer?.name}</p><ul className="list-disc space-y-1 pl-5 text-destructive">{credit?.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul><p className="text-xs">Devam etmek için yönetici olarak istisna gerekçesini kayda yazın veya tahsilat alın.</p></div>}
           {machineBlocked && <div role="alert" className="space-y-2 rounded-xl border-2 border-destructive/70 bg-destructive/10 p-3 text-sm"><p className="font-semibold text-destructive">Ekipman bakım kilidi</p><p className="text-xs">Bakım aralığı 5 saatten fazla aşıldı. Önce ekipman bölümünden bakım kaydı girin veya aşağıya yönetici istisna gerekçesi yazın.</p></div>}
           {(hasRestrictedCustomer || machineBlocked) && <div className="space-y-2"><Label htmlFor="job-override-reason">Yönetici istisna gerekçesi *</Label><Textarea id="job-override-reason" required value={String(form.override_reason ?? "")} onChange={(e) => onChange({ ...form, override_reason: e.target.value })} placeholder="İstisna neden gerekli?"/></div>}

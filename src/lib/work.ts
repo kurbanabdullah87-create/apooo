@@ -34,6 +34,16 @@ export function useSaveRecord(kind: WorkKind) {
 export function elapsedSeconds(p:Payload, now=Date.now()) {
  return Math.max(0,Number(p.seconds??0)+(p.started_at?Math.max(0,(now-Date.parse(String(p.started_at)))/1000):0));
 }
+/** Stable, explainable job queue score: urgency + customer importance + overdue age + planning effort. */
+export function jobPriorityScore(p: Payload, today = new Date().toISOString().slice(0, 10)) {
+ if (p.status === "Tamamlandı" || p.status === "İptal") return 0;
+ const urgency = ({ normal: 0, urgent: 24, critical: 38 } as Record<string, number>)[String(p.urgency ?? "normal")] ?? 0;
+ const importance = ({ normal: 0, important: 15, strategic: 25 } as Record<string, number>)[String(p.customer_importance ?? "normal")] ?? 0;
+ const due = String(p.promised_date ?? "");
+ const daysLate = due && due < today ? Math.min(30, Math.floor((Date.parse(`${today}T12:00:00`) - Date.parse(`${due}T12:00:00`)) / 86400000)) : 0;
+ const planning = Math.min(12, Math.max(0, Number(p.planned_hours ?? 0)) * 1.5);
+ return Math.round(urgency + importance + daysLate * 2 + planning);
+}
 export function hourlyCharge(seconds:number,rate:number) { return Math.round(seconds/3600*rate*100)/100; }
 export function payrollAmount(days:number,rate:number,multiplier:number) {
  if(![1,.5,.25].includes(days)||![1,1.5,2].includes(multiplier)||rate<0) throw new Error('Geçersiz yevmiye');
