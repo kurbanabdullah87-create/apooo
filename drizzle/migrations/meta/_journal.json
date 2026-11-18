@@ -78,6 +78,13 @@
       "when": 1795132800000,
       "tag": "0013_debts_and_installments",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795219200000,
+      "tag": "0014_credit_card_installments",
+      "breakpoints": true
     }
   ]
 }

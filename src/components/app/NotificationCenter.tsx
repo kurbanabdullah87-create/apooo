@@ -30,6 +30,11 @@ export function NotificationCenter() {
     if (error) throw error;
     return data ?? [];
   }});
+  const creditPlans = useQuery({ queryKey: ["credit-card-records"], enabled: me.data?.isUsta === true, queryFn: async () => {
+    const { data, error } = await supabase.from("credit_card_records").select("id,name,payload").eq("record_kind", "purchase");
+    if (error) throw error;
+    return data ?? [];
+  }});
   const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useState<string[]>([]);
   const storageKey = `saha-notifications-read:${me.data?.id ?? "guest"}`;
@@ -76,6 +81,18 @@ export function NotificationCenter() {
       const late = installment.due_on < today;
       result.push({ id: `debt:${installment.id}`, kind: "debt", title: `${late ? "Geciken taksit" : installment.due_on === today ? "Bugün taksit vadesi" : "Yaklaşan taksit"} · ${debt.name}`, detail: `${debt.direction === "payable" ? "Ödenecek" : "Tahsil edilecek"} · ${installment.installment_no}. taksit · ${formatTL(remaining)} · vade ${new Date(`${installment.due_on}T12:00:00`).toLocaleDateString("tr-TR")}`, open: () => { setOpen(false); void navigate({ to: "/borc" }); } });
     }
+    const weekAheadForCards = new Date(`${today}T12:00:00`);
+    weekAheadForCards.setDate(weekAheadForCards.getDate() + 7);
+    const weekCardDate = `${weekAheadForCards.getFullYear()}-${String(weekAheadForCards.getMonth() + 1).padStart(2, "0")}-${String(weekAheadForCards.getDate()).padStart(2, "0")}`;
+    for (const plan of creditPlans.data ?? []) {
+      const payload = plan.payload as { bank?: string; last4?: string; schedule?: { no: number; due_on: string; total: number; paid: number }[] };
+      for (const installment of payload.schedule ?? []) {
+        const remaining = Math.max(0, Number(installment.total) - Number(installment.paid));
+        if (remaining <= 0 || installment.due_on > weekCardDate) continue;
+        const late = installment.due_on < today;
+        result.push({ id: `credit-card:${plan.id}:${installment.no}`, kind: "debt", title: `${late ? "Geciken kart taksiti" : installment.due_on === today ? "Bugün kart taksiti" : "Yaklaşan kart taksiti"} · ${plan.name}`, detail: `${payload.bank ?? "Kredi kartı"} · •••• ${payload.last4 ?? "----"} · ${installment.no}. taksit · ${formatTL(remaining)} · vade ${new Date(`${installment.due_on}T12:00:00`).toLocaleDateString("tr-TR")}`, open: () => { setOpen(false); void navigate({ to: "/borc" }); } });
+      }
+    }
     for (const job of jobs.data ?? []) {
       if (job.payload.started_at && elapsedSeconds(job.payload, Date.now()) >= 8 * 3600) result.push({
         id: `timer:${job.id}:${String(job.payload.started_at)}`, kind: "timer", title: `Uzun süredir açık kronometre · ${String(job.payload.title ?? "İş")}`,
@@ -83,7 +100,7 @@ export function NotificationCenter() {
       });
     }
     return result.sort((a, b) => a.title.localeCompare(b.title, "tr-TR"));
-  }, [appointments.data, customers.data, debtInstallments.data, debtRows.data, equipment.data, jobs.data, navigate, transactions.data]);
+  }, [appointments.data, creditPlans.data, customers.data, debtInstallments.data, debtRows.data, equipment.data, jobs.data, navigate, transactions.data]);
 
   const unread = notices.filter((item) => !dismissed.includes(item.id));
   const markAllRead = () => {

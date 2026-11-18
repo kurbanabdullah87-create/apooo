@@ -87,3 +87,5 @@ END;
 $$;
 REVOKE ALL ON FUNCTION public.record_debt_payment(uuid, uuid, numeric, date, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.record_debt_payment(uuid, uuid, numeric, date, text) TO authenticated;
+
+NOTIFY pgrst, 'reload schema';

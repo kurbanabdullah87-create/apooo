@@ -12,6 +12,7 @@ import { pageHead } from "@/lib/work";
 import { formatTL, todayISO } from "@/lib/finance";
 import { supabase } from "@/integrations/supabase/client";
 import { askNotifyPermission, notifySupported } from "@/lib/reminders";
+import { CreditCardInstallments } from "@/components/app/CreditCardInstallments";
 
 export const Route = createFileRoute("/_authenticated/borc")({
   head: () => pageHead("Borç & Alacak", "Borçlar, alacaklar ve taksit ödeme planı."),
@@ -44,6 +45,7 @@ const leftAmount = (i: Installment) => Math.max(0, Number(i.amount) - Number(i.p
 
 function DebtPage() {
   const qc = useQueryClient();
+  const [section, setSection] = useState<"debts" | "credit-cards">("debts");
   const [direction, setDirection] = useState<Direction>("receivable");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -113,7 +115,11 @@ function DebtPage() {
   const titleById = new Map(rows.map((d) => [d.id, d]));
 
   return <div className="space-y-4 pb-8">
-    <div className="flex items-center justify-between gap-3"><div><h1 className="text-2xl font-bold tracking-tight">Borç & Alacak</h1><p className="mt-1 text-sm text-muted-foreground">Kimin ne kadar borcu var, hangi ödeme ne zaman geliyor?</p></div><Button onClick={() => { setForm((f) => ({ ...f, direction })); setAddOpen(true); }}><Plus className="mr-1 size-4"/>Yeni kayıt</Button></div>
+    <div className="flex items-center justify-between gap-3"><div><h1 className="text-2xl font-bold tracking-tight">Borç & Alacak</h1><p className="mt-1 text-sm text-muted-foreground">Borçlarını, alacaklarını ve kredi kartı taksitlerini ayrı takip et.</p></div>{section === "debts" && <Button onClick={() => { setForm((f) => ({ ...f, direction })); setAddOpen(true); }}><Plus className="mr-1 size-4"/>Yeni kayıt</Button>}</div>
+
+    <div className="grid grid-cols-2 rounded-xl bg-muted p-1"><button onClick={() => setSection("debts")} className={`rounded-lg px-3 py-2 text-sm font-medium ${section === "debts" ? "bg-background shadow-sm" : "text-muted-foreground"}`}>Borç & Alacak</button><button onClick={() => setSection("credit-cards")} className={`rounded-lg px-3 py-2 text-sm font-medium ${section === "credit-cards" ? "bg-background shadow-sm" : "text-muted-foreground"}`}>Kredi Kartı Taksitleri</button></div>
+
+    {section === "credit-cards" ? <CreditCardInstallments/> : <>
 
     <div className="grid grid-cols-2 gap-3">
       <div className="rounded-2xl border bg-card p-4"><div className="flex items-center gap-2 text-sm text-muted-foreground"><ArrowDownLeft className="size-4 text-emerald-600"/>Tahsil edeceğim</div><p className="mt-2 text-xl font-bold">{formatTL(collectTotal)}</p></div>
@@ -141,5 +147,6 @@ function DebtPage() {
     <Dialog open={addOpen} onOpenChange={setAddOpen}><DialogContent className="max-h-[90dvh] overflow-y-auto"><DialogHeader><DialogTitle>Yeni borç / alacak</DialogTitle></DialogHeader><form className="space-y-4" onSubmit={(e) => { e.preventDefault(); saveDebt.mutate(); }}><div className="grid grid-cols-2 rounded-lg bg-muted p-1"><button type="button" onClick={() => setForm({ ...form, direction: "receivable" })} className={`rounded-md py-2 text-sm ${form.direction === "receivable" ? "bg-background shadow" : "text-muted-foreground"}`}>Bana borçlu</button><button type="button" onClick={() => setForm({ ...form, direction: "payable" })} className={`rounded-md py-2 text-sm ${form.direction === "payable" ? "bg-background shadow" : "text-muted-foreground"}`}>Ben borçluyum</button></div><div className="space-y-2"><Label>Kişi, kurum veya makine adı *</Label><Input required placeholder="Örn. Ali Yılmaz / Ekskavatör" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}/></div><div className="space-y-2"><Label>Toplam tutar (₺) *</Label><Input required type="number" min="0.01" step="0.01" placeholder="0,00" value={form.total_amount} onChange={(e) => setForm({ ...form, total_amount: e.target.value })}/></div><div className="grid grid-cols-2 gap-3"><div className="space-y-2"><Label>Alınma tarihi</Label><Input type="date" value={form.acquired_on} onChange={(e) => setForm({ ...form, acquired_on: e.target.value })}/></div><div className="space-y-2"><Label>Taksit sayısı</Label><Input type="number" min="1" max="360" value={form.installment_count} onChange={(e) => setForm({ ...form, installment_count: e.target.value })}/></div></div><div className="grid grid-cols-2 gap-3"><div className="space-y-2"><Label>İlk taksit vadesi</Label><Input type="date" value={form.first_due_on} onChange={(e) => setForm({ ...form, first_due_on: e.target.value })}/></div><div className="space-y-2"><Label>Taksit aralığı (ay)</Label><Input type="number" min="1" max="12" value={form.interval_months} onChange={(e) => setForm({ ...form, interval_months: e.target.value })}/></div></div><div className="space-y-2"><Label>Açıklama / not</Label><Textarea rows={2} placeholder="Örn. marka-model, alacak nedeni, ödeme koşulu" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}/></div><p className="rounded-lg bg-muted p-3 text-xs text-muted-foreground">{Number(form.installment_count) > 0 && Number(form.total_amount) > 0 ? `${form.installment_count} taksit · yaklaşık ${formatTL(Number(form.total_amount) / Number(form.installment_count))} / taksit. Kuruş farkı son taksite eklenir.` : "Taksit tutarları ve vadeler otomatik oluşturulur."}</p><Button type="submit" className="w-full" disabled={saveDebt.isPending}>{saveDebt.isPending ? "Kaydediliyor…" : "Kaydet ve taksit planı oluştur"}</Button></form></DialogContent></Dialog>
 
     <Dialog open={Boolean(payItem)} onOpenChange={(open) => { if (!open) setPayItem(null); }}><DialogContent><DialogHeader><DialogTitle>Taksit ödemesi kaydet</DialogTitle></DialogHeader>{payItem && <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); addPayment.mutate(); }}><div className="rounded-xl bg-muted p-3 text-sm"><strong>{payItem.debt.name}</strong><p className="mt-1 text-muted-foreground">{payItem.installment.installment_no}/{payItem.debt.installment_count}. taksit · kalan {formatTL(leftAmount(payItem.installment))} · vade {dateLabel(payItem.installment.due_on)}</p></div><div className="space-y-2"><Label>Ödenen tutar (₺)</Label><Input type="number" min="0.01" max={leftAmount(payItem.installment)} step="0.01" required value={payment.amount} onChange={(e) => setPayment({ ...payment, amount: e.target.value })}/></div><div className="space-y-2"><Label>Ödeme tarihi</Label><Input type="date" required value={payment.paid_on} onChange={(e) => setPayment({ ...payment, paid_on: e.target.value })}/></div><div className="space-y-2"><Label>Not (isteğe bağlı)</Label><Input placeholder="Örn. banka havalesi" value={payment.note} onChange={(e) => setPayment({ ...payment, note: e.target.value })}/></div><Button className="w-full" type="submit" disabled={addPayment.isPending}>{addPayment.isPending ? "Kaydediliyor…" : "Ödemeyi kaydet"}</Button></form>}</DialogContent></Dialog>
+    </>}
   </div>;
 }

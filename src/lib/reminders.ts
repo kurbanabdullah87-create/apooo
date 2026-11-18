@@ -114,6 +114,14 @@ export function useDebtReminders(enabled: boolean, onOpen: () => void) {
       return data ?? [];
     },
   });
+  const cardPlans = useQuery({
+    queryKey: ["credit-card-records"], enabled,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("credit_card_records").select("id,name,payload").eq("record_kind", "purchase");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
   useEffect(() => {
     if (!enabled) return;
     const tick = () => {
@@ -139,10 +147,33 @@ export function useDebtReminders(enabled: boolean, onOpen: () => void) {
         })();
         toast(title, { description: detail, duration: 20_000, action: { label: "Aç", onClick: onOpen } });
       }
+      for (const plan of cardPlans.data ?? []) {
+        const info = plan.payload as { bank?: string; last4?: string; schedule?: { no: number; due_on: string; total: number; paid: number }[] };
+        for (const installment of info.schedule ?? []) {
+          const amount = Number(installment.total) - Number(installment.paid);
+          if (installment.due_on !== today || amount <= 0) continue;
+          const key = `credit-card-due:${plan.id}:${installment.no}:${today}`;
+          if (seen(key)) continue;
+          mark(key);
+          const title = "🔔 Kredi kartı taksiti bugün";
+          const detail = `${plan.name} · ${info.bank ?? "Kart"} •••• ${info.last4 ?? "----"} · ${installment.no}. taksit · kalan ${formatTL(amount)}`;
+          void (async () => {
+            if (notifySupported() && Notification.permission === "granted") {
+              try {
+                const options: NotificationOptions = { body: detail, tag: key, icon: "/icon-192.png", data: { url: "/borc" }, requireInteraction: true };
+                const registration = await navigator.serviceWorker?.getRegistration();
+                if (registration) await registration.showNotification(title, options);
+                else new Notification(title, options).onclick = () => { window.focus(); location.assign("/borc"); };
+              } catch { /* bildirim izni veya platform desteği olmayabilir */ }
+            }
+          })();
+          toast(title, { description: detail, duration: 20_000, action: { label: "Aç", onClick: onOpen } });
+        }
+      }
     };
     tick();
     const timer = setInterval(tick, 30_000);
     document.addEventListener("visibilitychange", tick);
     return () => { clearInterval(timer); document.removeEventListener("visibilitychange", tick); };
-  }, [debts.data, enabled, installments.data, onOpen]);
+  }, [cardPlans.data, debts.data, enabled, installments.data, onOpen]);
 }

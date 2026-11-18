@@ -14,6 +14,12 @@ export type Database = {
   }
   public: {
     Tables: {
+      credit_card_records: {
+        Row: { id: string; team_id: string; owner_id: string; record_kind: string; card_id: string | null; name: string; payload: Json; created_at: string; updated_at: string }
+        Insert: { id?: string; team_id?: string; owner_id?: string; record_kind: string; card_id?: string | null; name: string; payload?: Json; created_at?: string; updated_at?: string }
+        Update: { id?: string; team_id?: string; owner_id?: string; record_kind?: string; card_id?: string | null; name?: string; payload?: Json; created_at?: string; updated_at?: string }
+        Relationships: [{ foreignKeyName: "credit_card_records_card_id_fkey"; columns: ["card_id"]; isOneToOne: false; referencedRelation: "credit_card_records"; referencedColumns: ["id"] }]
+      }
       debt_records: {
         Row: { id: string; team_id: string; owner_id: string; direction: string; name: string; description: string; total_amount: number; acquired_on: string; installment_count: number; interval_months: number; first_due_on: string; created_at: string; updated_at: string }
         Insert: { id?: string; team_id?: string; owner_id?: string; direction: string; name: string; description?: string; total_amount: number; acquired_on?: string; installment_count?: number; interval_months?: number; first_due_on?: string; created_at?: string; updated_at?: string }
