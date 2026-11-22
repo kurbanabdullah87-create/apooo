@@ -50,10 +50,13 @@ function MonthlyReport() {
   async function exportPdf() {
     try {
       const { jsPDF } = await import("jspdf"); const doc = new jsPDF({ unit: "mm", format: "a4" }); let y = 20;
-      doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.text("SAHA · AYLIK RAPOR", 18, y); y += 9;
-      doc.setFont("helvetica", "normal"); doc.setFontSize(11); doc.text(title, 18, y); y += 10;
-      const section = (label: string) => { if (y > 270) { doc.addPage(); y = 20; } doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.text(label, 18, y); y += 7; doc.setFont("helvetica", "normal"); doc.setFontSize(9); };
-      const line = (label: string, value: string) => { if (y > 278) { doc.addPage(); y = 20; } doc.text(label, 18, y); doc.text(value, 192, y, { align: "right" }); y += 6; };
+      const fontToBase64 = async (path: string) => { const bytes = new Uint8Array(await (await fetch(path)).arrayBuffer()); let binary = ""; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(binary); };
+      doc.addFileToVFS("DejaVuSans.ttf", await fontToBase64("/fonts/DejaVuSans.ttf")); doc.addFileToVFS("DejaVuSans-Bold.ttf", await fontToBase64("/fonts/DejaVuSans-Bold.ttf")); doc.addFont("DejaVuSans.ttf", "Saha", "normal"); doc.addFont("DejaVuSans-Bold.ttf", "Saha", "bold");
+      doc.setProperties({ title: `Saha aylık rapor · ${title}`, subject: "Aylık finans ve operasyon özeti", author: "SAHA", creator: "SAHA" });
+      doc.setFont("Saha", "bold"); doc.setFontSize(18); doc.text("SAHA · AYLIK RAPOR", 18, y); y += 9;
+      doc.setFont("Saha", "normal"); doc.setFontSize(11); doc.text(title, 18, y); y += 10;
+      const section = (label: string) => { if (y > 270) { doc.addPage(); y = 20; } doc.setFont("Saha", "bold"); doc.setFontSize(12); doc.text(label, 18, y); y += 7; doc.setFont("Saha", "normal"); doc.setFontSize(9); };
+      const line = (label: string, value: string) => { if (y > 278) { doc.addPage(); y = 20; } const left = doc.splitTextToSize(label, 118); const right = doc.splitTextToSize(value, 58); doc.text(left, 18, y); doc.text(right, 192, y, { align: "right" }); y += Math.max(left.length, right.length) * 4.5; };
       section("Finansal özet"); line("Tahsilat", formatTL(data.summary.income)); line("Gider", formatTL(data.summary.expense)); line("Net nakit akışı", formatTL(data.summary.net));
       line("Yevmiye ödeme ve avansları", formatTL(data.payrollOutflow));
       section("Banka hareket özeti"); if (!bankVault.unlocked) line("Kişisel kasa", "Kilitli · ayrıntılar eklenmedi"); else if (!data.bankRows.length) line("Hareket", "Bu ay kayıt yok"); else { data.bankByCurrency.forEach((row) => { line(`Gelen · ${row.currency}`, new Intl.NumberFormat("tr-TR", { style: "currency", currency: row.currency }).format(row.incoming)); line(`Giden · ${row.currency}`, new Intl.NumberFormat("tr-TR", { style: "currency", currency: row.currency }).format(row.outgoing)); }); section("Banka işlem ayrıntıları"); data.bankRows.forEach((row) => { if (y > 270) { doc.addPage(); y = 20; } const account = bankAccounts.data?.find((item) => item.id === row.account_id); const currency = account?.currency || "TRY"; line(`${row.date} · ${row.counterparty || "Taraf belirtilmemiş"}`, new Intl.NumberFormat("tr-TR", { style: "currency", currency }).format(row.amount * (row.direction === "outgoing" ? -1 : 1))); doc.setFontSize(8); doc.text(doc.splitTextToSize(row.description || "Açıklama yok", 168), 18, y); y += 5; }); }
@@ -62,7 +65,7 @@ function MonthlyReport() {
       section("En iyi 5 müşteri"); if (!data.topCustomers.length) line("Tahsilat", "Yok"); else data.topCustomers.forEach((row, index) => line(`${index + 1}. ${row.customer.name}`, formatTL(row.income)));
       section("Ekipman kullanımı"); if (!data.equipmentUse.length) line("Kullanım", "Kayıt yok"); else data.equipmentUse.forEach((row) => line(row.name, `${row.uses} iş`));
       section("Gider kategorileri"); if (!data.expenseCategories.length) line("Gider", "Yok"); else data.expenseCategories.forEach((row) => line(row.name, formatTL(row.value)));
-      const pages = doc.getNumberOfPages(); for (let page = 1; page <= pages; page++) { doc.setPage(page); doc.setFontSize(8); doc.text(`Bu belge uygulama kayıtlarından oluşturulmuştur · Sayfa ${page}/${pages}`, 18, 288); }
+      const pages = doc.getNumberOfPages(); for (let page = 1; page <= pages; page++) { doc.setPage(page); doc.setFont("Saha", "normal"); doc.setFontSize(8); doc.text(`Uygulama kayıtlarından oluşturulmuştur · Sayfa ${page}/${pages}`, 18, 288); }
       doc.save(`saha-aylik-rapor-${month}.pdf`); toast.success("Aylık PDF raporu indirildi.");
     } catch { toast.error("PDF oluşturulamadı."); }
   }
