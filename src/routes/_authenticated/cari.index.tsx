@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, UserPlus, Search, TrendingUp, TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SwipeRow } from "@/components/app/SwipeRow";
@@ -19,6 +19,14 @@ function CariList() {
   const del = useUndoableDelete("customers");
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem("saha.openCustomerForm") !== "1") return;
+      sessionStorage.removeItem("saha.openCustomerForm");
+      setOpen(true);
+    } catch { /* optional cross-route quick action */ }
+  }, []);
 
   const rows = useMemo(
     () =>

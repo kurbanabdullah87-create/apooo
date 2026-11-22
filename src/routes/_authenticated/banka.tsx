@@ -565,7 +565,8 @@ function Bank() {
           chunk.forEach((line, lineIndex) => {
             doc.setFont("Saha", line.bold ? "bold" : "normal");
             doc.setFontSize(line.bold ? 8 : 7.2);
-            doc.setTextColor(...(line.bold ? ink : muted));
+            if (line.bold) doc.setTextColor(...ink);
+            else doc.setTextColor(...muted);
             doc.text(line.text, margin + 5, y + cardHeaderHeight + lineIndex * ledgerLineHeight);
           });
           y += cardHeight + 3;

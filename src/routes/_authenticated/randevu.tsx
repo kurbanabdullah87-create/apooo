@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Archive, Bell, CalendarDays, ChevronLeft, ChevronRight, Download, MessageCircle, Phone, Play, Plus, Search, Trash2, Undo2 } from "lucide-react";
+import { Archive, Bell, CalendarDays, ChevronLeft, ChevronRight, Download, MessageCircle, Phone, Play, Plus, Search, Trash2, Undo2, Navigation } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +24,7 @@ import { buildReceipt, shareOrDownload } from "@/lib/receipt";
 import { pageHead, useRecords, useSaveRecord, validateJobForm, type Payload, type WorkRecord } from "@/lib/work";
 import { supabase } from "@/integrations/supabase/client";
 import type { BusinessProfile } from "@/lib/receipt";
+import { coordsOf, distanceMeters, getPosition } from "@/lib/geo";
 
 export const Route = createFileRoute("/_authenticated/randevu")({
   head: () => pageHead("Randevular", "İsme göre randevu takibi."),
@@ -57,6 +58,7 @@ function Appointments() {
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [now, setNow] = useState(Date.now());
   const [perm, setPerm] = useState(notifySupported() ? Notification.permission : "denied");
+  const [routeOrder, setRouteOrder] = useState<string[]>([]);
 
   // Sayfa ilk açılınca bildirim izni iste (default ise)
   useEffect(() => {
@@ -106,14 +108,35 @@ function Appointments() {
     toast.success(`${events.length} randevu takvim dosyası olarak indirildi. Google veya Apple Takvim'e içe aktarabilirsin.`);
   }
 
+  async function optimizeDayRoute() {
+    const candidates = (recs.data ?? []).filter((row) => row.payload.date === day && !row.payload.archived && row.payload.status !== "İptal");
+    const located = candidates.flatMap((row) => {
+      const customer = customers.data?.find((candidate) => candidate.id === String(row.payload.customer_id ?? ""));
+      const position = coordsOf({ lat: row.payload.lat ?? customer?.latitude, lng: row.payload.lng ?? customer?.longitude });
+      return position ? [{ row, position }] : [];
+    });
+    if (located.length < 2) { toast.error("Rota sıralaması için bu günde en az iki konumlu randevu gerekli. Müşteri koordinatlarını kaydedin."); return; }
+    let current: { lat: number; lng: number } | undefined;
+    try { current = await getPosition(5000); } catch { current = located[0]?.position; toast.info("Cihaz konumu alınamadı; rota ilk kayıtlı müşteri konumundan başlatıldı."); }
+    if (!current) return;
+    const remaining = [...located]; const ordered: string[] = [];
+    while (remaining.length) {
+      let nearestIndex = 0; let nearestDistance = Number.POSITIVE_INFINITY;
+      remaining.forEach((candidate, index) => { const distance = distanceMeters(current!, candidate.position); if (distance < nearestDistance) { nearestDistance = distance; nearestIndex = index; } });
+      const next = remaining.splice(nearestIndex, 1)[0]; if (!next) break; ordered.push(next.row.id); current = next.position;
+    }
+    setRouteOrder(ordered); setView("day"); toast.success(`${ordered.length} konumlu randevu en yakın komşu yöntemiyle sıralandı. Bu bir rota tahminidir; canlı trafik hesaba katılmaz.`);
+  }
+
   const groups = useMemo(() => {
     const m = new Map<string, WorkRecord[]>();
     for (const r of rows) {
       const d = String(r.payload.date ?? "");
       m.set(d, [...(m.get(d) ?? []), r]);
     }
-    return [...m.entries()];
-  }, [rows]);
+    const order = new Map(routeOrder.map((id, index) => [id, index]));
+    return [...m.entries()].map(([date, list]) => [date, date === day && routeOrder.length ? [...list].sort((a, b) => (order.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.id) ?? Number.MAX_SAFE_INTEGER)) : list] as [string, WorkRecord[]]);
+  }, [rows, routeOrder, day]);
 
   const setArchived = (r: WorkRecord, archived: boolean) =>
     save.mutate(
@@ -326,6 +349,7 @@ function Appointments() {
         </Button>
         <span className="flex items-center justify-end px-2 text-xs text-muted-foreground">{rows.length} randevu gösteriliyor</span>
       </div>
+      {me.data?.isUsta && <Button type="button" variant="outline" className="w-full" onClick={() => void optimizeDayRoute()} disabled={recs.isLoading || view === "archive"}><Navigation/>Seçili günün rotasını sırala · en yakın konum önce</Button>}
 
       {view === "month" && <section className="space-y-3 rounded-2xl border bg-card p-3 sm:p-4">
         <div className="flex items-center justify-between"><Button variant="secondary" size="icon" aria-label="Önceki ay" onClick={() => { const d = new Date(`${calendarMonth}-01T12:00:00`); d.setMonth(d.getMonth() - 1); setDay(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`); }}><ChevronLeft/></Button><h2 className="font-semibold capitalize">{calendarStart.toLocaleDateString("tr-TR", { month: "long", year: "numeric" })}</h2><Button variant="secondary" size="icon" aria-label="Sonraki ay" onClick={() => { const d = new Date(`${calendarMonth}-01T12:00:00`); d.setMonth(d.getMonth() + 1); setDay(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`); }}><ChevronRight/></Button></div>

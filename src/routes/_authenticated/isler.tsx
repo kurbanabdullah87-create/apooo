@@ -108,6 +108,32 @@ function Jobs() {
     setOpen(true);
   }
 
+  useEffect(() => {
+    const openJobForm = () => edit();
+    window.addEventListener("saha-open-job-form", openJobForm);
+    return () => window.removeEventListener("saha-open-job-form", openJobForm);
+  }, [date, me.data?.id]);
+
+  useEffect(() => {
+    try {
+      if (jobs.isLoading) return;
+      const requested = sessionStorage.getItem("saha.openJobForm");
+      if (!requested) return;
+      sessionStorage.removeItem("saha.openJobForm");
+      if (requested === "camera") {
+        const target = (jobs.data ?? []).find((job) => !["Tamamlandı", "İptal"].includes(String(job.payload.status)));
+        if (target) {
+          setDate(String(target.payload.date ?? todayISO())); setFilter("Tümü"); setExpanded(target.id);
+          toast("İş açıldı. Fotoğrafı kayda eklemek için Öncesi veya Sonrası düğmesine dokun.");
+          return;
+        }
+        edit(); toast("Önce işi kaydet; ardından iş kartındaki Fotoğraf düğmesiyle çekimi ekle.");
+        return;
+      }
+      edit();
+    } catch { /* optional cross-route quick action */ }
+  }, [jobs.isLoading, jobs.data]);
+
   async function change(j: WorkRecord, p: Payload) {
     await save.mutateAsync({ id: j.id, owner_id: j.owner_id, payload: p });
   }

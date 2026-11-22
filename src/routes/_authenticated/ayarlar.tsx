@@ -17,6 +17,7 @@ import { savePin, registerBiometric } from "@/lib/device-lock";
 import { supabase } from "@/integrations/supabase/client";
 import { todayISO, formatTL } from "@/lib/finance";
 import { pendingCount, flushQueue } from "@/lib/offline";
+import { IbanInput } from "@/components/app/IbanInput";
 export const Route = createFileRoute("/_authenticated/ayarlar")({
   head: () => pageHead("Ayarlar", "Ekip, mesaj şablonları ve cihaz güvenliği."),
   component: Settings,
@@ -84,6 +85,8 @@ function Settings() {
       {me.data?.isUsta && (
         <>
           <section className="space-y-3">
+            <AccessibilitySettings />
+            <BusinessHoursSettings value={String(form.working_hours_json ?? "")} onChange={(value) => setForm({ ...form, working_hours_json: value })}/>
             <h2 className="font-semibold">İşletme</h2>
             <label className="flex min-h-14 items-center justify-between gap-3 rounded-2xl border bg-card p-3"><span><span className="block font-semibold">Saha modu · yüksek kontrast</span><span className="text-xs text-muted-foreground">Güneş ışığında daha net metin ve kenarlıklar</span></span><input type="checkbox" checked={fieldMode} onChange={(e) => setFieldMode(e.target.checked)}/></label>
             <Label htmlFor="business">Makbuz işletme adı</Label>
@@ -100,7 +103,7 @@ function Settings() {
             ] as const).map(([k, l]) => (
               <div className="space-y-2" key={k}>
                 <Label htmlFor={k}>{l}</Label>
-                <Input id={k} value={String(form[k] ?? "")} onChange={(e) => setForm({ ...form, [k]: e.target.value })} />
+                {k === "iban" ? <IbanInput id={k} value={String(form[k] ?? "")} onChange={(value) => setForm({ ...form, [k]: value })}/> : <Input id={k} value={String(form[k] ?? "")} onChange={(e) => setForm({ ...form, [k]: e.target.value })} />}
               </div>
             ))}
             <div className="space-y-3 rounded-2xl border bg-card p-4">
@@ -329,6 +332,16 @@ function Settings() {
 }
 function createServerFnHook() {
   return useServerFn(createApprentice);
+}
+function AccessibilitySettings() {
+  const [scale, setScale] = useState(() => { try { return localStorage.getItem("saha-text-scale") ?? "normal"; } catch { return "normal"; } });
+  const [colorblind, setColorblind] = useState(() => { try { return localStorage.getItem("saha-colorblind") === "true"; } catch { return false; } });
+  useEffect(() => {
+    document.documentElement.dataset.textScale = scale;
+    document.documentElement.dataset.colorblind = colorblind ? "true" : "false";
+    try { localStorage.setItem("saha-text-scale", scale); localStorage.setItem("saha-colorblind", String(colorblind)); } catch { /* browser storage can be disabled */ }
+  }, [scale, colorblind]);
+  return <div className="space-y-3 rounded-2xl border bg-card p-4"><div><h3 className="font-semibold">Erişilebilirlik</h3><p className="text-xs text-muted-foreground">Yalnızca bu cihazda saklanır.</p></div><div className="space-y-2"><Label htmlFor="text-scale">Metin boyutu</Label><select id="text-scale" className="h-11 w-full rounded-xl border bg-background px-3 text-sm" value={scale} onChange={(event) => setScale(event.target.value)}><option value="small">Küçük</option><option value="normal">Normal</option><option value="large">Büyük</option><option value="xlarge">Çok büyük</option></select></div><label className="flex min-h-12 items-center justify-between gap-3 rounded-xl border px-3"><span><span className="block text-sm font-medium">Renk körlüğüne uygun işaretler</span><span className="text-xs text-muted-foreground">Durum renklerine ek olarak farklı çizgi desenleri kullan</span></span><input type="checkbox" checked={colorblind} onChange={(event) => setColorblind(event.target.checked)}/></label></div>;
 }
 function TemplateEditor({
   template,

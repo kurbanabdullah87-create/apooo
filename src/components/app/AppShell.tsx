@@ -13,6 +13,10 @@ import { GlobalSearch } from "./GlobalSearch";
 import { QuickAdd } from "./QuickAdd";
 import { useAppointmentReminders, useDebtReminders } from "@/lib/reminders";
 import { NotificationCenter } from "@/components/app/NotificationCenter";
+import { VoiceCommandButton } from "@/components/app/VoiceCommandButton";
+import { useRecords } from "@/lib/work";
+import { useCustomers } from "@/lib/data";
+import { toast } from "sonner";
 
 const NAV = [
   { to: "/panel", label: "Panel", icon: LayoutDashboard },
@@ -33,7 +37,13 @@ export function AppShell() {
   const [pull, setPull] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [queuedWrites, setQueuedWrites] = useState(0);
+  const [searchSeed, setSearchSeed] = useState("");
+  const [showOpenJobs, setShowOpenJobs] = useState(false);
   const startY = useRef<number | null>(null);
+  const jobs = useRecords("job");
+  const customers = useCustomers();
+  const openToday = (jobs.data ?? []).filter((job) => job.payload.date === new Date().toLocaleDateString("sv-SE") && job.payload.status !== "Tamamlandı" && job.payload.status !== "İptal");
+  const activeJob = (jobs.data ?? []).filter((job) => Boolean(job.payload.started_at) && job.payload.status !== "Tamamlandı").sort((a, b) => String(b.payload.started_at).localeCompare(String(a.payload.started_at)))[0];
 
   const isUsta = me.data?.isUsta ?? false;
   useAppointmentReminders(isUsta, () => void navigate({ to: "/randevu" }));
@@ -56,6 +66,76 @@ export function AppShell() {
     return () => { active = false; window.removeEventListener("saha-queue", update); window.removeEventListener("saha-synced", update); window.removeEventListener("online", update); };
   }, [me.data?.id]);
 
+  useEffect(() => {
+    const onNavigate = (event: Event) => {
+      const to = (event as CustomEvent<unknown>).detail;
+      if (typeof to === "string" && to.startsWith("/")) void navigate({ to } as never);
+    };
+    const onPanel = () => void navigate({ to: "/panel" });
+    const onSearch = (event: Event) => { setSearchSeed(String((event as CustomEvent<string>).detail ?? "")); setSearchOpen(true); };
+    const onJob = () => { void navigate({ to: "/isler" }).then(() => window.setTimeout(() => window.dispatchEvent(new Event("saha-open-job-form")), 0)); };
+    const onKeys = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+      const key = event.key.toLocaleLowerCase("en-US");
+      if (key === "k") { event.preventDefault(); setSearchOpen(true); }
+      else if (key === "n") { event.preventDefault(); onJob(); }
+      else if (key === "/") { event.preventDefault(); toast.info("Kısayollar: Ctrl+N yeni iş · Ctrl+K ara · Ctrl+/ yardım"); }
+    };
+    window.addEventListener("saha-navigate", onNavigate);
+    window.addEventListener("saha-open-panel", onPanel);
+    window.addEventListener("saha-open-search", onSearch);
+    window.addEventListener("saha-request-job-form", onJob);
+    window.addEventListener("keydown", onKeys);
+    return () => { window.removeEventListener("saha-navigate", onNavigate); window.removeEventListener("saha-open-panel", onPanel); window.removeEventListener("saha-open-search", onSearch); window.removeEventListener("saha-request-job-form", onJob); window.removeEventListener("keydown", onKeys); };
+  }, [navigate]);
+
+  useEffect(() => {
+    if (!isUsta || openToday.length === 0) return;
+    setShowOpenJobs(true);
+    const timer = window.setTimeout(() => setShowOpenJobs(false), 3000);
+    return () => window.clearTimeout(timer);
+  }, [isUsta, me.data?.id, openToday.length]);
+
+  useEffect(() => {
+    const pageName: Record<string, string> = { "/panel": "Panel", "/isler": "İşler", "/cari": "Cari", "/yevmiye": "Yevmiye", "/ekipman": "Ekipman", "/doviz": "Döviz", "/randevu": "Randevular", "/banka": "Banka" };
+    const base = `${pageName[path] ?? "Saha"} — Saha`;
+    if (!activeJob) { document.title = base; return; }
+    const tick = () => {
+      const seconds = Math.max(0, Math.floor((Date.now() - Date.parse(String(activeJob.payload.started_at))) / 1000));
+      const time = [Math.floor(seconds / 3600), Math.floor(seconds / 60) % 60, seconds % 60].map((part) => String(part).padStart(2, "0")).join(":");
+      const customerName = customers.data?.find((customer) => customer.id === activeJob.payload.customer_id)?.name;
+      document.title = `▶ ${time} · ${customerName || String(activeJob.payload.title ?? "Aktif iş")}`;
+    };
+    tick(); const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [path, activeJob, customers.data]);
+
+  useEffect(() => {
+    const pathKey = `saha-usage:${me.data?.id ?? "guest"}`;
+    let previousPath = path; let enteredAt = Date.now();
+    const recordTime = () => {
+      const elapsed = Math.max(0, Math.min(4 * 60 * 60_000, Date.now() - enteredAt));
+      try {
+        const usage = JSON.parse(localStorage.getItem(pathKey) ?? "{}") as Record<string, number>;
+        usage[previousPath] = (Number(usage[previousPath]) || 0) + elapsed;
+        localStorage.setItem(pathKey, JSON.stringify(usage));
+      } catch { /* local-only usage analytics are optional */ }
+      previousPath = path; enteredAt = Date.now();
+    };
+    recordTime();
+    return () => {
+      const elapsed = Math.max(0, Math.min(4 * 60 * 60_000, Date.now() - enteredAt));
+      try { const usage = JSON.parse(localStorage.getItem(pathKey) ?? "{}") as Record<string, number>; usage[path] = (Number(usage[path]) || 0) + elapsed; localStorage.setItem(pathKey, JSON.stringify(usage)); } catch { /* optional */ }
+    };
+  }, [path, me.data?.id]);
+
+  useEffect(() => {
+    try {
+      document.documentElement.dataset.textScale = localStorage.getItem("saha-text-scale") ?? "normal";
+      document.documentElement.dataset.colorblind = localStorage.getItem("saha-colorblind") === "true" ? "true" : "false";
+    } catch { /* accessibility preferences can fall back to browser defaults */ }
+  }, []);
+
   async function refresh() {
     setRefreshing(true);
     haptic();
@@ -71,7 +151,7 @@ export function AppShell() {
           className="flex h-11 min-w-0 flex-1 justify-start gap-3 px-3 text-sm text-muted-foreground"
         >
           <Search className="size-4" /><span className="truncate">Saha · Ara</span>
-        </Button>{isUsta&&<NotificationCenter/>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Randevular"><Link to="/randevu"><CalendarClock/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Hava Durumu"><Link to="/hava"><Cloud/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Borç ve alacak"><Link to="/borc"><HandCoins/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Hesap hareketleri"><Link to="/banka"><Landmark/></Link></Button>{isUsta&&<Button asChild variant="ghost" size="icon" title="Giderler"><Link to="/giderler"><Receipt/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Ayarlar"><Link to="/ayarlar"><Settings/></Link></Button></div>
+        </Button>{isUsta&&<VoiceCommandButton onSearch={(query) => { setSearchSeed(query); setSearchOpen(true); }}/>}{isUsta&&<NotificationCenter/>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Randevular"><Link to="/randevu"><CalendarClock/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Hava Durumu"><Link to="/hava"><Cloud/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Borç ve alacak"><Link to="/borc"><HandCoins/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Hesap hareketleri"><Link to="/banka"><Landmark/></Link></Button>{isUsta&&<Button asChild variant="ghost" size="icon" title="Giderler"><Link to="/giderler"><Receipt/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Ayarlar"><Link to="/ayarlar"><Settings/></Link></Button></div>
         {queuedWrites > 0 && <div className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-warning" role="status"><CloudUpload className="size-3.5"/>{queuedWrites} çevrimdışı kayıt senkronizasyon bekliyor</div>}
       </header>
 
@@ -93,6 +173,7 @@ export function AppShell() {
           startY.current = null;
         }}
       >
+        {showOpenJobs && openToday.length > 0 && <button type="button" onClick={() => { setShowOpenJobs(false); void navigate({ to: "/isler" }); }} className="mb-3 w-full rounded-xl border border-primary/30 bg-primary/10 p-3 text-left text-sm font-medium text-primary" role="status">Bugün {openToday.length} açık işiniz var · görmek için dokunun</button>}
         {(pull > 0 || refreshing) && (
           <div className="flex justify-center text-muted-foreground" style={{ height: refreshing ? 40 : pull }}>
             {refreshing ? <Loader2 className="mt-2 size-5 animate-spin" /> : <ArrowDown className={cn("mt-2 size-5 transition", pull >= 60 && "rotate-180 text-primary")} />}
@@ -133,7 +214,7 @@ export function AppShell() {
         </div>
       </nav>
 
-      {isUsta && <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} onPick={(id) => navigate({ to: "/cari/$id", params: { id } })} />}
+      {isUsta && <GlobalSearch open={searchOpen} initialQuery={searchSeed} onOpenChange={(open) => { setSearchOpen(open); if (!open) setSearchSeed(""); }} onPick={(id) => navigate({ to: "/cari/$id", params: { id } })} />}
       {isUsta && <QuickAdd open={addOpen} onOpenChange={setAddOpen} />}
       {me.data && <DeviceLock user={me.data.id} />}
     </div>
