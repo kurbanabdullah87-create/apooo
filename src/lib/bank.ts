@@ -354,7 +354,7 @@ export function useBankMovements(ownerId: string | null | undefined, accountId: 
     queryFn: async () => {
       if (!ownerId || !accountId) return [];
       const vault = await readVault(ownerId);
-      return vault.transactions.filter((row) => row.account_id === accountId).sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at));
+      return vault.transactions.filter((row) => accountId === "all" || row.account_id === accountId).sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at));
     },
   });
 }
