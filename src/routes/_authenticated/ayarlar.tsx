@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Save, UserPlus, LogOut, Fingerprint, LockKeyhole, Award, Link2, Loader2, Plus, X } from "lucide-react";
+import { Save, UserPlus, LogOut, Fingerprint, LockKeyhole, Award, Link2, Loader2, Plus, X, ShieldCheck, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -135,6 +135,12 @@ function Settings() {
               Kaydet
             </Button>
           </section>
+          <LaunchReadinessChecklist
+            value={String(form.launch_checklist_v1 ?? "")}
+            onChange={(value) => setForm((current) => ({ ...current, launch_checklist_v1: value }))}
+            onSave={() => save.mutate({ id: settings.data?.[0]?.id, payload: form })}
+            saving={save.isPending}
+          />
           <section className="space-y-3 border-t pt-5">
             <h2 className="font-semibold">Çırak / eleman hesabı</h2>
             <form
@@ -332,6 +338,133 @@ function Settings() {
 }
 function useCreateServerFn() {
   return useServerFn(createApprentice);
+}
+const launchChecklistGroups = [
+  {
+    title: "Kod ve kalite",
+    items: [
+      ["build", "Üretim derlemesi başarılı", "Vercel’in kullanacağı production build komutunu çalıştırın."],
+      ["types", "TypeScript denetimi temiz", "Derlemenin geçmesi tek başına tip hatası olmadığını göstermez."],
+      ["tests", "Otomatik testler başarılı", "Özellikle oturum, ekip yetkileri ve finans hesaplarını kontrol edin."],
+      ["review", "Değişiklikler gözden geçirildi", "Son değişiklikleri ve bağımlılık güncellemelerini inceleyin."],
+    ],
+  },
+  {
+    title: "Vercel ve alan adı",
+    items: [
+      ["vercel-project", "Doğru GitHub deposu ve main dalı bağlı", "Vercel Project Settings → Git bölümünde doğrulayın."],
+      ["deployment", "Son production deployment Ready ve doğru commit", "Deployment ayrıntısındaki commit ile main dalındaki son commit aynı olmalı."],
+      ["env", "Production ortam değişkenleri güncel", "Supabase URL/anahtarları ve Google OAuth ayarlarını production ortamında kontrol edin."],
+      ["domain", "Canlı alan adı, HTTPS ve yönlendirmeler çalışıyor", "Giriş, çıkış, geri dönüş adresleri ve hata sayfalarını deneyin."],
+    ],
+  },
+  {
+    title: "Veritabanı ve güvenlik",
+    items: [
+      ["migrations", "Bekleyen Supabase migrasyonları uygulandı", "Migration geçmişi ile kod deposundaki SQL dosyalarını karşılaştırın."],
+      ["rls", "RLS ve ekipler arası veri ayrımı doğrulandı", "Usta ve çırak hesaplarıyla başka ekibin kayıtlarına erişilemediğini deneyin."],
+      ["storage", "Dosya depolama izinleri ve bağlantı süreleri doğrulandı", "Dekont ve fotoğrafların yetkisiz, herkese açık URL ile açılmadığını kontrol edin."],
+      ["backup", "Yedekleme ve geri yükleme yolu doğrulandı", "Yedeğin alınabildiğini ve geri yüklemenin nasıl yapılacağını belgeleyin."],
+    ],
+  },
+  {
+    title: "Oturum ve dayanıklılık",
+    items: [
+      ["auth", "Google ve parola girişi ile kalıcı oturum denendi", "Tarayıcıyı kapatıp açın; OAuth dönüş ve çıkış akışını da kontrol edin."],
+      ["device-lock", "Cihaz kilidi ve biyometrik yedek akışı denendi", "Desteklenmeyen cihazda PIN/parola geri dönüşünü doğrulayın."],
+      ["offline", "Çevrimdışı kuyruk yeniden deneme ve çift kayıt açısından denendi", "Bağlantı kesip kayıt oluşturun; yeniden bağlanınca bir kez eşitlendiğini doğrulayın."],
+      ["monitoring", "Hata kayıtları ve izleme kişisel veriyi açığa çıkarmıyor", "İstemci ve sunucu loglarında parola, token ve finans verisi olmadığını kontrol edin."],
+    ],
+  },
+  {
+    title: "Ürün, erişilebilirlik ve mevzuat",
+    items: [
+      ["pwa", "Mobil PWA kurulumu ve güncellemesi doğrulandı", "Eski service worker önbelleğinden yeni sürüme geçişi de deneyin."],
+      ["a11y", "Klavye, kontrast ve azaltılmış hareket kontrol edildi", "Telefon ve masaüstünde temel ekranları gözden geçirin."],
+      ["finance", "Finans hesapları ve PDF raporları örneklerle mutabık", "Bilinen gelir, gider, yevmiye ve banka örneklerini çıktıyla karşılaştırın."],
+      ["privacy", "KVKK, saklama, dışa aktarma ve silme süreçleri gözden geçirildi", "Gerekli aydınlatma, saklama süresi ve kullanıcı taleplerini doğrulayın."],
+    ],
+  },
+  {
+    title: "Canlı kullanım provası",
+    items: [
+      ["smoke", "Uçtan uca canlı prova tamamlandı", "Giriş, iş oluşturma, tahsilat, banka PDF’i, çıkış ve yeniden girişi deneyin."],
+      ["support", "Sorun bildirme ve geri alma adımları hazır", "Sürüm sorunu halinde kimin ne yapacağını ve önceki sürüme dönüşü belirleyin."],
+    ],
+  },
+] as const;
+const launchChecklistIds = new Set(launchChecklistGroups.flatMap((group) => group.items.map(([id]) => id)));
+
+function LaunchReadinessChecklist({
+  value,
+  onChange,
+  onSave,
+  saving,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSave: () => void;
+  saving: boolean;
+}) {
+  const checked = (() => {
+    try {
+      const parsed: unknown = JSON.parse(value || "[]");
+      return new Set(Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string" && launchChecklistIds.has(item)) : []);
+    } catch {
+      return new Set<string>();
+    }
+  })();
+  const total = launchChecklistGroups.reduce((sum, group) => sum + group.items.length, 0);
+  const completed = checked.size;
+  const toggle = (id: string) => {
+    const next = new Set(checked);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    onChange(JSON.stringify([...next]));
+  };
+
+  return (
+    <section className="space-y-4 rounded-2xl border bg-card p-4 sm:p-5">
+      <div className="flex items-start gap-3">
+        <span className="rounded-xl bg-primary/10 p-2 text-primary"><ShieldCheck className="size-5" /></span>
+        <div className="min-w-0 flex-1">
+          <h2 className="font-semibold">Canlıya çıkış kontrol listesi</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Yayın öncesi teknik, güvenlik ve kullanım kontrollerini takip edin.</p>
+        </div>
+        <span className="shrink-0 text-sm font-semibold tabular-nums">{completed}/{total}</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Kontrol listesi ilerlemesi" aria-valuemin={0} aria-valuemax={total} aria-valuenow={completed}>
+        <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${Math.min(100, (completed / total) * 100)}%` }} />
+      </div>
+      <div className="space-y-2">
+        {launchChecklistGroups.map((group) => {
+          const groupDone = group.items.filter(([id]) => checked.has(id)).length;
+          return (
+            <details key={group.title} className="rounded-xl border px-3">
+              <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
+                <span>{group.title}</span><span className="text-xs text-muted-foreground">{groupDone}/{group.items.length}</span>
+              </summary>
+              <div className="space-y-2 pb-3">
+                {group.items.map(([id, title, hint]) => (
+                  <label key={id} className="flex cursor-pointer gap-3 rounded-xl bg-muted/40 p-3">
+                    <input className="mt-0.5 size-4 shrink-0 accent-primary" type="checkbox" checked={checked.has(id)} onChange={() => toggle(id)} />
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-2 text-sm font-medium">{checked.has(id) && <CheckCircle2 className="size-4 shrink-0 text-primary" />}{title}</span>
+                      <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{hint}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </details>
+          );
+        })}
+      </div>
+      <div className="flex flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs leading-relaxed text-muted-foreground">Bu liste kontrolleri kaydeder; işaretler otomatik doğrulama veya güvenlik sertifikası anlamına gelmez.</p>
+        <Button type="button" className="shrink-0" disabled={saving} onClick={onSave}><Save className="size-4" />{saving ? "Kaydediliyor…" : "İlerlemeyi kaydet"}</Button>
+      </div>
+    </section>
+  );
 }
 function AccessibilitySettings() {
   const [scale, setScale] = useState(() => { try { return localStorage.getItem("saha-text-scale") ?? "normal"; } catch { return "normal"; } });
