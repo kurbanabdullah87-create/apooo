@@ -41,6 +41,7 @@ function Settings() {
   const [linkBusy, setLinkBusy] = useState(false);
   const [count, setCount] = useState(0);
   const [fieldMode, setFieldMode] = useState(() => { try { return localStorage.getItem("saha-field-mode") === "sunlight"; } catch { return false; } });
+  const [theme, setTheme] = useState(() => { try { return localStorage.getItem("saha-theme") ?? "ocean"; } catch { return "ocean"; } });
   const masterNameOptions = [...new Set(String(form.master_names ?? "").split(/\r?\n/).map((name) => name.trim()).filter(Boolean))];
   const addMasterName = () => {
     const name = masterNameInput.trim();
@@ -68,6 +69,12 @@ function Settings() {
     document.documentElement.dataset.fieldMode = fieldMode ? "sunlight" : "standard";
     try { localStorage.setItem("saha-field-mode", fieldMode ? "sunlight" : "standard"); } catch { /* device storage can be disabled */ }
   }, [fieldMode]);
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    try { localStorage.setItem("saha-theme", theme); } catch { /* browser storage can be disabled */ }
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (meta) meta.content = getComputedStyle(document.documentElement).getPropertyValue("--primary").trim() || "#4fd1b5";
+  }, [theme]);
   const completed = (jobs.data ?? []).filter((j) => j.payload.status === "Tamamlandı").length;
   const income = (txs.data ?? [])
     .filter((t) => t.kind === "payment" && t.occurred_on.startsWith(todayISO().slice(0, 7)))
@@ -86,6 +93,7 @@ function Settings() {
         <>
           <section className="space-y-3">
             <AccessibilitySettings />
+            <ThemeSettings value={theme} onChange={setTheme} />
             <BusinessHoursSettings value={String(form.working_hours_json ?? "")} onChange={(value) => setForm({ ...form, working_hours_json: value })}/>
             <h2 className="font-semibold">İşletme</h2>
             <label className="flex min-h-14 items-center justify-between gap-3 rounded-2xl border bg-card p-3"><span><span className="block font-semibold">Saha modu · yüksek kontrast</span><span className="text-xs text-muted-foreground">Güneş ışığında daha net metin ve kenarlıklar</span></span><input type="checkbox" checked={fieldMode} onChange={(e) => setFieldMode(e.target.checked)}/></label>
@@ -393,7 +401,7 @@ const launchChecklistGroups = [
     ],
   },
 ] as const;
-const launchChecklistIds = new Set(launchChecklistGroups.flatMap((group) => group.items.map(([id]) => id)));
+const launchChecklistIds: Set<string> = new Set(launchChecklistGroups.flatMap((group) => group.items.map(([id]) => id)));
 
 function LaunchReadinessChecklist({
   value,
@@ -434,7 +442,7 @@ function LaunchReadinessChecklist({
         <span className="shrink-0 text-sm font-semibold tabular-nums">{completed}/{total}</span>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Kontrol listesi ilerlemesi" aria-valuemin={0} aria-valuemax={total} aria-valuenow={completed}>
-        <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${Math.min(100, (completed / total) * 100)}%` }} />
+        <div className="liquid-fill h-full rounded-full" style={{ width: `${Math.min(100, (completed / total) * 100)}%` }} />
       </div>
       <div className="space-y-2">
         {launchChecklistGroups.map((group) => {
@@ -475,6 +483,18 @@ function AccessibilitySettings() {
     try { localStorage.setItem("saha-text-scale", scale); localStorage.setItem("saha-colorblind", String(colorblind)); } catch { /* browser storage can be disabled */ }
   }, [scale, colorblind]);
   return <div className="space-y-3 rounded-2xl border bg-card p-4"><div><h3 className="font-semibold">Erişilebilirlik</h3><p className="text-xs text-muted-foreground">Yalnızca bu cihazda saklanır.</p></div><div className="space-y-2"><Label htmlFor="text-scale">Metin boyutu</Label><select id="text-scale" className="h-11 w-full rounded-xl border bg-background px-3 text-sm" value={scale} onChange={(event) => setScale(event.target.value)}><option value="small">Küçük</option><option value="normal">Normal</option><option value="large">Büyük</option><option value="xlarge">Çok büyük</option></select></div><label className="flex min-h-12 items-center justify-between gap-3 rounded-xl border px-3"><span><span className="block text-sm font-medium">Renk körlüğüne uygun işaretler</span><span className="text-xs text-muted-foreground">Durum renklerine ek olarak farklı çizgi desenleri kullan</span></span><input type="checkbox" checked={colorblind} onChange={(event) => setColorblind(event.target.checked)}/></label></div>;
+}
+const themeChoices = [
+  ["ocean", "Okyanus", "Mavi · turkuaz"],
+  ["forest", "Orman", "Yeşil · doğal"],
+  ["sunset", "Gün batımı", "Turuncu · sıcak"],
+  ["lilac", "Leylak", "Mor · yumuşak"],
+  ["dawn", "Şafak", "Mercan · canlı"],
+  ["twilight", "Alacakaranlık", "Çivit · sakin"],
+  ["gold", "Altın", "Sarı · enerjik"],
+] as const;
+function ThemeSettings({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return <div className="space-y-3 rounded-2xl border bg-card p-4"><div><h3 className="font-semibold">Renk teması</h3><p className="text-xs text-muted-foreground">Seçiminiz bu cihazda anında uygulanır.</p></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{themeChoices.map(([id, label, description]) => <button key={id} type="button" onClick={() => onChange(id)} aria-pressed={value === id} className={`flex min-h-14 items-center gap-2 rounded-xl border px-3 text-left transition active:scale-[.98] ${value === id ? "border-primary bg-primary/10 ring-1 ring-primary/40" : "bg-background/40 hover:bg-accent/60"}`}><span className="size-4 shrink-0 rounded-full shadow-sm" style={{ background: `var(--theme-${id}, var(--primary))` }}/><span className="min-w-0"><span className="block text-sm font-semibold">{label}</span><span className="block truncate text-[10px] text-muted-foreground">{description}</span></span></button>)}</div></div>;
 }
 type WorkDay = { open: boolean; start: string; end: string };
 type WorkHours = { days: WorkDay[]; holidays: Array<{ date: string; label: string }> };

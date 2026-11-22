@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useRecords } from "@/lib/work";
 import { EXPENSE_LABELS, todayISO, type ExpenseCategory } from "@/lib/finance";
 import { cn } from "@/lib/utils";
+import { suggestExpenseCategory } from "@/lib/categorize";
 import { FormDrawer } from "./FormDrawer";
 
 export function ExpenseForm({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
@@ -18,6 +19,7 @@ export function ExpenseForm({ open, onOpenChange }: { open: boolean; onOpenChang
   const [receiptPath, setReceiptPath] = useState<string | null>(null);
   const [expenseId, setExpenseId] = useState(crypto.randomUUID());
   const [jobRecordId, setJobRecordId] = useState("");
+  const [suggestion, setSuggestion] = useState<ExpenseCategory | null>(null);
   const jobs = useRecords("job");
   function close(openNow: boolean) {
     if (!openNow && receiptPath) void supabase.storage.from("saha-media").remove([receiptPath]);
@@ -36,6 +38,10 @@ export function ExpenseForm({ open, onOpenChange }: { open: boolean; onOpenChang
       setJobRecordId("");
     }
   }, [open]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSuggestion(suggestExpenseCategory(description)), 500);
+    return () => window.clearTimeout(timer);
+  }, [description]);
 
   return (
     <FormDrawer
@@ -79,6 +85,7 @@ export function ExpenseForm({ open, onOpenChange }: { open: boolean; onOpenChang
         <Label>Açıklama</Label>
         <Input className="h-12" value={description} onChange={(e) => setDescription(e.target.value)} />
       </div>
+      {suggestion && suggestion !== category && <button type="button" onClick={() => setCategory(suggestion)} className="animate-slide-up-fade w-fit rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">✦ Tahmin: {EXPENSE_LABELS[suggestion]} · uygula</button>}
       <div className="space-y-2"><Label htmlFor="expense-job">İş bağlantısı <span className="font-normal text-muted-foreground">(opsiyonel · kârlılık raporu)</span></Label><select id="expense-job" className="h-11 w-full rounded-xl border bg-secondary px-3 text-sm" value={jobRecordId} onChange={(e) => setJobRecordId(e.target.value)}><option value="">Genel gider</option>{(jobs.data ?? []).map((job) => <option value={job.id} key={job.id}>{String(job.payload.title)} · {String(job.payload.date ?? "")}</option>)}</select></div>
       <div className="space-y-2">
         <Label>Tarih</Label>

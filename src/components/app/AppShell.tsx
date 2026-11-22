@@ -38,13 +38,36 @@ export function AppShell() {
   const [pull, setPull] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [queuedWrites, setQueuedWrites] = useState(0);
+  const [isOnline, setIsOnline] = useState(() => typeof navigator === "undefined" ? true : navigator.onLine);
+  const [clockNow, setClockNow] = useState(() => Date.now());
   const [searchSeed, setSearchSeed] = useState("");
   const [showOpenJobs, setShowOpenJobs] = useState(false);
   const startY = useRef<number | null>(null);
+  const edgeStartX = useRef<number | null>(null);
   const jobs = useRecords("job");
   const customers = useCustomers();
   const openToday = (jobs.data ?? []).filter((job) => job.payload.date === new Date().toLocaleDateString("sv-SE") && job.payload.status !== "Tamamlandı" && job.payload.status !== "İptal");
   const activeJob = (jobs.data ?? []).filter((job) => Boolean(job.payload.started_at) && job.payload.status !== "Tamamlandı").sort((a, b) => String(b.payload.started_at).localeCompare(String(a.payload.started_at)))[0];
+  const activeJobId = activeJob?.id;
+  const activeJobStartedAt = String(activeJob?.payload.started_at ?? "");
+
+  useEffect(() => {
+    const update = () => setIsOnline(navigator.onLine);
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => { window.removeEventListener("online", update); window.removeEventListener("offline", update); };
+  }, []);
+  useEffect(() => {
+    document.body.dataset.route = path.replace(/^\//, "") || "panel";
+    try { document.documentElement.dataset.theme = localStorage.getItem("saha-theme") ?? "ocean"; } catch { /* use default theme */ }
+    const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (themeColor) themeColor.content = getComputedStyle(document.documentElement).getPropertyValue("--primary").trim() || "#4fd1b5";
+  }, [path]);
+  useEffect(() => {
+    if (!activeJobStartedAt) return;
+    const timer = window.setInterval(() => setClockNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [activeJobId, activeJobStartedAt]);
 
   const isUsta = me.data?.isUsta ?? false;
   useAppointmentReminders(isUsta, () => void navigate({ to: "/randevu" }));
@@ -209,19 +232,21 @@ export function AppShell() {
       </aside>
 
       <header className="glass-topbar sticky top-0 z-30 px-4 pb-3 pt-[max(env(safe-area-inset-top),0.75rem)] lg:mx-auto lg:max-w-[1440px] lg:px-10 lg:pt-6">
-        <div className="flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.035] p-1.5 backdrop-blur-xl lg:rounded-[1.4rem] lg:bg-white/[0.045] lg:p-2"><Link to="/panel" className="mr-1 flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 font-bold text-primary lg:hidden" aria-label="Panele dön">S</Link><Button variant="ghost"
+        <div className={cn("flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.035] p-1.5 backdrop-blur-xl transition-colors duration-500 lg:rounded-[1.4rem] lg:bg-white/[0.045] lg:p-2", !isOnline && "border-destructive/30 bg-destructive/10", activeJob && "border-primary/25 bg-primary/[0.06]")}><Link to="/panel" className="mr-1 flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 font-bold text-primary lg:hidden" aria-label="Panele dön">S</Link><Button variant="ghost"
           onClick={() => setSearchOpen(true)}
           className="flex h-10 min-w-0 flex-1 justify-start gap-3 rounded-xl px-3 text-sm text-muted-foreground hover:bg-white/[0.06]"
         >
           <Search className="size-4" /><span className="truncate">Ara: müşteri, iş, tutar…</span><kbd className="ml-auto hidden rounded-md border border-white/10 bg-black/10 px-1.5 py-0.5 text-[10px] font-medium lg:inline-block">Ctrl K</kbd>
-        </Button>{isUsta&&<VoiceCommandButton onSearch={(query) => { setSearchSeed(query); setSearchOpen(true); }}/>}{isUsta&&<NotificationCenter/>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Randevular" className="rounded-xl hover:bg-white/[0.07]"><Link to="/randevu"><CalendarClock/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Hava Durumu" className="rounded-xl hover:bg-white/[0.07]"><Link to="/hava"><Cloud/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Borç ve alacak" className="rounded-xl hover:bg-white/[0.07]"><Link to="/borc"><HandCoins/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Hesap hareketleri" className="rounded-xl hover:bg-white/[0.07]"><Link to="/banka"><Landmark/></Link></Button>{isUsta&&<Button asChild variant="ghost" size="icon" title="Giderler" className="rounded-xl hover:bg-white/[0.07]"><Link to="/giderler"><Receipt/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Ayarlar" className="rounded-xl hover:bg-white/[0.07]"><Link to="/ayarlar"><Settings/></Link></Button></div>
-        {queuedWrites > 0 && <div className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-warning" role="status"><CloudUpload className="size-3.5"/>{queuedWrites} çevrimdışı kayıt senkronizasyon bekliyor</div>}
+        </Button>{activeJob && <span className="hidden items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary sm:inline-flex" role="status"><span className="size-1.5 animate-pulse rounded-full bg-primary"/> {(() => { const seconds = Math.max(0, Math.floor((clockNow - Date.parse(String(activeJob.payload.started_at))) / 1000)); return `${String(Math.floor(seconds / 3600)).padStart(2, "0")}:${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`; })()}</span>}{isUsta&&<VoiceCommandButton onSearch={(query) => { setSearchSeed(query); setSearchOpen(true); }}/>}{isUsta&&<NotificationCenter/>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Randevular" className="rounded-xl hover:bg-white/[0.07]"><Link to="/randevu"><CalendarClock/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Hava Durumu" className="rounded-xl hover:bg-white/[0.07]"><Link to="/hava"><Cloud/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Borç ve alacak" className="rounded-xl hover:bg-white/[0.07]"><Link to="/borc"><HandCoins/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Hesap hareketleri" className="rounded-xl hover:bg-white/[0.07]"><Link to="/banka"><Landmark/></Link></Button>{isUsta&&<Button asChild variant="ghost" size="icon" title="Giderler" className="rounded-xl hover:bg-white/[0.07]"><Link to="/giderler"><Receipt/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Ayarlar" className="rounded-xl hover:bg-white/[0.07]"><Link to="/ayarlar"><Settings/></Link></Button></div>
+        {(!isOnline || queuedWrites > 0) && <div className={cn("mt-2 flex items-center gap-1.5 text-xs font-semibold", isOnline ? "text-warning" : "text-destructive")} role="status"><span className={cn("size-2 rounded-full", isOnline ? "bg-warning" : "animate-pulse bg-destructive")}/>{!isOnline ? "Çevrimdışı" : "Senkronizasyon bekliyor"}{queuedWrites > 0 && <> · <CloudUpload className="size-3.5"/>{queuedWrites} kayıt</>}</div>}
       </header>
 
       <main
-        className="mx-auto w-full max-w-md px-4 pb-32 pt-4 lg:max-w-[1440px] lg:px-10 lg:pb-12 lg:pt-5"
+        className="mx-auto w-full max-w-2xl px-4 pb-32 pt-4 sm:max-w-4xl lg:max-w-[1440px] lg:px-10 lg:pb-12 lg:pt-5"
         onTouchStart={(e) => {
           startY.current = window.scrollY <= 0 ? e.touches[0]?.clientY ?? null : null;
+          const x = e.touches[0]?.clientX;
+          edgeStartX.current = x !== undefined && x < 24 ? x : null;
         }}
         onTouchMove={(e) => {
           if (startY.current === null) return;
@@ -230,8 +255,11 @@ export function AppShell() {
           const d = touch.clientY - startY.current;
           setPull(d > 0 ? Math.min(d / 2, 80) : 0);
         }}
-        onTouchEnd={() => {
+        onTouchEnd={(e) => {
           if (pull >= 60) void refresh();
+          const touch = e.changedTouches[0];
+          if (edgeStartX.current !== null && touch && touch.clientX - edgeStartX.current > Math.max(60, window.innerWidth * 0.22) && path !== "/panel" && window.history.length > 1) { haptic(12); window.history.back(); }
+          edgeStartX.current = null;
           setPull(0);
           startY.current = null;
         }}
