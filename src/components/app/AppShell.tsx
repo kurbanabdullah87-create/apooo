@@ -204,10 +204,11 @@ export function AppShell() {
               <Link
                 to={n.to}
                 onClick={() => haptic(8)}
-                className={cn("flex min-w-0 flex-col items-center gap-1 py-3 text-[10px] font-medium sm:text-[11px]", isUsta && "col-span-2", active ? "text-primary" : "text-muted-foreground")}
+                className={cn("relative flex min-w-0 flex-col items-center gap-1 py-3 text-[10px] font-medium sm:text-[11px]", isUsta && "col-span-2", active ? "text-primary" : "text-muted-foreground")}
               >
                 <n.icon className="size-5" />
                 {n.label}
+                {n.to === "/isler" && openToday.length > 0 && <span className="absolute right-1/4 top-1 min-w-4 rounded-full bg-primary px-1 text-center text-[9px] leading-4 text-primary-foreground" aria-label={`${openToday.length} açık iş`}>{openToday.length}</span>}
               </Link>
             </div>;
           })}

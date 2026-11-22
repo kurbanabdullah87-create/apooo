@@ -198,6 +198,17 @@ function Appointments() {
     if (!edit) return;
     const p = edit.payload;
     if (!norm(p.name)) return void toast.error("İsim gerekli");
+    const hoursJson = String(profile?.working_hours_json ?? "");
+    if (hoursJson) {
+      try {
+        const hours = JSON.parse(hoursJson) as { days?: Array<{ open?: boolean; start?: string; end?: string }>; holidays?: Array<{ date?: string; label?: string }> };
+        const dateValue = String(p.date ?? ""); const dayIndex = (new Date(`${dateValue}T12:00:00`).getDay() + 6) % 7;
+        if ((hours.holidays ?? []).some((holiday) => holiday.date === dateValue)) return void toast.error("Seçilen tarih işletme tatili olarak işaretli.");
+        const schedule = hours.days?.[dayIndex]; const timeValue = String(p.time ?? "");
+        if (schedule && !schedule.open) return void toast.error("İşletme seçilen gün kapalı. Önce çalışma saatleri ayarını kontrol edin.");
+        if (schedule?.open && schedule.start && schedule.end && (timeValue < schedule.start || timeValue >= schedule.end)) return void toast.error(`Randevu saati çalışma aralığı dışında (${schedule.start}–${schedule.end}).`);
+      } catch { return void toast.error("Çalışma saatleri ayarı okunamadı. Ayarlar bölümünden düzeltin."); }
+    }
     const selectedCustomer = (customers.data ?? []).find((customer) => customer.id === p.customer_id);
     const customerTxs = (transactions.data ?? []).filter((tx) => tx.customer_id === selectedCustomer?.id);
     const credit = selectedCustomer ? customerRestriction(selectedCustomer, customerTxs) : null;
