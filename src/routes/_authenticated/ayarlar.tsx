@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { InstallButton } from "@/components/app/InstallButton";
 import { useMe } from "@/hooks/use-me";
 import { useRecords, useSaveRecord, pageHead, type Payload } from "@/lib/work";
-import { useTemplates, useUpsert, useTransactions } from "@/lib/data";
+import { useCustomers, useExpenses, useTemplates, useUpsert, useTransactions } from "@/lib/data";
 import { createApprentice } from "@/lib/team.functions";
 import { savePin, registerBiometric } from "@/lib/device-lock";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,6 +27,8 @@ function Settings() {
   const settings = useRecords("settings");
   const jobs = useRecords("job");
   const txs = useTransactions();
+  const customers = useCustomers();
+  const expenses = useExpenses();
   const templates = useTemplates();
   const updateTemplate = useUpsert("message_templates");
   const save = useSaveRecord("settings");
@@ -91,6 +93,8 @@ function Settings() {
       <InstallButton />
       {me.data?.isUsta && (
         <>
+          <DataHealth customers={customers.data ?? []} expenses={expenses.data ?? []} />
+          <UsageStats userId={me.data.id} />
           <section className="space-y-3">
             <AccessibilitySettings />
             <ThemeSettings value={theme} onChange={setTheme} />
@@ -346,6 +350,35 @@ function Settings() {
 }
 function useCreateServerFn() {
   return useServerFn(createApprentice);
+}
+function DataHealth({ customers, expenses }: {
+  customers: NonNullable<ReturnType<typeof useCustomers>["data"]>;
+  expenses: NonNullable<ReturnType<typeof useExpenses>["data"]>;
+}) {
+  const missingPhone = customers.filter((customer) => !customer.phone?.trim()).length;
+  const missingLocation = customers.filter((customer) => customer.latitude == null || customer.longitude == null).length;
+  const missingReceipt = expenses.filter((expense) => expense.amount > 500 && !expense.receipt_photo_url).length;
+  const missingCategory = expenses.filter((expense) => !expense.category).length;
+  const checks = [["Telefonu olmayan müşteri", missingPhone], ["Konumu kayıtlı olmayan müşteri", missingLocation], ["500 ₺ üzeri fişsiz gider", missingReceipt], ["Kategorisiz gider", missingCategory]] as const;
+  return <section className="space-y-3 rounded-2xl border bg-card p-4"><div className="flex items-center gap-2"><ShieldCheck className="size-5 text-primary"/><div><h2 className="font-semibold">Veri sağlığı</h2><p className="text-xs text-muted-foreground">Mevcut kayıtlardaki eksik alanların özeti</p></div></div><div className="grid grid-cols-2 gap-2">{checks.map(([label, value]) => <div key={label} className="flex min-h-16 items-center justify-between gap-2 rounded-xl border bg-background/40 p-3"><span className="text-xs leading-snug text-muted-foreground">{label}</span><span className={`num text-lg font-bold ${value ? "text-warning" : "text-success"}`}>{value}</span></div>)}</div><p className="text-[11px] leading-relaxed text-muted-foreground">Bu özet yalnızca kayıt alanlarını sayar; belgelerin doğruluğunu veya yasal uygunluğunu denetlemez.</p></section>;
+}
+function UsageStats({ userId }: { userId: string }) {
+  const [usage, setUsage] = useState<Record<string, number>>({});
+  useEffect(() => {
+    const read = () => {
+      try {
+        const value: unknown = JSON.parse(localStorage.getItem(`saha-usage:${userId}`) ?? "{}");
+        setUsage(value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, number> : {});
+      } catch { setUsage({}); }
+    };
+    read();
+    const timer = window.setInterval(read, 30_000);
+    return () => window.clearInterval(timer);
+  }, [userId]);
+  const pages = Object.entries(usage).filter(([, seconds]) => Number.isFinite(seconds) && seconds > 0).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  const labels: Record<string, string> = { "/panel": "Panel", "/isler": "İşler", "/cari": "Cari", "/yevmiye": "Yevmiye", "/ekipman": "Ekipman", "/doviz": "Döviz", "/banka": "Banka", "/randevu": "Randevular", "/rapor": "Raporlar" };
+  const duration = (seconds: number) => seconds >= 3600 ? `${(seconds / 3600).toFixed(1)} sa` : `${Math.max(1, Math.round(seconds / 60))} dk`;
+  return <details className="rounded-2xl border bg-card p-4"><summary className="cursor-pointer list-none font-semibold">Bu cihazdaki kullanım özeti</summary><p className="mt-1 text-xs text-muted-foreground">Sayfada geçirilen süre yerel depolamada tutulur, dışarı gönderilmez.</p>{pages.length ? <ul className="mt-3 space-y-2">{pages.map(([path, seconds]) => <li key={path} className="flex items-center justify-between rounded-xl bg-background/40 px-3 py-2 text-sm"><span>{labels[path] ?? path}</span><span className="num font-semibold text-primary">{duration(seconds)}</span></li>)}</ul> : <p className="mt-3 rounded-xl border border-dashed p-3 text-center text-xs text-muted-foreground">Kullanım özeti oluşturmak için uygulamayı kullanmaya devam edin.</p>}</details>;
 }
 const launchChecklistGroups = [
   {
