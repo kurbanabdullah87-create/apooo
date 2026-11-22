@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Play, Pause, Check, Copy, ChevronDown, Clock, Download, Search, X, CalendarCheck, Activity, Phone, MessageCircle, Share2, FileText, ClipboardCheck, Mail } from "lucide-react";
+import { Plus, Play, Pause, Check, Copy, ChevronDown, Clock, Download, Search, X, CalendarCheck, Activity, Phone, MessageCircle, Share2, FileText, ClipboardCheck, Mail, LayoutGrid, LayoutList, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { FormDrawer } from "@/components/app/forms/FormDrawer";
@@ -68,7 +68,12 @@ function Jobs() {
   const [form, setForm] = useState<Payload>({});
   const [filter, setFilter] = useState("Tümü");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [date, setDate] = useState(todayISO());
+  const [quickRange, setQuickRange] = useState<"" | "today" | "week" | "month">("");
+  const [customerFilter, setCustomerFilter] = useState("");
+  const [minimumAmount, setMinimumAmount] = useState("");
+  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [showProgress, setShowProgress] = useState(true);
   const [expanded, setExpanded] = useState<string>();
   const [now, setNow] = useState(Date.now());
@@ -84,10 +89,11 @@ function Jobs() {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+  useEffect(() => { const timer = window.setTimeout(() => setDebouncedQuery(searchQuery), 300); return () => window.clearTimeout(timer); }, [searchQuery]);
 
   const members = useMembers();
 
-  function edit(j?: WorkRecord, p?: Payload) {
+  const edit = useCallback((j?: WorkRecord, p?: Payload) => {
     setEditing(j);
     setForm(
       j
@@ -106,13 +112,13 @@ function Jobs() {
           },
     );
     setOpen(true);
-  }
+  }, [date, me.data?.id]);
 
   useEffect(() => {
     const openJobForm = () => edit();
     window.addEventListener("saha-open-job-form", openJobForm);
     return () => window.removeEventListener("saha-open-job-form", openJobForm);
-  }, [date, me.data?.id]);
+  }, [edit]);
 
   useEffect(() => {
     try {
@@ -132,7 +138,7 @@ function Jobs() {
       }
       edit();
     } catch { /* optional cross-route quick action */ }
-  }, [jobs.isLoading, jobs.data]);
+  }, [jobs.isLoading, jobs.data, edit]);
 
   async function change(j: WorkRecord, p: Payload) {
     await save.mutateAsync({ id: j.id, owner_id: j.owner_id, payload: p });
@@ -291,22 +297,38 @@ function Jobs() {
     );
   }
 
-  const dateRows = (jobs.data ?? []).filter((job) => !date || job.payload.date === date);
+  const dateRange = (() => {
+    const today = todayISO();
+    if (quickRange === "today") return [today, today] as const;
+    if (quickRange === "week") { const monday = new Date(`${today}T12:00:00`); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7)); const start = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`; return [start, today] as const; }
+    if (quickRange === "month") return [today.slice(0, 7) + "-01", today] as const;
+    return null;
+  })();
+  const dateRows = (jobs.data ?? []).filter((job) => {
+    const rowDate = String(job.payload.date ?? "");
+    if (dateRange) return rowDate >= dateRange[0] && rowDate <= dateRange[1];
+    return !date || rowDate === date;
+  });
   const statusCounts = Object.fromEntries(["Tümü", ...STATUSES].map((status) => [
     status,
     status === "Tümü" ? dateRows.length : dateRows.filter((job) => String(job.payload.status ?? "Bekliyor") === status).length,
   ])) as Record<string, number>;
-  const normalizedQuery = searchQuery.trim().toLocaleLowerCase("tr-TR");
-  const rows = dateRows.filter((job) => {
-    if (filter !== "Tümü" && String(job.payload.status ?? "Bekliyor") !== filter) return false;
-    if (!normalizedQuery) return true;
+  const normalizedQuery = debouncedQuery.trim().toLocaleLowerCase("tr-TR");
+  const queryRows = dateRows.filter((job) => {
     const customer = customers.data?.find((item) => item.id === job.payload.customer_id);
+    const amount = Number(job.payload.price ?? 0) || hourlyCharge(elapsedSeconds(job.payload, now), Number(job.payload.hourly_rate ?? 0));
+    if (customerFilter && job.payload.customer_id !== customerFilter) return false;
+    if (minimumAmount && amount < Number(minimumAmount)) return false;
+    if (!normalizedQuery) return true;
     const machine = equipment.data?.find((item) => item.id === job.payload.equipment_id);
     const assigned = members.find((item) => item.id === job.owner_id);
     const searchable = [job.payload.title, customer?.name, customer?.phone, job.payload.address, customer?.address, job.payload.notes, machine?.payload.name, assigned?.username]
       .map((value) => String(value ?? "").toLocaleLowerCase("tr-TR"));
     return searchable.some((value) => value.includes(normalizedQuery));
   }).sort((a, b) => jobPriorityScore(b.payload) - jobPriorityScore(a.payload) || String(a.payload.time ?? "").localeCompare(String(b.payload.time ?? "")));
+  const rows = queryRows.filter((job) => filter === "Tümü" || String(job.payload.status ?? "Bekliyor") === filter);
+  const displayRows = viewMode === "kanban" ? queryRows : rows;
+  const activeFilterCount = Number(Boolean(normalizedQuery)) + Number(filter !== "Tümü") + Number(Boolean(dateRange)) + Number(Boolean(customerFilter)) + Number(Boolean(minimumAmount));
   const capacityRows = (jobs.data ?? []).filter((job) => job.payload.date === date && job.payload.status !== "Tamamlandı" && job.payload.status !== "İptal");
   const capacity = members.map((member) => ({ member, count: capacityRows.filter((job) => job.owner_id === member.id).length })).filter((row) => row.count > 0).sort((a, b) => b.count - a.count);
   const runningCount = dateRows.filter((job) => Boolean(job.payload.started_at) && job.payload.status !== "Tamamlandı").length;
@@ -329,14 +351,14 @@ function Jobs() {
           aria-label="İş günü"
           type="date"
           value={date}
-          onChange={(e) => setDate(e.target.value)}
+          onChange={(e) => { setDate(e.target.value); setQuickRange(""); }}
           className="rounded-md border bg-secondary p-2 text-sm"
         />
-        <Button variant="ghost" size="sm" onClick={() => setDate("")}>
-          Tüm tarihler
-        </Button>
-        <Button variant={date === todayISO() ? "secondary" : "outline"} size="sm" onClick={() => setDate(todayISO())}><CalendarCheck className="size-4"/>Bugün</Button>
-        <Button variant={date === dateOffset(1) ? "secondary" : "outline"} size="sm" onClick={() => setDate(dateOffset(1))}>Yarın</Button>
+        <Button variant="ghost" size="sm" onClick={() => { setDate(""); setQuickRange(""); }}>Tüm tarihler</Button>
+        <Button variant={quickRange === "today" || (!quickRange && date === todayISO()) ? "secondary" : "outline"} size="sm" onClick={() => { setDate(""); setQuickRange("today"); }}><CalendarCheck className="size-4"/>Bugün</Button>
+        <Button variant={quickRange === "week" ? "secondary" : "outline"} size="sm" onClick={() => { setDate(""); setQuickRange("week"); }}>Bu hafta</Button>
+        <Button variant={quickRange === "month" ? "secondary" : "outline"} size="sm" onClick={() => { setDate(""); setQuickRange("month"); }}>Bu ay</Button>
+        <Button variant={date === dateOffset(1) && !quickRange ? "secondary" : "outline"} size="sm" onClick={() => { setQuickRange(""); setDate(dateOffset(1)); }}>Yarın</Button>
         <Button variant="outline" size="sm" onClick={getWeather}>
           Hava durumu
         </Button>
@@ -352,9 +374,15 @@ function Jobs() {
         <Input aria-label="İşlerde ara" className="h-11 pl-9 pr-10" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="İş, müşteri, telefon, adres veya ekipman ara"/>
         {searchQuery && <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 size-9 -translate-y-1/2" aria-label="Aramayı temizle" onClick={() => setSearchQuery("")}><X className="size-4"/></Button>}
       </div>
-      <div className="flex gap-2 overflow-x-auto pb-1" role="group" aria-label="İş durumu filtresi">
-        {["Tümü", ...STATUSES].map((status) => <Button key={status} type="button" size="sm" variant={filter === status ? "default" : "outline"} className="shrink-0" aria-pressed={filter === status} onClick={() => setFilter(status)}>{status}<span className="ml-1 rounded-full bg-background/20 px-1.5 text-[10px]">{statusCounts[status] ?? 0}</span></Button>)}
+      <div className="grid gap-2 sm:grid-cols-[1fr_10rem_auto]">
+        <select aria-label="Müşteriye göre filtrele" className="h-10 rounded-xl border bg-secondary px-3 text-sm" value={customerFilter} onChange={(event) => setCustomerFilter(event.target.value)}><option value="">Tüm müşteriler</option>{(customers.data ?? []).map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select>
+        <Input aria-label="En düşük iş tutarı" type="number" min="0" step="100" value={minimumAmount} onChange={(event) => setMinimumAmount(event.target.value)} placeholder="En az tutar ₺" />
+        <Button type="button" variant="outline" size="sm" onClick={() => { setFilter("Tümü"); setViewMode(viewMode === "list" ? "kanban" : "list"); }}><span className="flex items-center gap-2">{viewMode === "list" ? <LayoutGrid className="size-4"/> : <LayoutList className="size-4"/>}{viewMode === "list" ? "Kanban" : "Liste"}</span></Button>
       </div>
+      {(activeFilterCount > 0 || customerFilter || minimumAmount) && <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground"><span>{activeFilterCount} filtre aktif</span><Button type="button" variant="link" size="sm" className="h-7 px-1" onClick={() => { setSearchQuery(""); setDebouncedQuery(""); setFilter("Tümü"); setCustomerFilter(""); setMinimumAmount(""); setQuickRange(""); setDate(""); }}>Filtreleri temizle</Button></div>}
+      {viewMode === "list" && <div className="flex gap-2 overflow-x-auto pb-1" role="group" aria-label="İş durumu filtresi">
+        {["Tümü", ...STATUSES].map((status) => <Button key={status} type="button" size="sm" variant={filter === status ? "default" : "outline"} className="shrink-0" aria-pressed={filter === status} onClick={() => setFilter(status)}>{status}<span className="ml-1 rounded-full bg-background/20 px-1.5 text-[10px]">{statusCounts[status] ?? 0}</span></Button>)}
+      </div>}
       {date && capacity.length > 0 && <section className="space-y-2 rounded-2xl border bg-card p-3" aria-label="Ekip kapasitesi"><div className="flex items-center justify-between"><h2 className="text-sm font-semibold">Ekip kapasitesi · {date}</h2><span className="text-xs text-muted-foreground">Açık iş sayısı</span></div><div className="flex flex-wrap gap-2">{capacity.map(({ member, count }) => <span key={member.id} className={`rounded-full border px-3 py-1 text-xs ${count >= 4 ? "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200" : "bg-secondary"}`}>{member.username} · {count} iş{count >= 4 ? " · yoğun" : ""}</span>)}</div></section>}
       {me.data?.isUsta && !!templates.data?.length && (
         <div className="flex flex-wrap gap-2">
@@ -374,8 +402,22 @@ function Jobs() {
       {jobs.error && <p className="text-destructive">İşler yüklenemedi.</p>}
       {jobs.isLoading ? (
         <div className="space-y-3" aria-label="İşler yükleniyor" aria-busy="true">{[0, 1, 2].map((key) => <div key={key} className="space-y-3 rounded-2xl border bg-card p-4"><Skeleton className="h-5 w-2/5"/><Skeleton className="h-4 w-3/5"/><Skeleton className="h-10 w-full"/></div>)}</div>
-      ) : rows.length === 0 ? (
+      ) : displayRows.length === 0 ? (
         <div className="rounded-2xl border border-dashed p-8 text-center"><Search className="mx-auto size-6 text-muted-foreground"/><p className="mt-2 text-sm font-medium">{normalizedQuery ? "Aramayla eşleşen iş bulunamadı." : filter !== "Tümü" ? `${filter} durumunda iş yok.` : "Bu tarihte iş yok."}</p>{(normalizedQuery || filter !== "Tümü") && <Button className="mt-3" size="sm" variant="secondary" onClick={() => { setSearchQuery(""); setFilter("Tümü"); }}>Filtreleri temizle</Button>}</div>
+      ) : viewMode === "kanban" ? (
+        <div className="space-y-3">
+          <div className="overflow-x-auto pb-2"><div className="grid min-w-[810px] grid-cols-3 gap-3">
+            {["Bekliyor", "Devam Ediyor", "Tamamlandı"].map((column) => {
+              const columnRows = queryRows.filter((job) => String(job.payload.status ?? "Bekliyor") === column);
+              return <section key={column} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); if (!me.data?.isUsta) return; const id = event.dataTransfer.getData("text/plain"); const job = queryRows.find((row) => row.id === id); if (!job || job.payload.status === column || job.payload.billed) return; if (column === "Tamamlandı") { void complete(job, elapsedSeconds(job.payload, now)); return; } const prerequisite = queryRows.find((row) => row.id === String(job.payload.depends_on_job_id ?? "")); if (column === "Devam Ediyor" && prerequisite && prerequisite.payload.status !== "Tamamlandı") { toast.error(`Önce “${String(prerequisite.payload.title)}” işini tamamlayın.`); return; } void change(job, { ...job.payload, status: column }); }} className="min-h-64 rounded-2xl border bg-secondary/40 p-3">
+                <header className="mb-3 flex items-center justify-between"><h2 className="font-semibold">{column}</h2><span className="rounded-full bg-background px-2 py-0.5 text-xs">{columnRows.length}</span></header>
+                <div className="max-h-[65vh] space-y-2 overflow-y-auto">{columnRows.map((job) => { const customer = customers.data?.find((row) => row.id === job.payload.customer_id); const addr = String(job.payload.address ?? customer?.address ?? ""); const seconds = elapsedSeconds(job.payload, now); const amount = Number(job.payload.price ?? 0) || hourlyCharge(seconds, Number(job.payload.hourly_rate ?? 0)); return <article key={job.id} draggable={Boolean(me.data?.isUsta && !job.payload.billed)} onDragStart={(event) => event.dataTransfer.setData("text/plain", job.id)} className={`space-y-2 rounded-xl border bg-card p-3 shadow-sm ${job.payload.started_at ? "border-l-4 border-l-primary" : ""} ${column === "Tamamlandı" ? "opacity-75" : ""}`}><div className="flex items-start justify-between gap-2"><div className="min-w-0"><h3 className="truncate text-sm font-semibold">{customer?.name || String(job.payload.title ?? "İş")}</h3><p className="line-clamp-2 text-xs text-muted-foreground">{String(job.payload.title ?? "")}</p></div><span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] ${column === "Tamamlandı" ? "bg-emerald-500/10 text-emerald-700" : column === "Devam Ediyor" ? "bg-primary/10 text-primary" : "bg-amber-500/10 text-amber-700"}`}>{column}</span></div>{addr && <p className="flex items-center gap-1 truncate text-[11px] text-muted-foreground"><MapPin className="size-3 shrink-0"/>{addr}</p>}<div className="flex items-center justify-between text-xs"><span className="num text-muted-foreground">{Math.floor(seconds / 3600)}:{String(Math.floor(seconds / 60) % 60).padStart(2, "0")}</span><span className="num font-semibold">{formatTL(amount)}</span></div><div className="flex gap-1"><Button size="sm" variant="ghost" className="h-8 flex-1" onClick={() => { setViewMode("list"); setExpanded(job.id); }}>Aç</Button>{me.data?.isUsta && <select aria-label={`${String(job.payload.title)} durumunu seç`} className="h-8 min-w-0 flex-1 rounded-lg border bg-background px-1 text-xs" value={column} disabled={Boolean(job.payload.billed)} onChange={(event) => { if (event.target.value === "Tamamlandı") void complete(job, seconds); else void change(job, { ...job.payload, status: event.target.value }); }}><option>Bekliyor</option><option>Devam Ediyor</option><option>Tamamlandı</option></select>}</div></article>; })}</div>
+              </section>;
+            })}
+          </div></div>
+          {queryRows.some((job) => !["Bekliyor", "Devam Ediyor", "Tamamlandı"].includes(String(job.payload.status))) && <section className="rounded-2xl border bg-card p-3"><h2 className="mb-2 text-sm font-semibold">Teklifler ve ertelenen işler</h2><div className="flex flex-wrap gap-2">{queryRows.filter((job) => !["Bekliyor", "Devam Ediyor", "Tamamlandı"].includes(String(job.payload.status))).map((job) => <Button key={job.id} variant="outline" size="sm" onClick={() => { setViewMode("list"); setExpanded(job.id); }}>{String(job.payload.title ?? "İş")} · {String(job.payload.status)}</Button>)}</div></section>}
+          <p className="text-center text-[11px] text-muted-foreground">Kartı başka kolona sürükleyin; klavye ve mobil kullanımında kart içindeki durum menüsünü kullanın.</p>
+        </div>
       ) : (
         rows.map((j, index) => {
           const p = j.payload;

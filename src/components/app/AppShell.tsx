@@ -13,6 +13,7 @@ import { GlobalSearch } from "./GlobalSearch";
 import { QuickAdd } from "./QuickAdd";
 import { useAppointmentReminders, useDebtReminders } from "@/lib/reminders";
 import { NotificationCenter } from "@/components/app/NotificationCenter";
+import { supabase } from "@/integrations/supabase/client";
 import { VoiceCommandButton } from "@/components/app/VoiceCommandButton";
 import { useRecords } from "@/lib/work";
 import { useCustomers } from "@/lib/data";
@@ -136,6 +137,30 @@ export function AppShell() {
     } catch { /* accessibility preferences can fall back to browser defaults */ }
   }, []);
 
+  useEffect(() => {
+    const userId = me.data?.id;
+    if (!userId) return;
+    const key = `saha:last-activity:${userId}`;
+    const maxIdle = 8 * 60 * 60_000;
+    let ending = false;
+    const touch = () => {
+      if (ending) return;
+      let last = 0;
+      try { last = Number(localStorage.getItem(key) ?? 0); } catch { last = 0; }
+      if (last && Date.now() - last >= maxIdle) {
+        ending = true;
+        void supabase.auth.signOut({ scope: "local" }).finally(() => toast.info("Güvenlik için oturum kapatıldı. Yeniden giriş yapın."));
+        return;
+      }
+      try { localStorage.setItem(key, String(Date.now())); } catch { /* session expiry check remains active in memory */ }
+    };
+    const timer = window.setInterval(touch, 60_000);
+    const events = ["pointerdown", "keydown", "touchstart", "scroll"] as const;
+    for (const event of events) window.addEventListener(event, touch, { passive: true });
+    touch();
+    return () => { window.clearInterval(timer); for (const event of events) window.removeEventListener(event, touch); };
+  }, [me.data?.id]);
+
   async function refresh() {
     setRefreshing(true);
     haptic();
@@ -144,19 +169,57 @@ export function AppShell() {
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col">
-      <header className="sticky top-0 z-30 border-b bg-background/90 px-4 pb-3 pt-[max(env(safe-area-inset-top),0.75rem)] backdrop-blur">
-        <div className="flex items-center gap-2"><Button variant="secondary"
+    <div className="relative min-h-dvh w-full lg:pl-72">
+      <aside className="glass-sidebar fixed inset-y-4 left-4 z-40 hidden w-60 flex-col rounded-[1.8rem] p-3 lg:flex" aria-label="Ana gezinme">
+        <Link to="/panel" className="flex items-center gap-3 rounded-2xl px-3 py-3 transition hover:bg-white/[0.06]">
+          <span className="flex size-10 items-center justify-center rounded-2xl bg-primary text-lg font-black text-primary-foreground shadow-lg shadow-primary/20">S</span>
+          <span className="min-w-0"><span className="block text-base font-bold tracking-tight">Saha</span><span className="block text-[11px] text-muted-foreground">Operasyon merkezi</span></span>
+        </Link>
+        <div className="mx-3 my-3 h-px bg-white/10" />
+        <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/75">Çalışma alanı</p>
+        <nav className="flex-1 space-y-1 overflow-y-auto" aria-label="Sayfalar">
+          {NAV.filter((item) => isUsta || ["/isler", "/yevmiye"].includes(item.to)).map((item) => {
+            const active = path.startsWith(item.to);
+            return <Link key={item.to} to={item.to} onClick={() => haptic(8)} aria-current={active ? "page" : undefined} className={cn("glass-nav-item group relative flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition duration-200", active ? "is-active text-primary" : "text-muted-foreground hover:translate-x-0.5 hover:bg-white/[0.06] hover:text-foreground")}>
+              <item.icon className="size-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110" />
+              <span className="flex-1">{item.label}</span>
+              {item.to === "/isler" && openToday.length > 0 && <span className="min-w-5 rounded-full bg-primary/15 px-1.5 text-center text-[10px] font-bold leading-5 text-primary">{openToday.length}</span>}
+            </Link>;
+          })}
+          <div className="mx-3 my-3 h-px bg-white/10" />
+          <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/75">Araçlar</p>
+          {[
+            { to: "/randevu", label: "Randevular", icon: CalendarClock },
+            { to: "/rapor", label: "Aylık rapor", icon: LayoutDashboard },
+            { to: "/hesaplayici", label: "Maliyet hesaplayıcı", icon: Coins },
+            { to: "/banka", label: "Hesap hareketleri", icon: Landmark },
+            { to: "/giderler", label: "Giderler", icon: Receipt },
+            { to: "/hava", label: "Hava durumu", icon: Cloud },
+            { to: "/ayarlar", label: "Ayarlar", icon: Settings },
+          ].filter((item) => isUsta || item.to === "/ayarlar").map((item) => {
+            const active = path.startsWith(item.to);
+            return <Link key={item.to} to={item.to} onClick={() => haptic(8)} aria-current={active ? "page" : undefined} className={cn("glass-nav-item group flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition duration-200", active ? "is-active text-primary" : "text-muted-foreground hover:translate-x-0.5 hover:bg-white/[0.06] hover:text-foreground")}><item.icon className="size-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110"/><span>{item.label}</span></Link>;
+          })}
+        </nav>
+        {isUsta && <Button onClick={() => { haptic(); setAddOpen(true); }} className="mt-3 h-12 w-full rounded-2xl shadow-lg shadow-primary/15"><Plus/>Hızlı işlem ekle</Button>}
+        <div className="mt-3 flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-black/10 p-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">{me.data?.profile?.display_name?.slice(0, 1) || "U"}</span>
+          <span className="min-w-0"><span className="block truncate text-xs font-semibold">{me.data?.profile?.display_name || "Usta hesabı"}</span><span className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted-foreground"><span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,.65)]"/>Çalışma alanı hazır</span></span>
+        </div>
+      </aside>
+
+      <header className="glass-topbar sticky top-0 z-30 px-4 pb-3 pt-[max(env(safe-area-inset-top),0.75rem)] lg:mx-auto lg:max-w-[1440px] lg:px-10 lg:pt-6">
+        <div className="flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.035] p-1.5 backdrop-blur-xl lg:rounded-[1.4rem] lg:bg-white/[0.045] lg:p-2"><Link to="/panel" className="mr-1 flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 font-bold text-primary lg:hidden" aria-label="Panele dön">S</Link><Button variant="ghost"
           onClick={() => setSearchOpen(true)}
-          className="flex h-11 min-w-0 flex-1 justify-start gap-3 px-3 text-sm text-muted-foreground"
+          className="flex h-10 min-w-0 flex-1 justify-start gap-3 rounded-xl px-3 text-sm text-muted-foreground hover:bg-white/[0.06]"
         >
-          <Search className="size-4" /><span className="truncate">Saha · Ara</span>
-        </Button>{isUsta&&<VoiceCommandButton onSearch={(query) => { setSearchSeed(query); setSearchOpen(true); }}/>}{isUsta&&<NotificationCenter/>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Randevular"><Link to="/randevu"><CalendarClock/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Hava Durumu"><Link to="/hava"><Cloud/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Borç ve alacak"><Link to="/borc"><HandCoins/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Hesap hareketleri"><Link to="/banka"><Landmark/></Link></Button>{isUsta&&<Button asChild variant="ghost" size="icon" title="Giderler"><Link to="/giderler"><Receipt/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Ayarlar"><Link to="/ayarlar"><Settings/></Link></Button></div>
+          <Search className="size-4" /><span className="truncate">Ara: müşteri, iş, tutar…</span><kbd className="ml-auto hidden rounded-md border border-white/10 bg-black/10 px-1.5 py-0.5 text-[10px] font-medium lg:inline-block">Ctrl K</kbd>
+        </Button>{isUsta&&<VoiceCommandButton onSearch={(query) => { setSearchSeed(query); setSearchOpen(true); }}/>}{isUsta&&<NotificationCenter/>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Randevular" className="rounded-xl hover:bg-white/[0.07]"><Link to="/randevu"><CalendarClock/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Hava Durumu" className="rounded-xl hover:bg-white/[0.07]"><Link to="/hava"><Cloud/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Borç ve alacak" className="rounded-xl hover:bg-white/[0.07]"><Link to="/borc"><HandCoins/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Hesap hareketleri" className="rounded-xl hover:bg-white/[0.07]"><Link to="/banka"><Landmark/></Link></Button>{isUsta&&<Button asChild variant="ghost" size="icon" title="Giderler" className="rounded-xl hover:bg-white/[0.07]"><Link to="/giderler"><Receipt/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Ayarlar" className="rounded-xl hover:bg-white/[0.07]"><Link to="/ayarlar"><Settings/></Link></Button></div>
         {queuedWrites > 0 && <div className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-warning" role="status"><CloudUpload className="size-3.5"/>{queuedWrites} çevrimdışı kayıt senkronizasyon bekliyor</div>}
       </header>
 
       <main
-        className="flex-1 px-4 pb-32 pt-4"
+        className="mx-auto w-full max-w-md px-4 pb-32 pt-4 lg:max-w-[1440px] lg:px-10 lg:pb-12 lg:pt-5"
         onTouchStart={(e) => {
           startY.current = window.scrollY <= 0 ? e.touches[0]?.clientY ?? null : null;
         }}
@@ -195,7 +258,7 @@ export function AppShell() {
         )}
       </main>
 
-      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 backdrop-blur">
+      <nav className="glass-dock safe-bottom fixed inset-x-3 bottom-3 z-30 rounded-[1.4rem] p-1.5 lg:hidden">
         <div className={`mx-auto grid max-w-md ${isUsta ? "grid-cols-13" : "grid-cols-2"}`}>
           {NAV.filter(n => isUsta || ["/isler", "/yevmiye"].includes(n.to)).map((n, index) => {
             const active = path.startsWith(n.to);
@@ -204,7 +267,8 @@ export function AppShell() {
               <Link
                 to={n.to}
                 onClick={() => haptic(8)}
-                className={cn("relative flex min-w-0 flex-col items-center gap-1 py-3 text-[10px] font-medium sm:text-[11px]", isUsta && "col-span-2", active ? "text-primary" : "text-muted-foreground")}
+                aria-current={active ? "page" : undefined}
+                className={cn("glass-dock-item relative flex min-w-0 flex-col items-center gap-1 rounded-xl py-2.5 text-[10px] font-medium transition duration-200 sm:text-[11px]", isUsta && "col-span-2", active ? "is-active text-primary" : "text-muted-foreground hover:bg-white/[0.06]")}
               >
                 <n.icon className="size-5" />
                 {n.label}

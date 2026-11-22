@@ -50,6 +50,22 @@ try {
     } else {
       await applyMigration(tx, "0014_credit_card_installments.sql", "0014_credit_card_installments");
     }
+
+    const [{ definition: workKindDefinition }] = await tx`
+      SELECT pg_get_constraintdef(oid) AS definition
+      FROM pg_constraint
+      WHERE conrelid='public.work_records'::regclass AND conname='work_records_kind_check'
+    `;
+    const ratePolicies = await tx`
+      SELECT policyname FROM pg_policies
+      WHERE schemaname='public' AND tablename='work_records'
+        AND policyname IN ('own exchange-rate snapshot read','own exchange-rate snapshot insert')
+    `;
+    if (!String(workKindDefinition ?? "").includes("exchange_rate") || ratePolicies.length !== 2) {
+      await applyMigration(tx, "0015_exchange_rate_snapshots.sql", "0015_exchange_rate_snapshots");
+    } else {
+      console.log("[db:migrate] Exchange-rate snapshots are already secured.");
+    }
   });
 
   const requiredTables = ["debt_records", "debt_installments", "debt_payments", "credit_card_records"];

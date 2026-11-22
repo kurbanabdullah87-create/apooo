@@ -2,7 +2,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useMemo } from "react";
 import { ChevronLeft, ChevronRight, AlertTriangle, MapPin, MessageCircle, Wallet, HardHat, WalletCards, TrendingUp, TrendingDown, BriefcaseBusiness, UserPlus, Camera, QrCode, RefreshCw, ArrowUpRight, ArrowDownRight, Clock3, CircleDollarSign } from "lucide-react";
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useCustomers, useExpenses, useTransactions } from "@/lib/data";
 import { customerBalance, customerRestriction, EXPENSE_LABELS, formatTL, monthKey, monthSummary, overdueAmount, profitBreakdown, todayISO, type ExpenseCategory } from "@/lib/finance";
 import { pageHead, useSaveRecord } from "@/lib/work";
@@ -16,11 +17,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getLiveCurrencyRates } from "@/lib/currency.functions";
 import { useRecords } from "@/lib/work";
 import { CodeScanner } from "@/components/app/CodeScanner";
+import { persistWrite } from "@/lib/offline";
 
 export const Route = createFileRoute("/_authenticated/panel")({
   head: () => pageHead("Panel", "Aylık gelir, gider ve kâr özeti."),
   component: Panel,
 });
+
+type CustomerRow = NonNullable<ReturnType<typeof useCustomers>["data"]>[number];
 
 const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
 
@@ -45,12 +49,43 @@ function Panel() {
   const customerRows = customers.data;
   const saveJob = useSaveRecord("job");
   const me = useMe();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [nearby, setNearby] = useState<{ customer: NonNullable<typeof customers.data>[number]; meters: number } | null>(null);
+  const [nearby, setNearby] = useState<{ customer: CustomerRow; meters: number } | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
   const cachedRates = readCachedRates();
   const rates = useQuery({ queryKey: ["live-currency-rates"], queryFn: () => getLiveCurrencyRates(), ...(cachedRates ? { initialData: cachedRates.value, initialDataUpdatedAt: cachedRates.savedAt } : {}), staleTime: 5 * 60_000, gcTime: 10 * 60_000, refetchInterval: 10 * 60_000, retry: 1 });
+  const rateHistory = useQuery({
+    queryKey: ["exchange-rate-history", me.data?.id], enabled: Boolean(me.data?.id), staleTime: 30_000,
+    queryFn: async () => {
+      if (!me.data?.id) return null;
+      const { data, error } = await supabase.from("work_records").select("id,created_at,payload").eq("kind", "exchange_rate").eq("owner_id", me.data.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (error) throw error;
+      return data as { id: string; created_at: string; payload: Record<string, unknown> } | null;
+    },
+  });
+  const saveRateSnapshot = useMutation({
+    mutationFn: (payload: Record<string, unknown>) => persistWrite("work_records", "insert", { owner_id: me.data?.id, kind: "exchange_rate", payload }),
+    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["exchange-rate-history", me.data?.id] }); },
+    onError: () => toast.error("Kur geçmişi güvenli biçimde kaydedilemedi."),
+  });
+  useEffect(() => {
+    if (!rates.data || !me.data?.id || !me.data.isUsta || saveRateSnapshot.isPending) return;
+    const previous = rateHistory.data;
+    const previousAt = Date.parse(String(previous?.payload.snapshot_at ?? previous?.created_at ?? ""));
+    const providerStamp = rates.data.lastUpdatedAt;
+    if (previous?.payload.provider_updated_at === providerStamp && Date.now() - previousAt < 9 * 60_000) return;
+    const tryPerUsd = Number(rates.data.rates.TRY);
+    if (!Number.isFinite(tryPerUsd) || tryPerUsd <= 0) return;
+    const payload = {
+      base: "TRY", source: "mid-market", provider_updated_at: providerStamp, snapshot_at: new Date().toISOString(),
+      usd: 1 / tryPerUsd,
+      eur: Number(rates.data.rates.EUR) / tryPerUsd,
+      gbp: Number(rates.data.rates.GBP) / tryPerUsd,
+    };
+    if ([payload.usd, payload.eur, payload.gbp].every((value) => Number.isFinite(value) && value > 0)) saveRateSnapshot.mutate(payload);
+  }, [rates.data, me.data?.id, me.data?.isUsta, rateHistory.data, saveRateSnapshot]);
   useEffect(() => {
     const on = () => setOnline(true); const off = () => setOnline(false);
     window.addEventListener("online", on); window.addEventListener("offline", off);
@@ -115,13 +150,13 @@ function Panel() {
     if (!customerRows?.length) return;
     void getPosition(5000).then((position) => {
       if (!active) return;
-      const closest = customerRows.map((customer) => { const coords = coordsOf({ lat: customer.latitude, lng: customer.longitude }); return coords ? { customer, meters: distanceMeters(position, coords) } : null; }).filter((row): row is { customer: NonNullable<typeof customers.data>[number]; meters: number } => row !== null && row.meters <= 100).sort((a, b) => a.meters - b.meters)[0] ?? null;
+      const closest = customerRows.map((customer) => { const coords = coordsOf({ lat: customer.latitude, lng: customer.longitude }); return coords ? { customer, meters: distanceMeters(position, coords) } : null; }).filter((row): row is { customer: CustomerRow; meters: number } => row !== null && row.meters <= 100).sort((a, b) => a.meters - b.meters)[0] ?? null;
       setNearby(closest);
     }).catch(() => setNearby(null));
     return () => { active = false; };
   }, [customerRows]);
 
-  function startNearbyJob(customer: NonNullable<typeof customers.data>[number]) {
+  function startNearbyJob(customer: CustomerRow) {
     const related = (txs.data ?? []).filter((tx) => tx.customer_id === customer.id);
     const risk = customerRestriction(customer, related);
     if (risk.blocked) { toast.error("Cari kilidi aktif; önce tahsilat alın."); void navigate({ to: "/cari/$id", params: { id: customer.id } }); return; }
