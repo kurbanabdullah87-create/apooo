@@ -30,7 +30,7 @@ function Settings() {
   const templates = useTemplates();
   const updateTemplate = useUpsert("message_templates");
   const save = useSaveRecord("settings");
-  const create = createServerFnHook();
+  const create = useCreateServerFn();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [form, setForm] = useState<Payload>({ business: "Saha", target: 0 });
@@ -330,7 +330,7 @@ function Settings() {
     </div>
   );
 }
-function createServerFnHook() {
+function useCreateServerFn() {
   return useServerFn(createApprentice);
 }
 function AccessibilitySettings() {

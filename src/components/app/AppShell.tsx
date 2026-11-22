@@ -53,7 +53,7 @@ export function AppShell() {
     const refresh = () => void qc.invalidateQueries();
     window.addEventListener("online", sync);
     window.addEventListener("saha-synced", refresh);
-    if (me.data) sync();
+    if (me.data?.id) sync();
     return () => { window.removeEventListener("online", sync); window.removeEventListener("saha-synced", refresh); };
   }, [me.data?.id, qc]);
   useEffect(() => {

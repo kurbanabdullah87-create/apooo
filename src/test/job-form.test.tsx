@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 import { JobFormBody } from "@/components/app/JobFormBody";
 import type { Payload, WorkRecord } from "@/lib/work";
@@ -12,7 +13,8 @@ const job = (id: string, payload: Payload): WorkRecord => ({ id, owner_id: "u", 
 
 function Harness({ jobs = [], initial = {} }: { jobs?: WorkRecord[]; initial?: Payload }) {
   const [form, setForm] = useState<Payload>({ title: "", date: "2026-11-14", ...initial });
-  return <JobFormBody form={form} onChange={setForm} customers={[]} members={[]} equipment={[eq("m1", "Motopomp", 105 * 3600), eq("m2", "Jeneratör", 10 * 3600)]} jobs={jobs} />;
+  const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
+  return <QueryClientProvider client={queryClient}><JobFormBody form={form} onChange={setForm} customers={[]} members={[]} equipment={[eq("m1", "Motopomp", 105 * 3600), eq("m2", "Jeneratör", 10 * 3600)]} jobs={jobs} /></QueryClientProvider>;
 }
 
 describe("İş formu: önce makine", () => {
