@@ -194,11 +194,11 @@ export function AppShell() {
   }
 
   return (
-    <div className="relative min-h-dvh w-full lg:pl-72">
+    <div className="relative min-h-dvh w-full min-w-0 overflow-x-clip lg:pl-72">
       <aside className="glass-sidebar fixed inset-y-4 left-4 z-40 hidden w-60 flex-col rounded-[1.8rem] p-3 lg:flex" aria-label="Ana gezinme">
         <Link to="/panel" className="flex items-center gap-3 rounded-2xl px-3 py-3 transition hover:bg-white/[0.06]">
-          <span className="flex size-10 items-center justify-center rounded-2xl bg-primary text-lg font-black text-primary-foreground shadow-lg shadow-primary/20">S</span>
-          <span className="min-w-0"><span className="block text-base font-bold tracking-tight">Saha</span><span className="block text-[11px] text-muted-foreground">Operasyon merkezi</span></span>
+          <img src="/brand-mark.svg" alt="" className="size-10 rounded-2xl shadow-lg shadow-primary/20" />
+          <span className="min-w-0"><span className="flex items-center gap-2 text-base font-bold tracking-tight">Saha <span className="rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-primary">Pro</span></span><span className="block text-[11px] text-muted-foreground">Operasyon ve finans</span></span>
         </Link>
         <div className="mx-3 my-3 h-px bg-white/10" />
         <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/75">Çalışma alanı</p>
@@ -233,10 +233,10 @@ export function AppShell() {
         </div>
       </aside>
 
-      <header className="glass-topbar sticky top-0 z-30 px-4 pb-3 pt-[max(env(safe-area-inset-top),0.75rem)] lg:mx-auto lg:max-w-[1440px] lg:px-10 lg:pt-6">
-        <div className={cn("flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.035] p-1.5 backdrop-blur-xl transition-colors duration-500 lg:rounded-[1.4rem] lg:bg-white/[0.045] lg:p-2", !isOnline && "border-destructive/30 bg-destructive/10", activeJob && "border-primary/25 bg-primary/[0.06]")}><Link to="/panel" className="mr-1 flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 font-bold text-primary lg:hidden" aria-label="Panele dön">S</Link><Button variant="ghost"
+      <header className="glass-topbar sticky top-0 z-30 px-4 pb-3 pt-[max(env(safe-area-inset-top),0.75rem)] lg:mx-auto lg:max-w-[1600px] lg:px-10 lg:pt-6">
+        <div className={cn("flex flex-wrap items-center gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.035] p-1.5 backdrop-blur-xl transition-colors duration-500 lg:flex-nowrap lg:gap-2 lg:rounded-[1.4rem] lg:bg-white/[0.045] lg:p-2", !isOnline && "border-destructive/30 bg-destructive/10", activeJob && "border-primary/25 bg-primary/[0.06]")}><Link to="/panel" className="mr-1 flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary/15 lg:hidden" aria-label="Panele dön"><img src="/brand-mark.svg" alt="" className="size-full"/></Link><Button variant="ghost"
           onClick={() => setSearchOpen(true)}
-          className="flex h-10 min-w-0 flex-1 justify-start gap-3 rounded-xl px-3 text-sm text-muted-foreground hover:bg-white/[0.06]"
+          className="flex h-10 min-w-0 basis-36 flex-1 justify-start gap-3 rounded-xl px-3 text-sm text-muted-foreground hover:bg-white/[0.06] lg:basis-auto"
         >
           <Search className="size-4" /><span className="truncate">Ara: müşteri, iş, tutar…</span><kbd className="ml-auto hidden rounded-md border border-white/10 bg-black/10 px-1.5 py-0.5 text-[10px] font-medium lg:inline-block">Ctrl K</kbd>
         </Button>{activeJob && <span className="hidden items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary sm:inline-flex" role="status"><span className="size-1.5 animate-pulse rounded-full bg-primary"/> {(() => { const seconds = Math.max(0, Math.floor((clockNow - Date.parse(String(activeJob.payload.started_at))) / 1000)); return `${String(Math.floor(seconds / 3600)).padStart(2, "0")}:${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`; })()}</span>}{isUsta&&<VoiceCommandButton onSearch={(query) => { setSearchSeed(query); setSearchOpen(true); }}/>}{isUsta&&<NotificationCenter/>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Randevular" className="rounded-xl hover:bg-white/[0.07]"><Link to="/randevu"><CalendarClock/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Hava Durumu" className="rounded-xl hover:bg-white/[0.07]"><Link to="/hava"><Cloud/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Borç ve alacak" className="rounded-xl hover:bg-white/[0.07]"><Link to="/borc"><HandCoins/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Hesap hareketleri" className="rounded-xl hover:bg-white/[0.07]"><Link to="/banka"><Landmark/></Link></Button>{isUsta&&<Button asChild variant="ghost" size="icon" title="Giderler" className="rounded-xl hover:bg-white/[0.07]"><Link to="/giderler"><Receipt/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Ayarlar" className="rounded-xl hover:bg-white/[0.07]"><Link to="/ayarlar"><Settings/></Link></Button></div>
@@ -246,7 +246,7 @@ export function AppShell() {
       </header>
 
       <main
-        className="mx-auto w-full max-w-2xl px-4 pb-32 pt-4 sm:max-w-4xl lg:max-w-[1440px] lg:px-10 lg:pb-12 lg:pt-5"
+        className="mx-auto w-full min-w-0 max-w-2xl px-4 pb-32 pt-4 sm:max-w-4xl lg:max-w-[1600px] lg:px-10 lg:pb-12 lg:pt-5"
         onTouchStart={(e) => {
           startY.current = window.scrollY <= 0 ? e.touches[0]?.clientY ?? null : null;
           const x = e.touches[0]?.clientX;

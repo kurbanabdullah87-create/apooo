@@ -14,10 +14,10 @@ export const Route = createFileRoute("/auth")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Giriş — Saha" },
+      { title: "Giriş — Saha Pro" },
       { name: "description", content: "Saha hesabına güvenli şekilde giriş yap." },
       { name: "robots", content: "noindex,nofollow" },
-      { property: "og:title", content: "Giriş — Saha" },
+      { property: "og:title", content: "Giriş — Saha Pro" },
       { property: "og:description", content: "Saha hesabına güvenli şekilde giriş yap." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -170,8 +170,8 @@ function AuthPage() {
         <aside className="relative hidden flex-col justify-between overflow-hidden px-12 py-10 lg:flex xl:px-20 xl:py-12">
           <div aria-hidden="true" className="absolute inset-8 rounded-[3rem] border border-white/[0.055]" />
           <div className="relative flex items-center gap-3">
-            <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20"><HardHat className="size-6" /></div>
-            <div><p className="text-xl font-bold tracking-tight">Saha</p><p className="text-xs text-muted-foreground">Operasyon ve finans yönetimi</p></div>
+            <img src="/brand-mark.svg" alt="" className="size-12 rounded-2xl shadow-lg shadow-primary/20" />
+            <div><p className="flex items-center gap-2 text-xl font-bold tracking-tight">Saha <span className="rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-primary">Pro</span></p><p className="text-xs text-muted-foreground">Operasyon ve finans yönetimi</p></div>
           </div>
           <div className="relative max-w-xl py-12">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/[0.08] px-3.5 py-2 text-xs font-semibold text-primary"><span className="size-1.5 rounded-full bg-primary"/>SAHA · OPERASYON VE FİNANS</div>
@@ -189,7 +189,7 @@ function AuthPage() {
         <div className="flex min-h-dvh items-center justify-center px-3 py-5 sm:px-8 sm:py-8 lg:px-10 xl:px-14">
           <section className="auth-card relative w-full max-w-[470px] overflow-hidden rounded-[1.5rem] border p-4 sm:rounded-[2rem] sm:p-9">
             <div className="relative mb-7 flex flex-col items-start gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between lg:hidden">
-              <div className="flex items-center gap-3"><div className="flex size-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground"><HardHat className="size-5" /></div><div><p className="text-lg font-bold tracking-tight">Saha</p><p className="text-xs text-muted-foreground">Operasyon ve finans</p></div></div>
+              <div className="flex items-center gap-3"><img src="/brand-mark.svg" alt="" className="size-11 rounded-2xl"/><div><p className="flex items-center gap-2 text-lg font-bold tracking-tight">Saha <span className="rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-primary">Pro</span></p><p className="text-xs text-muted-foreground">Operasyon ve finans</p></div></div>
               <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-2.5 py-1.5 text-[10px] font-medium text-emerald-300"><ShieldCheck className="size-3.5"/>Güvenli oturum</span>
             </div>
             <div className="relative mb-8 hidden items-center justify-end lg:flex"><span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-2.5 py-1.5 text-[10px] font-medium text-emerald-300"><ShieldCheck className="size-3.5"/>Güvenli oturum</span></div>
