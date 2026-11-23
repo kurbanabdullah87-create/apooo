@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Archive, Bell, CalendarDays, ChevronLeft, ChevronRight, Download, MessageCircle, Phone, Play, Plus, Search, Trash2, Undo2, Navigation } from "lucide-react";
+import { Archive, Bell, CalendarDays, ChevronLeft, ChevronRight, ContactRound, Download, MessageCircle, Phone, Play, Plus, Search, Trash2, Undo2, Navigation } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +10,7 @@ import { FormDrawer } from "@/components/app/forms/FormDrawer";
 import { JobFormBody } from "@/components/app/JobFormBody";
 import { SwipeRow } from "@/components/app/SwipeRow";
 import { useMe } from "@/hooks/use-me";
-import { useCustomers } from "@/lib/data";
+import { useCustomers, useUpsert } from "@/lib/data";
 import { customerBalance, formatDate, todayISO, type Tx } from "@/lib/finance";
 import { useMembers } from "@/lib/job-fields";
 import { persistWrite } from "@/lib/offline";
@@ -34,12 +34,15 @@ export const Route = createFileRoute("/_authenticated/randevu")({
 const STATUSES = ["Bekliyor", "Geldi", "İptal"] as const;
 const norm = (s: unknown) => String(s ?? "").toLocaleLowerCase("tr-TR").trim();
 const empty = (): Payload => ({ name: "", phone: "", date: todayISO(), time: "09:00", title: "", notes: "", status: "Bekliyor", remind: "30" });
+type DeviceContact = { name?: string[]; tel?: string[] };
+type DeviceContactsApi = { select: (properties: string[], options?: { multiple?: boolean }) => Promise<DeviceContact[]> };
 
 function Appointments() {
   const recs = useRecords("appointment");
   const customers = useCustomers();
   const transactions = useTransactions();
   const save = useSaveRecord("appointment");
+  const upsertCustomer = useUpsert("customers");
   const saveJob = useSaveRecord("job");
   const members = useMembers();
   const equipment = useRecords("equipment");
@@ -59,12 +62,17 @@ function Appointments() {
   const [now, setNow] = useState(Date.now());
   const [perm, setPerm] = useState(notifySupported() ? Notification.permission : "denied");
   const [routeOrder, setRouteOrder] = useState<string[]>([]);
+  const [contactsSupported, setContactsSupported] = useState(false);
 
   // Sayfa ilk açılınca bildirim izni iste (default ise)
   useEffect(() => {
     if (notifySupported() && Notification.permission === "default") {
       void askNotifyPermission().then(setPerm);
     }
+  }, []);
+
+  useEffect(() => {
+    setContactsSupported(typeof navigator !== "undefined" && "contacts" in navigator);
   }, []);
 
   useEffect(() => {
@@ -194,7 +202,24 @@ function Appointments() {
     setEdit((s) => s && { ...s, payload: { ...s.payload, name, customer_id: c?.id ?? null, phone: s.payload.phone || c?.phone || "" } });
   }
 
-  function submitAppointment() {
+  async function chooseDeviceContact() {
+    const contacts = (navigator as Navigator & { contacts?: DeviceContactsApi }).contacts;
+    if (!contacts) { toast.error("Bu tarayıcı rehber seçimini desteklemiyor. Telefon numarasını elle yazabilirsin."); return; }
+    try {
+      const [contact] = await contacts.select(["name", "tel"], { multiple: false });
+      if (!contact) return;
+      const name = (contact.name ?? []).filter(Boolean).join(" ").trim();
+      const phone = (contact.tel ?? []).find((value) => value.trim())?.trim() ?? "";
+      if (!name && !phone) { toast.error("Seçilen kişide ad veya telefon numarası bulunamadı."); return; }
+      setPickedName(name || phone);
+      if (phone) upd("phone", phone);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      toast.error(error instanceof Error ? `Kişi seçilemedi: ${error.message}` : "Kişi seçilemedi.");
+    }
+  }
+
+  async function submitAppointment() {
     if (!edit) return;
     const p = edit.payload;
     if (!norm(p.name)) return void toast.error("İsim gerekli");
@@ -209,7 +234,28 @@ function Appointments() {
         if (schedule?.open && schedule.start && schedule.end && (timeValue < schedule.start || timeValue >= schedule.end)) return void toast.error(`Randevu saati çalışma aralığı dışında (${schedule.start}–${schedule.end}).`);
       } catch { return void toast.error("Çalışma saatleri ayarı okunamadı. Ayarlar bölümünden düzeltin."); }
     }
-    const selectedCustomer = (customers.data ?? []).find((customer) => customer.id === p.customer_id);
+    let selectedCustomer = (customers.data ?? []).find((customer) => customer.id === p.customer_id);
+    const normalizePhone = (value: unknown) => {
+      const digits = String(value ?? "").replace(/\D/g, "");
+      if (digits.startsWith("90") && digits.length === 12) return `0${digits.slice(2)}`;
+      if (digits.length === 10) return `0${digits}`;
+      return digits;
+    };
+    if (!selectedCustomer) selectedCustomer = (customers.data ?? []).find((customer) => norm(customer.name) === norm(p.name) || (normalizePhone(p.phone) && normalizePhone(customer.phone) === normalizePhone(p.phone)));
+    if (!selectedCustomer && (customers.isLoading || customers.isError)) { toast.error(customers.isLoading ? "Cari listesi yükleniyor. Mükerrer kişi oluşturmamak için bir kez daha bekleyip kaydet." : "Cari listesi yüklenemedi. Mükerrer kişi oluşturmamak için randevuyu kaydetmedim; bağlantıyı yenileyip tekrar dene."); return; }
+    if (!selectedCustomer) {
+      const id = crypto.randomUUID();
+      const phone = String(p.phone ?? "").trim();
+      try {
+        const address = String(p.address ?? "").trim() || null;
+        await upsertCustomer.mutateAsync({ id, name: String(p.name).trim(), phone: phone || null, address, notes: "Randevu oluşturulurken otomatik açılan cari kart.", rating: null, credit_limit: 0, payment_due_days: 15, is_blocked: false, latitude: null, longitude: null });
+        selectedCustomer = { id, name: String(p.name).trim(), phone: phone || null, address, rating: null, notes: "Randevu oluşturulurken otomatik açılan cari kart.", credit_limit: 0, payment_due_days: 15, is_blocked: false, latitude: null, longitude: null, created_at: new Date().toISOString() };
+      } catch (error) {
+        toast.error(error instanceof Error ? `Cari kartı oluşturulamadı: ${error.message}` : "Cari kartı oluşturulamadı; randevu kaydedilmedi.");
+        return;
+      }
+    }
+    const appointment = { ...edit, payload: { ...p, customer_id: selectedCustomer.id, phone: String(p.phone || selectedCustomer.phone || "") } };
     const customerTxs = (transactions.data ?? []).filter((tx) => tx.customer_id === selectedCustomer?.id);
     const credit = selectedCustomer ? customerRestriction(selectedCustomer, customerTxs) : null;
     if (credit?.blocked && !String(p.override_reason ?? "").trim()) return void toast.error("Cari kilitli. Tahsilat alın veya yönetici istisna gerekçesini yazın.");
@@ -217,7 +263,7 @@ function Appointments() {
       (r) => r.id !== edit.id && !r.payload.archived && r.payload.status === "Bekliyor" && r.payload.date === p.date && r.payload.time === p.time,
     );
     if (clash) toast.warning(`Aynı saatte ${String(clash.payload.name)} ile randevu var.`);
-    save.mutate(edit, { onSuccess: () => setEdit(null) });
+    save.mutate(appointment, { onSuccess: () => setEdit(null) });
   }
 
   function openStartJob(a: WorkRecord) {
@@ -466,12 +512,13 @@ function Appointments() {
         <p className="py-8 text-center text-muted-foreground">{q ? "Bu isimle randevu bulunamadı." : view === "archive" ? "Arşiv boş." : view === "day" ? "Bu gün için randevu yok." : "Randevu yok."}</p>
       )}
 
-      <FormDrawer open={!!edit} onOpenChange={(o) => !o && setEdit(null)} title={edit?.id ? "Randevuyu düzenle" : "Yeni randevu"} busy={save.isPending} onSubmit={submitAppointment}>
+      <FormDrawer open={!!edit} onOpenChange={(o) => !o && setEdit(null)} title={edit?.id ? "Randevuyu düzenle" : "Yeni randevu"} busy={save.isPending || upsertCustomer.isPending} onSubmit={submitAppointment}>
         {edit && (
           <>
             <div className="space-y-2">
               <Label htmlFor="ap-name">İsim</Label>
-              <Input id="ap-name" required list="ap-customers" autoComplete="off" value={String(edit.payload.name ?? "")} onChange={(e) => setPickedName(e.target.value)} />
+              <div className="flex gap-2"><Input id="ap-name" required list="ap-customers" autoComplete="off" value={String(edit.payload.name ?? "")} onChange={(e) => setPickedName(e.target.value)} /><Button type="button" variant="outline" className="shrink-0" onClick={() => void chooseDeviceContact()}><ContactRound className="size-4"/>Rehber</Button></div>
+              {!contactsSupported && <p className="text-xs text-muted-foreground">Bu tarayıcı cihaz rehberi seçimini desteklemiyor. Android Chrome’da rehber penceresi açılır; burada numarayı elle yazabilir veya kayıtlı carilerden seçebilirsin.</p>}
               <datalist id="ap-customers">
                 {(customers.data ?? []).map((c) => (
                   <option key={c.id} value={c.name} />

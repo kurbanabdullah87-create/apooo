@@ -131,7 +131,68 @@ export function CreditCardInstallments() {
 
       {nextDues.length > 0 && <section className="rounded-2xl border border-amber-300/70 bg-amber-50/60 p-4 dark:bg-amber-950/20"><div className="flex gap-3"><BellRing className="mt-0.5 size-5 shrink-0 text-amber-600"/><div className="min-w-0 flex-1"><h3 className="font-semibold">Yaklaşan kart taksitleri</h3><div className="mt-2 space-y-2">{nextDues.slice(0, 5).map(({ p, row }) => <div key={`${p.id}:${row.no}`} className="flex justify-between gap-2 text-sm"><span className="truncate">{p.name} · {row.no}/{payload<PlanPayload>(p).count} · {dateLabel(row.due_on)}</span><strong className="shrink-0">{money(remaining(row))}</strong></div>)}</div></div></div></section>}
 
-      <section className="space-y-3"><div className="flex items-center justify-between"><h3 className="font-semibold">Kartlar</h3>{cards.length === 0 && <Button variant="ghost" size="sm" onClick={() => setCardOpen(true)}>İlk kartı ekle</Button>}</div>{cards.map((card) => { const c = payload<CardPayload>(card); const cardPlans = plans.filter((p) => p.card_id === card.id); const used = cardPlans.reduce((sum, p) => sum + outstanding(p), 0); return <div key={card.id} className="rounded-2xl border bg-card p-4"><div className="flex items-start gap-3"><span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><CreditCard className="size-5"/></span><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><div><p className="font-semibold">{card.name}</p><p className="text-xs text-muted-foreground">{c.bank} · •••• {c.last4} · {c.card_type === "business" ? "Ticari kart" : "Kredi kartı"}</p></div><strong className="text-sm">{money(c.limit - used)} kullanılabilir</strong></div><div className="mt-3 grid grid-cols-3 gap-2 text-xs"><div><p className="text-muted-foreground">Limit</p><strong>{money(c.limit)}</strong></div><div><p className="text-muted-foreground">Plan bakiyesi</p><strong>{money(used)}</strong></div><div><p className="text-muted-foreground">Ekstre / son ödeme</p><strong>{c.statement_day} / {c.due_day}</strong></div></div>{c.annual_rate > 0 && <p className="mt-2 text-xs text-muted-foreground">Kart yıllık akdi faiz oranı: %{c.annual_rate}</p>}{c.notes && <p className="mt-2 text-xs text-muted-foreground">{c.notes}</p>}</div></div><div className="mt-3 flex justify-end"><Button variant="ghost" size="sm" className="text-destructive" onClick={() => { if (window.confirm(`${card.name} kartı silinsin mi?`)) deleteRecord.mutate(card); }}><Trash2 className="mr-1 size-3.5"/>Kartı sil</Button></div></div>; })}</section>
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold">Kartlar</h3>
+          {cards.length === 0 && <Button variant="ghost" size="sm" onClick={() => setCardOpen(true)}>İlk kartı ekle</Button>}
+        </div>
+        <div className="space-y-3">
+          {cards.map((card) => {
+            const c = payload<CardPayload>(card);
+            const cardPlans = plans.filter((plan) => plan.card_id === card.id);
+            const used = cardPlans.reduce((sum, plan) => sum + outstanding(plan), 0);
+            const utilization = c.limit > 0 ? Math.min(100, Math.max(0, (used / c.limit) * 100)) : 0;
+            const thisMonthDue = roundMoney(cardPlans.reduce(
+              (sum, plan) => sum + schedules(plan).filter((row) => row.due_on.startsWith(today.slice(0, 7))).reduce((part, row) => part + remaining(row), 0),
+              0,
+            ));
+            const nextDue = cardPlans
+              .flatMap((plan) => schedules(plan).filter((row) => remaining(row) > 0).map((row) => ({ row, item: plan.name })))
+              .sort((a, b) => a.row.due_on.localeCompare(b.row.due_on))[0];
+
+            return (
+              <article key={card.id} className="rounded-2xl border bg-card p-4">
+                <div className="flex items-start gap-3">
+                  <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><CreditCard className="size-5" /></span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold">{card.name}</p>
+                        <p className="text-xs text-muted-foreground">{c.bank} · •••• {c.last4} · {c.card_type === "business" ? "Ticari kart" : "Kredi kartı"}</p>
+                      </div>
+                      <strong className="text-right text-sm">{money(c.limit - used)}<span className="block text-[10px] font-normal text-muted-foreground">planlara göre kullanılabilir</span></strong>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                      <div className="rounded-xl bg-muted/60 p-2"><p className="text-muted-foreground">Limit</p><strong>{money(c.limit)}</strong></div>
+                      <div className="rounded-xl bg-muted/60 p-2"><p className="text-muted-foreground">Kayıtlı plan bakiyesi</p><strong>{money(used)}</strong></div>
+                      <div className="rounded-xl bg-muted/60 p-2"><p className="text-muted-foreground">Bu ay planlanan taksit</p><strong>{money(thisMonthDue)}</strong></div>
+                      <div className="rounded-xl bg-muted/60 p-2"><p className="text-muted-foreground">Ekstre / son ödeme günü</p><strong>{c.statement_day} / {c.due_day}</strong></div>
+                    </div>
+                    <div className="mt-3">
+                      <div className="flex justify-between text-[11px]"><span className="text-muted-foreground">Kaydedilmiş taksit planı kullanım oranı</span><strong>%{utilization.toFixed(0)}</strong></div>
+                      <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label={card.name + " kart kullanım oranı"} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(utilization)}>
+                        <div className={"h-full rounded-full transition-[width] " + (utilization >= 80 ? "bg-amber-500" : "bg-primary")} style={{ width: utilization + "%" }} />
+                      </div>
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {nextDue ? (nextDue.row.due_on < today ? "Gecikmiş vade: " : "Sıradaki vade: ") + dateLabel(nextDue.row.due_on) + " · " + nextDue.item + " · " + money(remaining(nextDue.row)) : "Açık taksit planı vadesi yok."}
+                      {" "}· Plan kullanımı ekstre bakiyesi değildir; banka ekstresiyle ayrıca karşılaştır.
+                    </p>
+                    {used > c.limit && <p role="alert" className="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-300">Kayıtlı taksit planları kart limitini {money(used - c.limit)} aşıyor.</p>}
+                    {c.annual_rate > 0 && <p className="mt-2 text-xs text-muted-foreground">Kart yıllık akdi faiz oranı: %{c.annual_rate}</p>}
+                    {c.notes && <p className="mt-2 text-xs text-muted-foreground">{c.notes}</p>}
+                  </div>
+                </div>
+                <div className="mt-3 flex justify-end">
+                  <Button variant="ghost" size="sm" className="text-destructive" onClick={() => { if (window.confirm(card.name + " kartı silinsin mi?")) deleteRecord.mutate(card); }}>
+                    <Trash2 className="mr-1 size-3.5" />Kartı sil
+                  </Button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
 
       <section className="space-y-3"><h3 className="font-semibold">Alışveriş ve taksit planları</h3>{plans.length === 0 ? <div className="rounded-2xl border border-dashed p-7 text-center"><ReceiptText className="mx-auto size-8 text-muted-foreground"/><p className="mt-2 font-medium">Henüz kart taksiti yok</p><p className="mt-1 text-sm text-muted-foreground">Kart ekledikten sonra makine, ekipman veya diğer alışverişlerini taksit planına dönüştür.</p></div> : plans.map((plan) => { const p = payload<PlanPayload>(plan); const rows = p.schedule ?? []; const openRows = rows.filter((r) => remaining(r) > 0); const next = openRows[0]; const isOpen = expanded === plan.id; return <article key={plan.id} className="overflow-hidden rounded-2xl border bg-card"><button className="w-full p-4 text-left" onClick={() => setExpanded(isOpen ? null : plan.id)}><div className="flex items-start gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600"><Banknote className="size-5"/></span><span className="min-w-0 flex-1"><span className="flex justify-between gap-2"><strong className="truncate">{plan.name}</strong><strong className="shrink-0">{money(outstanding(plan))}</strong></span><span className="mt-1 block truncate text-xs text-muted-foreground">{p.bank} {p.card_name} · •••• {p.last4}{p.merchant ? ` · ${p.merchant}` : ""}</span><span className="mt-2 flex flex-wrap gap-x-3 text-xs text-muted-foreground"><span>{p.count} taksit</span><span>{money(p.total_repayment)} toplam geri ödeme</span><span>{next ? `Sıradaki ${dateLabel(next.due_on)}` : "Tamamlandı"}</span></span></span></div></button>{isOpen && <div className="space-y-3 border-t p-4"><div className="grid grid-cols-2 gap-2 rounded-xl bg-muted/50 p-3 text-xs sm:grid-cols-3"><div><p className="text-muted-foreground">İşlem tarihi</p><strong>{dateLabel(p.purchase_date)}</strong></div><div><p className="text-muted-foreground">Nakit fiyatı</p><strong>{money(p.cash_price)}</strong></div><div><p className="text-muted-foreground">Karttan çekilen</p><strong>{money(p.purchase_total)}</strong></div><div><p className="text-muted-foreground">Peşinat</p><strong>{money(p.down_payment)}</strong></div><div><p className="text-muted-foreground">Faiz / ücret toplamı</p><strong>{money(p.total_interest + p.total_fees)}</strong></div><div><p className="text-muted-foreground">Kategori / satıcı</p><strong>{p.category}{p.merchant ? ` · ${p.merchant}` : ""}</strong></div><div><p className="text-muted-foreground">Taksit faiz oranı</p><strong>Aylık %{p.monthly_rate}</strong></div><div><p className="text-muted-foreground">İlk vade / referans</p><strong>{dateLabel(p.first_due)}{p.reference ? ` · ${p.reference}` : ""}</strong></div></div>{p.notes && <p className="rounded-xl border p-3 text-xs text-muted-foreground">Not: {p.notes}</p>}<div className="space-y-2"><h4 className="text-xs font-semibold text-muted-foreground">TAKSİT PLANI</h4>{rows.map((row) => <div key={row.no} className="flex items-center gap-2 rounded-xl bg-muted/50 p-3"><CalendarClock className={`size-4 shrink-0 ${remaining(row) === 0 ? "text-emerald-600" : row.due_on < todayISO() ? "text-destructive" : "text-muted-foreground"}`}/><div className="min-w-0 flex-1"><p className="text-sm font-medium">{row.no}. taksit · {money(row.total)}</p><p className="text-xs text-muted-foreground">{dateLabel(row.due_on)} · anapara {money(row.principal)} · faiz {money(row.interest)} · ücret {money(row.fee)}{row.paid > 0 ? ` · ${money(row.paid)} ödendi` : ""}{row.due_on < todayISO() && remaining(row) > 0 ? " · Gecikmiş" : ""}</p></div>{remaining(row) > 0 ? <Button size="sm" variant="outline" onClick={() => { setPaymentPlan({ record: plan, row }); setPayForm({ amount: String(remaining(row)), paid_on: todayISO(), method: "Banka havalesi", account: "", reference: "", note: "" }); }}>Ödeme gir</Button> : <Check className="size-4 text-emerald-600"/>}</div>)}</div>{(p.payments ?? []).length > 0 && <div className="rounded-xl border p-3"><h4 className="mb-2 flex items-center gap-2 text-xs font-semibold text-muted-foreground"><FileText className="size-3.5"/>ÖDEME GEÇMİŞİ</h4>{p.payments.map((payment) => <div key={payment.id} className="flex flex-wrap justify-between gap-x-2 border-t py-2 text-xs"><span>{dateLabel(payment.paid_on)} · {payment.installment_no}. taksit · {payment.method}{payment.account ? ` · ${payment.account}` : ""}{payment.reference ? ` · Ref ${payment.reference}` : ""}{payment.note ? ` · ${payment.note}` : ""}</span><strong>{money(payment.amount)}</strong></div>)}</div>}<div className="flex justify-end"><Button variant="ghost" size="sm" className="text-destructive" onClick={() => { if (window.confirm(`${plan.name} taksit planı ve ödeme geçmişi silinsin mi?`)) deleteRecord.mutate(plan); }}><Trash2 className="mr-1 size-3.5"/>Planı sil</Button></div></div>}</article>; })}</section>
     </>}

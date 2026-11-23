@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { MapPin, Star } from "lucide-react";
+import { ContactRound, MapPin, Star } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,10 +10,31 @@ import { cn } from "@/lib/utils";
 import { getPosition } from "@/lib/geo";
 import { FormDrawer } from "./FormDrawer";
 
+type DeviceContact = { name?: string[]; tel?: string[]; address?: string[] };
+type DeviceContactsApi = { select: (properties: string[], options?: { multiple?: boolean }) => Promise<DeviceContact[]> };
+
 export function CustomerForm({ open, onOpenChange, customer }: { open: boolean; onOpenChange: (o: boolean) => void; customer?: Customer }) {
   const [f, setF] = useState({ name: "", phone: "", address: "", notes: "", rating: 0, credit_limit: 0, payment_due_days: 15, is_blocked: false, latitude: null as number | null, longitude: null as number | null });
   const [locating, setLocating] = useState(false);
   const upsert = useUpsert("customers");
+
+  async function importContact() {
+    const contacts = (navigator as Navigator & { contacts?: DeviceContactsApi }).contacts;
+    if (!contacts) { toast.error("Bu tarayıcı rehber seçimini desteklemiyor. Ad ve telefonu elle yazabilirsin."); return; }
+    try {
+      const [contact] = await contacts.select(["name", "tel", "address"], { multiple: false });
+      if (!contact) return;
+      setF((current) => ({ ...current,
+        name: (contact.name ?? []).filter(Boolean).join(" ").trim() || current.name,
+        phone: (contact.tel ?? []).find((value) => value.trim())?.trim() || current.phone,
+        address: (contact.address ?? []).find((value) => value.trim())?.trim() || current.address,
+      }));
+      toast.success("Rehber bilgileri forma aktarıldı.");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      toast.error(error instanceof Error ? `Kişi seçilemedi: ${error.message}` : "Kişi seçilemedi.");
+    }
+  }
 
   useEffect(() => {
     if (open)
@@ -58,7 +79,7 @@ export function CustomerForm({ open, onOpenChange, customer }: { open: boolean; 
       }}
     >
       <div className="space-y-2">
-        <Label>Ad Soyad / Firma</Label>
+        <div className="flex items-center justify-between gap-2"><Label>Ad Soyad / Firma</Label><Button type="button" variant="outline" size="sm" onClick={() => void importContact()}><ContactRound className="size-4"/>Rehberden al</Button></div>
         <Input className="h-12" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
       </div>
       <div className="space-y-2">

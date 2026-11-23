@@ -46,10 +46,12 @@ type BankVault = { accounts: BankAccountOption[]; transactions: BankMovement[]; 
 type EncryptedVault = { version: 1; salt: string; iv: string; ciphertext: string };
 type EncryptedVaultBackup = { format: "saha-encrypted-bank-vault"; version: 1; createdAt: string; vault: EncryptedVault };
 type EncryptedBiometricPassphrase = { credentialId: string; prfSalt: string; iv: string; ciphertext: string };
+type RememberedPassphrase = { key: CryptoKey; iv: string; ciphertext: string };
 
 const PBKDF2_ITERATIONS = 600_000;
 const vaultKey = (ownerId: string) => `saha-bank-vault-v1:${ownerId}`;
 const biometricVaultKey = (ownerId: string) => `saha-bank-vault-biometric-v1:${ownerId}`;
+const rememberedVaultKey = (ownerId: string) => `saha-bank-vault-remembered-v1:${ownerId}`;
 const vaultLockDurationKey = (ownerId: string) => `saha-bank-vault-lock-duration-v1:${ownerId}`;
 const keyCache = new Map<string, CryptoKey>();
 const utf8 = new TextEncoder();
@@ -122,6 +124,17 @@ async function enableBiometricVault(ownerId: string, passphrase: string) {
 async function deriveKey(passphrase: string, salt: Uint8Array) {
   const material = await crypto.subtle.importKey("raw", utf8.encode(passphrase), "PBKDF2", false, ["deriveKey"]);
   return crypto.subtle.deriveKey({ name: "PBKDF2", salt: Uint8Array.from(salt).buffer, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" }, material, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+}
+
+async function rememberPassphrase(ownerId: string, passphrase: string) {
+  const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: vaultAad(ownerId) }, key, utf8.encode(passphrase));
+  await set(rememberedVaultKey(ownerId), { key, iv: bytesToBase64(iv), ciphertext: bytesToBase64(new Uint8Array(ciphertext)) } satisfies RememberedPassphrase);
+}
+
+async function forgetPassphrase(ownerId: string) {
+  await del(rememberedVaultKey(ownerId));
 }
 
 async function encryptVault(ownerId: string, passphrase: string, vault: BankVault) {
@@ -226,13 +239,35 @@ export function useBankVault(ownerId: string | null | undefined) {
   const [exists, setExists] = useState<boolean | null>(null);
   const [unlocked, setUnlocked] = useState(false);
   const [biometricReady, setBiometricReady] = useState(false);
+  const [rememberReady, setRememberReady] = useState(false);
   const [lockDurationMinutes, setLockDurationMinutesState] = useState<1 | 5 | 10>(5);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let active = true;
     setExists(null);
     setUnlocked(false);
-    if (ownerId) void get<EncryptedVault>(vaultKey(ownerId)).then((saved) => { if (active) setExists(Boolean(saved)); });
+    setRememberReady(false);
+    if (ownerId) void get<EncryptedVault>(vaultKey(ownerId)).then(async (saved) => {
+      if (!active) return;
+      if (!saved) { setExists(false); return; }
+      let remembered: RememberedPassphrase | undefined;
+      try { remembered = await get<RememberedPassphrase>(rememberedVaultKey(ownerId)); }
+      catch { if (active) setExists(true); return; }
+      if (!active) return;
+      setRememberReady(Boolean(remembered));
+      if (remembered) {
+        try {
+          const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: base64ToBytes(remembered.iv), additionalData: vaultAad(ownerId) }, remembered.key, base64ToBytes(remembered.ciphertext));
+          await decryptVault(ownerId, decoder.decode(plaintext), saved);
+          if (active) setUnlocked(true);
+        } catch {
+          await forgetPassphrase(ownerId);
+          keyCache.delete(ownerId);
+          if (active) setRememberReady(false);
+        }
+      }
+      if (active) setExists(true);
+    }).catch(() => { if (active) setExists(false); });
     else setExists(false);
     return () => { active = false; if (ownerId) { keyCache.delete(ownerId); clearBankQueryData(queryClient, ownerId); } };
   }, [ownerId, queryClient]);
@@ -319,6 +354,37 @@ export function useBankVault(ownerId: string | null | undefined) {
     } finally { setBusy(false); }
   }
 
+  async function enableRememberDevice(passphrase: string) {
+    if (!ownerId) throw new Error("Oturum gerekli.");
+    const encrypted = await get<EncryptedVault>(vaultKey(ownerId));
+    if (!encrypted) throw new Error("Bu cihazda şifreli kasa bulunamadı.");
+    await decryptVault(ownerId, passphrase, encrypted);
+    await rememberPassphrase(ownerId, passphrase);
+    setRememberReady(true);
+    setUnlocked(true);
+  }
+
+  async function unlockRemembered() {
+    if (!ownerId) throw new Error("Oturum gerekli.");
+    const [encrypted, remembered] = await Promise.all([get<EncryptedVault>(vaultKey(ownerId)), get<RememberedPassphrase>(rememberedVaultKey(ownerId))]);
+    if (!encrypted || !remembered) throw new Error("Bu cihaz için hatırlanan kasa anahtarı bulunamadı.");
+    setBusy(true);
+    try {
+      const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: base64ToBytes(remembered.iv), additionalData: vaultAad(ownerId) }, remembered.key, base64ToBytes(remembered.ciphertext));
+      await decryptVault(ownerId, decoder.decode(plaintext), encrypted);
+      setUnlocked(true);
+    } catch {
+      await forgetPassphrase(ownerId);
+      setRememberReady(false);
+      throw new Error("Cihaz anahtarı açılamadı. Kasa parolanı kullanarak yeniden hatırlatabilirsin.");
+    } finally { setBusy(false); }
+  }
+
+  async function disableRememberDevice() {
+    if (ownerId) await forgetPassphrase(ownerId);
+    setRememberReady(false);
+  }
+
   async function enableBiometric(passphrase: string) {
     if (!ownerId) throw new Error("Oturum gerekli.");
     setBusy(true);
@@ -342,11 +408,15 @@ export function useBankVault(ownerId: string | null | undefined) {
   async function erase() {
     if (ownerId) keyCache.delete(ownerId);
     if (ownerId) await del(vaultKey(ownerId));
+    if (ownerId) await del(biometricVaultKey(ownerId));
+    if (ownerId) await forgetPassphrase(ownerId);
     setExists(false);
     setUnlocked(false);
+    setBiometricReady(false);
+    setRememberReady(false);
     if (ownerId) clearBankQueryData(queryClient, ownerId);
   }
-  return { exists, unlocked, busy, biometricReady, lockDurationMinutes, setLockDurationMinutes, create, unlock, unlockBiometric, enableBiometric, disableBiometric, lock, erase };
+  return { exists, unlocked, busy, biometricReady, rememberReady, lockDurationMinutes, setLockDurationMinutes, create, unlock, unlockBiometric, unlockRemembered, enableBiometric, disableBiometric, enableRememberDevice, disableRememberDevice, lock, erase };
 }
 
 /** One-time user-triggered migration: encrypt legacy cloud rows locally, verify write, then delete plaintext cloud rows. */

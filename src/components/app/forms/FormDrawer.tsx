@@ -27,7 +27,7 @@ export function FormDrawer({
 }) {
   return (
     <Drawer open={open} onOpenChange={onOpenChange} repositionInputs={false}>
-      <DrawerContent className="flex max-h-[92dvh] flex-col">
+      <DrawerContent className="mx-auto flex max-h-[92dvh] w-full max-w-3xl flex-col rounded-t-3xl">
         <DrawerHeader>
           <DrawerTitle>{title}</DrawerTitle>
         </DrawerHeader>

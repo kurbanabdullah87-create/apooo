@@ -163,7 +163,7 @@ async function gmailGet<T>(url: string, token: string): Promise<T> {
       if (["insufficientPermissions", "PERMISSION_DENIED"].includes(reason)) throw new Error("Google hesabı Gmail okuma iznini vermemiş. Google hesabındaki Saha iznini kaldırıp banka ekranından yeniden onayla.");
       if (["userRateLimitExceeded", "rateLimitExceeded", "quotaExceeded"].includes(reason)) throw new Error("Google Gmail API kullanım sınırına ulaşıldı. Bir süre bekleyip yeniden dene.");
       if (reason === "domainPolicy") throw new Error("Google Workspace yöneticin bu uygulamanın Gmail erişimini engelliyor. Yönetici izin vermeli.");
-      throw new Error(`Google Gmail erişimini reddetti (${reason || "403"}). Gmail API etkinliğini, OAuth izin kapsamını ve hesabın test listesinde olup olmadığını kontrol et.`);
+      throw new Error(`Google Gmail erişimini reddetti (${reason || "403"}). gmail.readonly izni kısıtlı bir Google kapsamıdır ve uygulama doğrulaması tamamlanmamışsa kullanıcı veya erişim sınırına takılabilir. Google Cloud → Google Auth Platform → Verification Center bölümündeki durumu kontrol et; Workspace hesabı kullanıyorsan yöneticinin uygulamaya izin verdiğinden emin ol.`);
     }
     if (response.status === 404) throw new Error("Google hesabında istenen Gmail iletisi bulunamadı. Tarama sorgusunu yeniden çalıştır.");
     throw new Error(`Gmail iletileri alınamadı (HTTP ${response.status}). Bağlantıyı kontrol edip yeniden dene.`);
