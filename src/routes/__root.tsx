@@ -67,8 +67,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { title: "Saha — İş ve saha operasyon yönetimi" },
+      { title: "Saha Pro — İş ve saha operasyon yönetimi" },
       { name: "description", content: "İş, cari hesap, tahsilat, gider, randevu ve çalışma kayıtlarını tek uygulamada yönetin." },
+      { name: "google-site-verification", content: "3w2g6b0ygNJJ2_LvRGSLAWwnZt_h2XWU2nt3pEVm7Io" },
       { name: "theme-color", content: "#000000" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
