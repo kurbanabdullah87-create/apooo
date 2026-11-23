@@ -1,6 +1,6 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { ArrowRight, BarChart3, Check, HardHat, Loader2, LockKeyhole, Mail, ShieldCheck, Sparkles, UsersRound, Eye, EyeOff, CalendarDays, WalletCards } from "lucide-react";
+import { ArrowRight, BarChart3, Check, HardHat, Loader2, LockKeyhole, Mail, ShieldCheck, UsersRound, Eye, EyeOff, CalendarDays, WalletCards } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -163,24 +163,23 @@ function AuthPage() {
   }
 
   return (
-    <main className="relative isolate min-h-dvh overflow-hidden bg-[#07090c] text-foreground selection:bg-primary/30">
-      <div aria-hidden="true" className="pointer-events-none absolute -left-48 -top-56 size-[38rem] rounded-full bg-primary/[0.13] blur-[125px]" />
-      <div aria-hidden="true" className="pointer-events-none absolute -bottom-72 right-[-8rem] size-[42rem] rounded-full bg-sky-500/[0.08] blur-[145px]" />
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.018)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.018)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:linear-gradient(to_bottom,black,transparent_80%)]" />
+    <main className="auth-shell relative isolate min-h-dvh overflow-hidden bg-background text-foreground selection:bg-primary/30">
+      <div aria-hidden="true" className="auth-orbit pointer-events-none absolute -left-48 -top-56 size-[38rem] rounded-full" />
+      <div aria-hidden="true" className="auth-orbit auth-orbit-secondary pointer-events-none absolute -bottom-72 right-[-8rem] size-[42rem] rounded-full" />
       <div className="relative mx-auto grid min-h-dvh w-full max-w-[1480px] lg:grid-cols-[minmax(0,1.08fr)_minmax(430px,0.92fr)]">
         <aside className="relative hidden flex-col justify-between overflow-hidden px-12 py-10 lg:flex xl:px-20 xl:py-12">
-          <div aria-hidden="true" className="absolute inset-8 rounded-[3rem] border border-white/[0.045]" />
+          <div aria-hidden="true" className="absolute inset-8 rounded-[3rem] border border-white/[0.055]" />
           <div className="relative flex items-center gap-3">
             <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20"><HardHat className="size-6" /></div>
             <div><p className="text-xl font-bold tracking-tight">Saha</p><p className="text-xs text-muted-foreground">Operasyon ve finans yönetimi</p></div>
           </div>
           <div className="relative max-w-xl py-12">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/[0.08] px-3.5 py-2 text-xs font-semibold text-primary"><Sparkles className="size-3.5"/>SAHA · OPERASYON VE FİNANS</div>
-            <h2 className="font-display text-5xl font-bold leading-[1.06] tracking-tight xl:text-[4.25rem]">İşin sahada.<br/><span className="bg-gradient-to-r from-primary via-emerald-200 to-cyan-200 bg-clip-text text-transparent">Kontrolün sende.</span></h2>
-            <p className="mt-6 max-w-lg text-base leading-7 text-slate-300">İşlerini, müşterilerini ve günlük finansını tek bir sade çalışma alanında yönet. Günün yoğunluğunda aradığın bilgi hep elinin altında olsun.</p>
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/[0.08] px-3.5 py-2 text-xs font-semibold text-primary"><span className="size-1.5 rounded-full bg-primary"/>SAHA · OPERASYON VE FİNANS</div>
+            <h2 className="font-display text-5xl font-semibold leading-[1.08] tracking-[-0.045em] xl:text-[4.25rem]">İşin sahada.<br/><span className="text-primary">Düzenin yanında.</span></h2>
+            <p className="mt-6 max-w-lg text-base leading-7 text-slate-300">İşlerini, müşterilerini ve günlük finansını tek bir sakin çalışma alanında yönet. Günün yoğunluğunda aradığın bilgi hep elinin altında olsun.</p>
             <div className="mt-9 grid max-w-lg grid-cols-2 gap-3">
-              <div className="group rounded-2xl border border-white/[0.09] bg-gradient-to-br from-white/[0.065] to-white/[0.02] p-4 shadow-xl shadow-black/10 backdrop-blur transition hover:border-primary/25"><div className="flex size-10 items-center justify-center rounded-xl border border-primary/15 bg-primary/10 text-primary"><UsersRound className="size-4.5"/></div><p className="mt-4 text-sm font-semibold">Müşteri ve işler</p><p className="mt-1 text-xs leading-5 text-slate-400">Cari hareketler, iş geçmişi ve saha takibi</p></div>
-              <div className="group rounded-2xl border border-white/[0.09] bg-gradient-to-br from-white/[0.065] to-white/[0.02] p-4 shadow-xl shadow-black/10 backdrop-blur transition hover:border-sky-400/25"><div className="flex size-10 items-center justify-center rounded-xl border border-sky-400/15 bg-sky-400/10 text-sky-300"><BarChart3 className="size-4.5"/></div><p className="mt-4 text-sm font-semibold">Finans ve raporlar</p><p className="mt-1 text-xs leading-5 text-slate-400">Tahsilat, gider, yevmiye ve dönem özeti</p></div>
+              <div className="auth-feature-card rounded-2xl border border-white/[0.09] p-4"><div className="flex size-10 items-center justify-center rounded-xl border border-primary/15 bg-primary/10 text-primary"><UsersRound className="size-4.5"/></div><p className="mt-4 text-sm font-semibold">Müşteri ve işler</p><p className="mt-1 text-xs leading-5 text-slate-400">Cari hareketler, iş geçmişi ve saha takibi</p></div>
+              <div className="auth-feature-card rounded-2xl border border-white/[0.09] p-4"><div className="flex size-10 items-center justify-center rounded-xl border border-amber-300/15 bg-amber-300/10 text-amber-200"><BarChart3 className="size-4.5"/></div><p className="mt-4 text-sm font-semibold">Finans ve raporlar</p><p className="mt-1 text-xs leading-5 text-slate-400">Tahsilat, gider, yevmiye ve dönem özeti</p></div>
             </div>
             <div className="mt-5 flex max-w-lg items-center gap-3 rounded-2xl border border-white/[0.08] bg-black/20 px-4 py-3"><div className="flex -space-x-2"><span className="flex size-8 items-center justify-center rounded-full border-2 border-[#101419] bg-primary/15 text-primary"><CalendarDays className="size-3.5"/></span><span className="flex size-8 items-center justify-center rounded-full border-2 border-[#101419] bg-sky-400/15 text-sky-300"><WalletCards className="size-3.5"/></span></div><p className="text-xs leading-5 text-slate-300">Takviminden hesap hareketlerine kadar<br/><strong className="font-semibold text-white">günlük iş akışın tek yerde.</strong></p><span className="ml-auto hidden rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-2.5 py-1 text-[10px] font-medium text-emerald-300 xl:inline-flex">Saha için tasarlandı</span></div>
           </div>
@@ -188,11 +187,9 @@ function AuthPage() {
         </aside>
 
         <div className="flex min-h-dvh items-center justify-center px-3 py-5 sm:px-8 sm:py-8 lg:px-10 xl:px-14">
-          <section className="relative w-full max-w-[470px] overflow-hidden rounded-[1.5rem] border border-white/[0.11] bg-[#101419]/95 p-4 shadow-[0_40px_120px_-35px_rgba(0,0,0,0.95)] backdrop-blur-2xl sm:rounded-[2rem] sm:p-9">
-            <div aria-hidden="true" className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-primary to-cyan-300/70" />
-            <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-28 size-64 rounded-full bg-primary/[0.08] blur-3xl" />
+          <section className="auth-card relative w-full max-w-[470px] overflow-hidden rounded-[1.5rem] border p-4 sm:rounded-[2rem] sm:p-9">
             <div className="relative mb-7 flex flex-col items-start gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between lg:hidden">
-              <div className="flex items-center gap-3"><div className="flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-emerald-400 text-primary-foreground shadow-lg shadow-primary/20"><HardHat className="size-5" /></div><div><p className="text-lg font-bold tracking-tight">Saha</p><p className="text-xs text-muted-foreground">Operasyon ve finans</p></div></div>
+              <div className="flex items-center gap-3"><div className="flex size-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground"><HardHat className="size-5" /></div><div><p className="text-lg font-bold tracking-tight">Saha</p><p className="text-xs text-muted-foreground">Operasyon ve finans</p></div></div>
               <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-2.5 py-1.5 text-[10px] font-medium text-emerald-300"><ShieldCheck className="size-3.5"/>Güvenli oturum</span>
             </div>
             <div className="relative mb-8 hidden items-center justify-end lg:flex"><span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-2.5 py-1.5 text-[10px] font-medium text-emerald-300"><ShieldCheck className="size-3.5"/>Güvenli oturum</span></div>

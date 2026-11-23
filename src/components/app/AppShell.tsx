@@ -205,8 +205,8 @@ export function AppShell() {
         <nav className="flex-1 space-y-1 overflow-y-auto" aria-label="Sayfalar">
           {NAV.filter((item) => isUsta || ["/isler", "/yevmiye"].includes(item.to)).map((item) => {
             const active = path.startsWith(item.to);
-            return <Link key={item.to} to={item.to} onClick={() => haptic(8)} aria-current={active ? "page" : undefined} className={cn("glass-nav-item group relative flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition duration-200", active ? "is-active text-primary" : "text-muted-foreground hover:translate-x-0.5 hover:bg-white/[0.06] hover:text-foreground")}>
-              <item.icon className="size-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110" />
+            return <Link key={item.to} to={item.to} onClick={() => haptic(8)} aria-current={active ? "page" : undefined} className={cn("glass-nav-item group relative flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors duration-200", active ? "is-active text-primary" : "text-muted-foreground hover:bg-white/[0.055] hover:text-foreground")}>
+              <item.icon className="size-[18px] shrink-0" />
               <span className="flex-1">{item.label}</span>
               {item.to === "/isler" && openToday.length > 0 && <span className="min-w-5 rounded-full bg-primary/15 px-1.5 text-center text-[10px] font-bold leading-5 text-primary">{openToday.length}</span>}
             </Link>;
@@ -223,7 +223,7 @@ export function AppShell() {
             { to: "/ayarlar", label: "Ayarlar", icon: Settings },
           ].filter((item) => isUsta || item.to === "/ayarlar").map((item) => {
             const active = path.startsWith(item.to);
-            return <Link key={item.to} to={item.to} onClick={() => haptic(8)} aria-current={active ? "page" : undefined} className={cn("glass-nav-item group flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition duration-200", active ? "is-active text-primary" : "text-muted-foreground hover:translate-x-0.5 hover:bg-white/[0.06] hover:text-foreground")}><item.icon className="size-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110"/><span>{item.label}</span></Link>;
+            return <Link key={item.to} to={item.to} onClick={() => haptic(8)} aria-current={active ? "page" : undefined} className={cn("glass-nav-item group flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors duration-200", active ? "is-active text-primary" : "text-muted-foreground hover:bg-white/[0.055] hover:text-foreground")}><item.icon className="size-[18px] shrink-0"/><span>{item.label}</span></Link>;
           })}
         </nav>
         {isUsta && <Button onClick={() => { haptic(); setAddOpen(true); }} className="mt-3 h-12 w-full rounded-2xl shadow-lg shadow-primary/15"><Plus/>Hızlı işlem ekle</Button>}
