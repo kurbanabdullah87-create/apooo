@@ -21,13 +21,12 @@ function PrivacyPage() {
           <p className="mt-6 text-sm font-semibold uppercase tracking-[0.18em] text-primary">Saha · Şeffaflık ve güven</p>
           <h1 className="mt-2 font-display text-3xl font-bold sm:text-4xl">Gizlilik ve KVKK Aydınlatma Metni</h1>
           <p className="mt-4 max-w-2xl leading-7 text-muted-foreground">Bu metin Saha uygulamasında hangi bilgilerin işlendiğini, ne amaçla kullanıldığını ve verileriniz üzerindeki haklarınızı açıklar.</p>
-          <p className="mt-3 text-xs text-muted-foreground">Son güncelleme: 17 Kasım 2026</p>
+          <p className="mt-3 text-xs text-muted-foreground">Son güncelleme: 23 Kasım 2026</p>
         </header>
 
-        <div className="mt-6 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5 text-sm leading-6">
-          <p className="font-semibold text-amber-200">Yayımdan önce tamamlanması gereken işletmeci bilgisi</p>
-          <p className="mt-2 text-muted-foreground">Veri sorumlusu: <strong className="text-foreground">[İşletmecinin tam adı veya ticaret unvanı]</strong><br />İletişim: <strong className="text-foreground">[Veri talepleri için geçerli e-posta adresi]</strong></p>
-          <p className="mt-2 text-muted-foreground">Bu alanlar gerçek bilgilerle değiştirilmeden metin tamamlanmış bir hukuki aydınlatma olarak kullanılmamalıdır.</p>
+        <div className="mt-6 rounded-2xl border bg-card p-5 text-sm leading-6">
+          <p className="font-semibold text-foreground">Veri sorumlusu ve iletişim</p>
+          <p className="mt-2 text-muted-foreground">Veri sorumlusu: <strong className="text-foreground">Abdullah Kurban</strong><br />Gizlilik ve veri başvuruları: <a className="font-medium text-primary underline underline-offset-4" href="mailto:abdullahkurban670@gmail.com">abdullahkurban670@gmail.com</a></p>
         </div>
 
         <div className="mt-6 flex gap-3 rounded-2xl border bg-card p-5 text-sm leading-6 text-muted-foreground">
