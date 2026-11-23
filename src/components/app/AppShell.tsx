@@ -1,7 +1,7 @@
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
-import { LayoutDashboard, Users, Receipt, Settings, Plus, Search, Loader2, ArrowDown, HardHat, CalendarDays, Wrench, CalendarClock, Cloud, CloudUpload, Landmark, Coins, HandCoins } from "lucide-react";
+import { LayoutDashboard, Users, Receipt, Settings, Plus, Search, Loader2, ArrowDown, HardHat, CalendarDays, Wrench, CalendarClock, Cloud, CloudUpload, Landmark, Coins, HandCoins, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DeviceLock } from "./DeviceLock";
 import { useEffect } from "react";
@@ -18,6 +18,7 @@ import { VoiceCommandButton } from "@/components/app/VoiceCommandButton";
 import { useRecords } from "@/lib/work";
 import { useCustomers } from "@/lib/data";
 import { toast } from "sonner";
+import { useBusinessProfile } from "@/lib/work-profile-context";
 
 const NAV = [
   { to: "/panel", label: "Panel", icon: LayoutDashboard },
@@ -31,6 +32,7 @@ const NAV = [
 export function AppShell() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const me = useMe();
+  const businessProfile = useBusinessProfile();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -238,6 +240,8 @@ export function AppShell() {
         >
           <Search className="size-4" /><span className="truncate">Ara: müşteri, iş, tutar…</span><kbd className="ml-auto hidden rounded-md border border-white/10 bg-black/10 px-1.5 py-0.5 text-[10px] font-medium lg:inline-block">Ctrl K</kbd>
         </Button>{activeJob && <span className="hidden items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary sm:inline-flex" role="status"><span className="size-1.5 animate-pulse rounded-full bg-primary"/> {(() => { const seconds = Math.max(0, Math.floor((clockNow - Date.parse(String(activeJob.payload.started_at))) / 1000)); return `${String(Math.floor(seconds / 3600)).padStart(2, "0")}:${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`; })()}</span>}{isUsta&&<VoiceCommandButton onSearch={(query) => { setSearchSeed(query); setSearchOpen(true); }}/>}{isUsta&&<NotificationCenter/>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Randevular" className="rounded-xl hover:bg-white/[0.07]"><Link to="/randevu"><CalendarClock/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Hava Durumu" className="rounded-xl hover:bg-white/[0.07]"><Link to="/hava"><Cloud/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Borç ve alacak" className="rounded-xl hover:bg-white/[0.07]"><Link to="/borc"><HandCoins/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Hesap hareketleri" className="rounded-xl hover:bg-white/[0.07]"><Link to="/banka"><Landmark/></Link></Button>{isUsta&&<Button asChild variant="ghost" size="icon" title="Giderler" className="rounded-xl hover:bg-white/[0.07]"><Link to="/giderler"><Receipt/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Ayarlar" className="rounded-xl hover:bg-white/[0.07]"><Link to="/ayarlar"><Settings/></Link></Button></div>
+        {isUsta && businessProfile.profileError && <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100" role="status"><Building2 className="size-4 shrink-0"/><span className="min-w-0 flex-1">{businessProfile.profileError}</span>{businessProfile.profiles.length === 0 && <Button asChild size="sm" variant="secondary"><Link to="/ayarlar">Ayarları aç</Link></Button>}<Button type="button" size="sm" variant="ghost" onClick={() => void businessProfile.refreshProfiles()}>Yenile</Button></div>}
+        {isUsta && businessProfile.isUsta && businessProfile.activeProfile && <div className="mt-2 flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/[0.045] px-3 py-2"><Building2 className="size-4 shrink-0 text-primary"/><label htmlFor="active-business-profile" className="sr-only">Etkin usta profili</label><select id="active-business-profile" value={businessProfile.activeProfileId ?? ""} onChange={(event) => businessProfile.switchProfile(event.target.value)} className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-foreground outline-none" aria-label="Etkin usta profili">{businessProfile.profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}{profile.is_default ? " · Varsayılan" : ""}{profile.is_archived ? " · Arşivli (yalnızca geçmiş)" : ""}</option>)}</select><span className="hidden text-[10px] text-muted-foreground sm:inline">Kayıt ve rapor kapsamı</span></div>}
         {(!isOnline || queuedWrites > 0) && <div className={cn("mt-2 flex items-center gap-1.5 text-xs font-semibold", isOnline ? "text-warning" : "text-destructive")} role="status"><span className={cn("size-2 rounded-full", isOnline ? "bg-warning" : "animate-pulse bg-destructive")}/>{!isOnline ? "Çevrimdışı" : "Senkronizasyon bekliyor"}{queuedWrites > 0 && <> · <CloudUpload className="size-3.5"/>{queuedWrites} kayıt</>}</div>}
       </header>
 

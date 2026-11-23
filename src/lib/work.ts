@@ -2,18 +2,25 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { cachedRead, persistWrite } from '@/lib/offline';
+import { useBusinessProfile } from '@/lib/work-profile-context';
 
 export type WorkKind = 'job' | 'payroll' | 'advance' | 'payment' | 'workplace' | 'equipment' | 'maintenance' | 'shopping' | 'job_template' | 'settings' | 'appointment' | 'inventory' | 'stock_movement' | 'attendance' | 'exchange_rate';
 export type Payload = Record<string, string | number | boolean | null | undefined> & {seconds?: string | number | boolean | null | undefined; started_at?: string | number | boolean | null | undefined; business?: string | number | boolean | null | undefined; status?: string | number | boolean | null | undefined; date?: string | number | boolean | null | undefined; title?: string | number | boolean | null | undefined; customer_id?: string | number | boolean | null | undefined; address?: string | number | boolean | null | undefined; hourly_rate?: string | number | boolean | null | undefined; price?: string | number | boolean | null | undefined; billed?: string | number | boolean | null | undefined; notes?: string | number | boolean | null | undefined; material_cost?: string | number | boolean | null | undefined; vat_rate?: string | number | boolean | null | undefined; days?: string | number | boolean | null | undefined; rate?: string | number | boolean | null | undefined; multiplier?: string | number | boolean | null | undefined; amount?: string | number | boolean | null | undefined; site?: string | number | boolean | null | undefined; name?: string | number | boolean | null | undefined; borrower?: string | number | boolean | null | undefined; borrowed_on?: string | number | boolean | null | undefined; last_service_seconds?: string | number | boolean | null | undefined; maintenance_hours?: string | number | boolean | null | undefined; purchased?: string | number | boolean | null | undefined; years?: string | number | boolean | null | undefined; code?: string | number | boolean | null | undefined; equipment_id?: string | number | boolean | null | undefined; cost?: string | number | boolean | null | undefined; done?: string | number | boolean | null | undefined; target?: string | number | boolean | null | undefined; owner_id?: string | number | boolean | null | undefined; job_seconds?: string | number | boolean | null | undefined; time?: string | number | boolean | null | undefined; planned_hours?: string | number | boolean | null | undefined; no_machine?: string | number | boolean | null | undefined; machine_applied_seconds?: string | number | boolean | null | undefined; machine_applied_to?: string | number | boolean | null | undefined;};
-export interface WorkRecord { id: string; owner_id: string; team_id: string; kind: WorkKind; payload: Payload; created_at: string; }
+export interface WorkRecord { id: string; owner_id: string; team_id: string; profile_id?: string | null; kind: WorkKind; payload: Payload; created_at: string; }
 /** Randevular, mevcut "shopping" türünde (payload._t = 'appointment') saklanır; ek migration gerekmez. */
 const shoppingSubtypes = ['appointment', 'inventory_item', 'stock_movement', 'attendance'] as const;
 const subtypeOf = (kind: WorkKind) => kind === 'appointment' ? 'appointment' : kind === 'inventory' ? 'inventory_item' : kind === 'stock_movement' ? 'stock_movement' : kind === 'attendance' ? 'attendance' : null;
 const dbKind = (k: WorkKind) => subtypeOf(k) ? 'shopping' : k;
 export function useRecords(kind: WorkKind) {
-  return useQuery({networkMode:'always',queryKey:['work',kind],queryFn:async () => {
-    const rows = await cachedRead('work:'+dbKind(kind), async () => {
-      const {data,error}=await supabase.from('work_records').select('*').eq('kind',dbKind(kind)).order('created_at',{ascending:false});
+  const profile = useBusinessProfile();
+  const profileScoped = kind !== 'settings' && profile.isUsta;
+  const scopeKey = profileScoped ? profile.activeProfileId : 'team';
+  return useQuery({networkMode:'always',enabled:!profile.loading && (!profileScoped || Boolean(profile.activeProfileId)),queryKey:profileScoped?['work',kind,'profile',scopeKey]:['work',kind],queryFn:async () => {
+    if (profileScoped && !profile.activeProfileId) return [];
+    const rows = await cachedRead('work:'+dbKind(kind)+(profileScoped?':'+profile.activeProfileId:''), async () => {
+      let query = supabase.from('work_records').select('*').eq('kind',dbKind(kind));
+      if (profileScoped && profile.activeProfileId) query = query.eq('profile_id', profile.activeProfileId);
+      const {data,error}=await query.order('created_at',{ascending:false});
       if(error) throw error; return data as unknown as WorkRecord[];
     });
     const subtype = subtypeOf(kind);
@@ -24,11 +31,18 @@ export function useRecords(kind: WorkKind) {
 }
 export function useSaveRecord(kind: WorkKind) {
  const qc=useQueryClient();
+ const profile=useBusinessProfile();
  return useMutation({networkMode:'always',mutationFn: async (row:{id?:string | undefined;owner_id?:string | undefined;payload:Payload}) => {
    const {data}=await supabase.auth.getSession(); if(!data.session) throw new Error('Oturum gerekli');
+   if (kind !== 'settings' && profile.isUsta && (!profile.activeProfileId || profile.activeProfile?.is_archived)) throw new Error('Kayıt eklemek için etkin bir usta profili seçin.');
+   if (row.id && kind !== 'settings' && profile.isUsta) {
+     const { data: existing, error } = await supabase.from('work_records').select('profile_id').eq('id', row.id).maybeSingle();
+     if (error) throw error;
+     if (existing && existing.profile_id !== profile.activeProfileId) throw new Error('Bu kayıt başka bir usta profiline ait. Profil değişikliğiyle kaydın kapsamı değiştirilemez.');
+   }
    const id=row.id??crypto.randomUUID();
    const subtype = subtypeOf(kind);
-   await persistWrite('work_records',row.id?'update':'insert',{...row,owner_id:row.owner_id??data.session.user.id,id,kind:dbKind(kind),payload:subtype?{...row.payload,_t:subtype}:row.payload}); return id;
+   await persistWrite('work_records',row.id?'update':'insert',{...row,owner_id:row.owner_id??data.session.user.id,id,kind:dbKind(kind),...(kind !== 'settings' && profile.activeProfileId ? { profile_id: profile.activeProfileId } : {}),payload:subtype?{...row.payload,_t:subtype}:row.payload}); return id;
  },onSuccess:()=>{qc.invalidateQueries({queryKey:['work']});toast.success('Kaydedildi');},onError:(e:Error)=>toast.error(e.message)});
 }
 export function elapsedSeconds(p:Payload, now=Date.now()) {

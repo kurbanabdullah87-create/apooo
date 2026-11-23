@@ -315,6 +315,7 @@ export type Database = {
           occurred_on: string
           receipt_photo_url: string | null
           job_record_id: string | null
+          profile_id: string | null
           team_id: string
         }
         Insert: {
@@ -326,6 +327,7 @@ export type Database = {
           occurred_on?: string
           receipt_photo_url?: string | null
           job_record_id?: string | null
+          profile_id?: string | null
           team_id?: string
         }
         Update: {
@@ -337,6 +339,7 @@ export type Database = {
           occurred_on?: string
           receipt_photo_url?: string | null
           job_record_id?: string | null
+          profile_id?: string | null
           team_id?: string
         }
         Relationships: []
@@ -363,6 +366,12 @@ export type Database = {
           team_id?: string
           title?: string
         }
+        Relationships: []
+      }
+      business_profiles: {
+        Row: { id: string; team_id: string; name: string; description: string | null; logo_url: string | null; phone: string | null; currency: string; default_hourly_rate: number | null; working_hours: Json; holidays: Json; color: string; is_default: boolean; is_archived: boolean; created_by: string; created_at: string; updated_at: string }
+        Insert: { id?: string; team_id: string; name: string; description?: string | null; logo_url?: string | null; phone?: string | null; currency?: string; default_hourly_rate?: number | null; working_hours?: Json; holidays?: Json; color?: string; is_default?: boolean; is_archived?: boolean; created_by: string; created_at?: string; updated_at?: string }
+        Update: { id?: string; team_id?: string; name?: string; description?: string | null; logo_url?: string | null; phone?: string | null; currency?: string; default_hourly_rate?: number | null; working_hours?: Json; holidays?: Json; color?: string; is_default?: boolean; is_archived?: boolean; created_by?: string; created_at?: string; updated_at?: string }
         Relationships: []
       }
       profiles: {
@@ -401,6 +410,7 @@ export type Database = {
           material_cost: number
           method: string | null
           occurred_on: string
+          profile_id: string | null
           team_id: string
           vat_rate: number
         }
@@ -415,6 +425,7 @@ export type Database = {
           material_cost?: number
           method?: string | null
           occurred_on?: string
+          profile_id?: string | null
           team_id?: string
           vat_rate?: number
         }
@@ -429,6 +440,7 @@ export type Database = {
           material_cost?: number
           method?: string | null
           occurred_on?: string
+          profile_id?: string | null
           team_id?: string
           vat_rate?: number
         }
@@ -474,6 +486,7 @@ export type Database = {
           kind: string
           owner_id: string
           payload: Json
+          profile_id: string | null
           team_id: string
           updated_at: string
         }
@@ -483,6 +496,7 @@ export type Database = {
           kind: string
           owner_id?: string
           payload?: Json
+          profile_id?: string | null
           team_id?: string
           updated_at?: string
         }
@@ -492,6 +506,7 @@ export type Database = {
           kind?: string
           owner_id?: string
           payload?: Json
+          profile_id?: string | null
           team_id?: string
           updated_at?: string
         }

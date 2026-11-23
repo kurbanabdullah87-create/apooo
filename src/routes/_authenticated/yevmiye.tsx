@@ -10,6 +10,7 @@ import { useMe } from "@/hooks/use-me";
 import { supabase } from "@/integrations/supabase/client";
 import { useRecords, useSaveRecord, payrollEntryAmount, payrollBalance, pageHead, type Payload, type WorkRecord } from "@/lib/work";
 import { todayISO, formatDate } from "@/lib/finance";
+import { useBusinessProfile } from "@/lib/work-profile-context";
 
 export const Route = createFileRoute("/_authenticated/yevmiye")({
   head: () => pageHead("Yevmiye ve Bordro", "İşyeri, çalışma takvimi, mesai, ödeme ve aylık bordro raporu."),
@@ -44,6 +45,7 @@ function Payroll() {
   const savePayment = useSaveRecord("payment");
   const saveWorkplace = useSaveRecord("workplace");
   const me = useMe();
+  const businessProfile = useBusinessProfile();
   const [month, setMonth] = useState(todayISO().slice(0, 7));
   const [selectedOwner, setSelectedOwner] = useState("");
   const [members, setMembers] = useState<{ id: string; username: string }[]>([]);
@@ -53,13 +55,17 @@ function Payroll() {
   const [advanceConfirmed, setAdvanceConfirmed] = useState(false);
   const [placeForm, setPlaceForm] = useState<{ id?: string; payload: Payload } | null>(null);
   const [workplaceSearch, setWorkplaceSearch] = useState("");
+  const newWorkplace = () => ({ ...blankWorkplace(), currency: businessProfile.activeProfile?.currency ?? "TRY" });
 
   useEffect(() => {
     void supabase.from("profiles").select("id,username").then(({ data }) => setMembers(data ?? []));
   }, []);
 
   const ownerId = selectedOwner || me.data?.id || "";
-  const selectedMasterName = String(settingsQuery.data?.find((record) => record.owner_id === me.data?.id)?.payload.master_report_name || me.data?.profile?.display_name || me.data?.profile?.username || "Usta");
+  const legacyReportName = settingsQuery.data?.find((record) => record.owner_id === me.data?.id)?.payload.master_report_name;
+  const selectedMasterName = businessProfile.activeProfile?.is_default && legacyReportName
+    ? String(legacyReportName)
+    : businessProfile.activeProfile?.name || me.data?.profile?.display_name || me.data?.profile?.username || "Usta";
   const workplaces = useMemo(() => (workplacesQuery.data ?? []).filter((r) => r.payload.active !== false), [workplacesQuery.data]);
   const allPayrollRows = (payroll.data ?? []).filter((r) => r.owner_id === ownerId);
   const rows = allPayrollRows.filter((r) => String(r.payload.date ?? "").startsWith(month));
@@ -157,7 +163,6 @@ function Payroll() {
       const header = () => {
         doc.setFillColor(15, 31, 54); doc.rect(0, 0, 210, 45, "F");
         doc.setTextColor(255, 255, 255); doc.setFont("DejaVu", "bold"); doc.setFontSize(20); doc.text("SAHA · YEVMIYE RAPORU", margin, 20);
-        const selectedMasterName = String(settingsQuery.data?.find((record) => record.owner_id === me.data?.id)?.payload.master_report_name ?? me.data?.profile?.display_name ?? me.data?.profile?.username ?? "Usta");
         const employeeName = members.find((m) => m.id === ownerId)?.username ?? "Çalışan";
         doc.setFont("DejaVu", "normal"); doc.setFontSize(8.5); doc.text(`${monthTitle(month)}  ·  Çalışan: ${employeeName}`, margin, 29);
         doc.text(`Usta / işveren: ${selectedMasterName}`, margin, 35);
@@ -248,11 +253,11 @@ function Payroll() {
       <div className="grid grid-cols-2 gap-2 border-t pt-3 sm:grid-cols-3">{statuses.map((status) => <div key={status.value} className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium ${status.tile}`}><span className="size-2.5 rounded-full bg-current"/><span>{status.label}</span></div>)}</div>
     </section>}
 
-    {tab === "workplaces" && <section className="space-y-4 rounded-3xl border bg-card p-4 shadow-sm sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">İŞYERİ KARTLARI</p><h2 className="mt-1 text-xl font-bold">Ücret ve işyeri bilgileri</h2><p className="mt-1 text-sm text-muted-foreground">İşyeri bilgileri yevmiye eklerken ücretle beraber otomatik seçilir.</p></div>{me.data?.isUsta && <Button onClick={() => setPlaceForm({ payload: blankWorkplace() })}><Plus/>İşyeri ekle</Button>}</div>
+    {tab === "workplaces" && <section className="space-y-4 rounded-3xl border bg-card p-4 shadow-sm sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">İŞYERİ KARTLARI · {businessProfile.activeProfile?.name ?? "Usta"}</p><h2 className="mt-1 text-xl font-bold">Ücret ve işyeri bilgileri</h2><p className="mt-1 text-sm text-muted-foreground">İşyeri bilgileri yevmiye eklerken ücretle beraber otomatik seçilir.</p></div>{me.data?.isUsta && <Button onClick={() => setPlaceForm({ payload: newWorkplace() })}><Plus/>İşyeri ekle</Button>}</div>
       <Input value={workplaceSearch} onChange={(e) => setWorkplaceSearch(e.target.value)} placeholder="İşyeri adına göre ara" aria-label="İşyeri adına göre ara"/>
       {workplacesQuery.error && <p className="text-sm text-destructive">İşyeri kayıtları yüklenemedi.</p>}
       <div className="grid gap-3 sm:grid-cols-2">{workplaces.filter((w) => String(w.payload.name).toLocaleLowerCase("tr-TR").includes(workplaceSearch.toLocaleLowerCase("tr-TR"))).map((w) => { const daily = String(w.payload.pay_type) === "hourly" ? n(w.payload.rate) * n(w.payload.daily_hours, 8) : n(w.payload.rate); return <article key={w.id} className="rounded-2xl border bg-background p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate font-bold">{String(w.payload.name)}</h3><p className="mt-1 text-xs text-muted-foreground">{String(w.payload.pay_type) === "hourly" ? "Saatlik ücret" : "Günlük yevmiye"} · {amountText(n(w.payload.rate), String(w.payload.currency))}{String(w.payload.pay_type) === "hourly" ? ` / saat · ${n(w.payload.daily_hours, 8)} sa/gün` : " / gün"}</p><p className="mt-2 text-sm font-semibold text-emerald-700 dark:text-emerald-300">Günlük karşılığı: {amountText(daily, String(w.payload.currency))}</p></div>{me.data?.isUsta && <Button size="sm" variant="secondary" onClick={() => setPlaceForm({ id: w.id, payload: { ...w.payload } })}>Düzenle</Button>}</div>{(w.payload.contact_name || w.payload.phone) && <p className="mt-3 border-t pt-3 text-xs text-muted-foreground">{String(w.payload.contact_name || "Yetkili kişi yok")}{w.payload.phone ? ` · ${String(w.payload.phone)}` : ""}</p>}{w.payload.notes && <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{String(w.payload.notes)}</p>}</article>; })}</div>
-      {!workplaces.length && !workplacesQuery.isLoading && <div className="rounded-2xl border border-dashed p-8 text-center"><BriefcaseBusiness className="mx-auto size-8 text-muted-foreground"/><p className="mt-3 font-medium">Henüz işyeri eklenmemiş</p><p className="mt-1 text-sm text-muted-foreground">İlk işyerini ekle; günlük veya saatlik ücretini kaydet.</p>{me.data?.isUsta && <Button className="mt-4" onClick={() => setPlaceForm({ payload: blankWorkplace() })}><Plus/>İlk işyerini ekle</Button>}</div>}
+      {!workplaces.length && !workplacesQuery.isLoading && <div className="rounded-2xl border border-dashed p-8 text-center"><BriefcaseBusiness className="mx-auto size-8 text-muted-foreground"/><p className="mt-3 font-medium">Henüz işyeri eklenmemiş</p><p className="mt-1 text-sm text-muted-foreground">İlk işyerini ekle; günlük veya saatlik ücretini kaydet.</p>{me.data?.isUsta && <Button className="mt-4" onClick={() => setPlaceForm({ payload: newWorkplace() })}><Plus/>İlk işyerini ekle</Button>}</div>}
     </section>}
 
     {tab === "report" && <section className="space-y-4 rounded-3xl border bg-card p-4 shadow-sm sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">BORDRO VE HAREKETLER</p><h2 className="mt-1 text-xl font-bold">{monthTitle(month)} özeti</h2></div><div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => void downloadPdf()} disabled={payroll.isLoading || advances.isLoading || payments.isLoading}><Download/>PDF oluştur</Button>{me.data?.isUsta && <><Button variant="outline" onClick={() => openEntry("advance")}><Banknote/>Avans</Button><Button onClick={() => openEntry("payment")}><Wallet/>Ödeme</Button></>}</div></div>

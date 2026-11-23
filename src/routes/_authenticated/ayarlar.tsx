@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Save, UserPlus, LogOut, Fingerprint, LockKeyhole, Award, Link2, Loader2, Plus, X, ShieldCheck, CheckCircle2 } from "lucide-react";
+import { Save, UserPlus, LogOut, Fingerprint, LockKeyhole, Award, Link2, Loader2, Plus, X, ShieldCheck, CheckCircle2, ArchiveRestore } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { todayISO, formatTL } from "@/lib/finance";
 import { pendingCount, flushQueue } from "@/lib/offline";
 import { IbanInput } from "@/components/app/IbanInput";
+import { useBusinessProfile } from "@/lib/work-profile-context";
 export const Route = createFileRoute("/_authenticated/ayarlar")({
   head: () => pageHead("Ayarlar", "Ekip, mesaj şablonları ve cihaz güvenliği."),
   component: Settings,
@@ -38,27 +39,11 @@ function Settings() {
   const [form, setForm] = useState<Payload>({ business: "Saha", target: 0 });
   const [pin, setPin] = useState("");
   const [team, setTeam] = useState({ username: "", password: "", name: "" });
-  const [masterNameInput, setMasterNameInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [linkBusy, setLinkBusy] = useState(false);
   const [count, setCount] = useState(0);
   const [fieldMode, setFieldMode] = useState(() => { try { return localStorage.getItem("saha-field-mode") === "sunlight"; } catch { return false; } });
   const [theme, setTheme] = useState(() => { try { return localStorage.getItem("saha-theme") ?? "ocean"; } catch { return "ocean"; } });
-  const masterNameOptions = [...new Set(String(form.master_names ?? "").split(/\r?\n/).map((name) => name.trim()).filter(Boolean))];
-  const addMasterName = () => {
-    const name = masterNameInput.trim();
-    if (!name) return;
-    if (masterNameOptions.some((existing) => existing.toLocaleLowerCase("tr-TR") === name.toLocaleLowerCase("tr-TR"))) {
-      toast.error("Bu usta adı zaten ekli.");
-      return;
-    }
-    setForm((current) => ({ ...current, master_names: [...masterNameOptions, name].join("\n") }));
-    setMasterNameInput("");
-  };
-  const removeMasterName = (name: string) => {
-    const remaining = masterNameOptions.filter((existing) => existing !== name);
-    setForm((current) => ({ ...current, master_names: remaining.join("\n"), ...(current.master_report_name === name ? { master_report_name: "" } : {}) }));
-  };
   useEffect(() => {
     if (settings.data?.[0]) setForm(settings.data[0].payload);
   }, [settings.data]);
@@ -118,19 +103,7 @@ function Settings() {
                 {k === "iban" ? <IbanInput id={k} value={String(form[k] ?? "")} onChange={(value) => setForm({ ...form, [k]: value })}/> : <Input id={k} value={String(form[k] ?? "")} onChange={(e) => setForm({ ...form, [k]: e.target.value })} />}
               </div>
             ))}
-            <div className="space-y-3 rounded-2xl border bg-card p-4">
-              <div><Label htmlFor="master-name-input">Aynı hesaba usta adı ekle</Label><p className="mt-1 text-xs text-muted-foreground">Her usta/işveren adını ekleyin; giriş ve hesap yetkileri değişmez.</p></div>
-              <div className="flex gap-2">
-                <Input id="master-name-input" maxLength={80} value={masterNameInput} onChange={(e) => setMasterNameInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addMasterName(); } }} placeholder="Örn. Abdullah Usta" />
-                <Button type="button" variant="secondary" aria-label="Usta adı ekle" onClick={addMasterName}><Plus className="size-4"/>Ekle</Button>
-              </div>
-              {masterNameOptions.length > 0 ? <ul className="flex flex-wrap gap-2">{masterNameOptions.map((name) => <li key={name} className="inline-flex max-w-full items-center gap-1 rounded-full border bg-background px-3 py-1.5 text-sm"><span className="truncate">{name}</span><button type="button" className="rounded-full p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={`${name} adını sil`} onClick={() => removeMasterName(name)}><X className="size-3.5"/></button></li>)}</ul> : <p className="rounded-xl border border-dashed p-3 text-center text-xs text-muted-foreground">Henüz ek usta adı eklenmedi.</p>}
-              <Label htmlFor="master-report-name">Yevmiye PDF’inde gösterilecek ad</Label>
-              <select id="master-report-name" className="h-11 w-full rounded-xl border bg-background px-3 text-sm" value={String(form.master_report_name ?? "")} onChange={(e) => setForm({ ...form, master_report_name: e.target.value })}>
-                <option value="">Profil adı · {me.data?.profile?.display_name || me.data?.profile?.username || "Usta"}</option>
-                {masterNameOptions.map((name) => <option key={name} value={name}>{name}</option>)}
-              </select>
-            </div>
+            <BusinessProfilesSettings />
             <Label htmlFor="target">Aylık ciro hedefi (TL)</Label>
             <Input
               id="target"
@@ -516,6 +489,72 @@ function AccessibilitySettings() {
     try { localStorage.setItem("saha-text-scale", scale); localStorage.setItem("saha-colorblind", String(colorblind)); } catch { /* browser storage can be disabled */ }
   }, [scale, colorblind]);
   return <div className="space-y-3 rounded-2xl border bg-card p-4"><div><h3 className="font-semibold">Erişilebilirlik</h3><p className="text-xs text-muted-foreground">Yalnızca bu cihazda saklanır.</p></div><div className="space-y-2"><Label htmlFor="text-scale">Metin boyutu</Label><select id="text-scale" className="h-11 w-full rounded-xl border bg-background px-3 text-sm" value={scale} onChange={(event) => setScale(event.target.value)}><option value="small">Küçük</option><option value="normal">Normal</option><option value="large">Büyük</option><option value="xlarge">Çok büyük</option></select></div><label className="flex min-h-12 items-center justify-between gap-3 rounded-xl border px-3"><span><span className="block text-sm font-medium">Renk körlüğüne uygun işaretler</span><span className="text-xs text-muted-foreground">Durum renklerine ek olarak farklı çizgi desenleri kullan</span></span><input type="checkbox" checked={colorblind} onChange={(event) => setColorblind(event.target.checked)}/></label></div>;
+}
+
+function BusinessProfilesSettings() {
+  const me = useMe();
+  const profileState = useBusinessProfile();
+  const qc = useQueryClient();
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [phone, setPhone] = useState("");
+  const [currency, setCurrency] = useState("TRY");
+  const [hourlyRate, setHourlyRate] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [renames, setRenames] = useState<Record<string, string>>({});
+  const [details, setDetails] = useState<Record<string, { phone: string; currency: string; hourlyRate: string }>>({});
+  const profileBackendReady = profileState.isUsta || profileState.loading;
+  async function createProfile(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const cleanName = name.trim();
+    if (!cleanName || !me.data?.id) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("business_profiles").insert({ team_id: me.data.id, created_by: me.data.id, name: cleanName, description: description.trim() || null, phone: phone.trim() || null, currency, default_hourly_rate: hourlyRate ? Number(hourlyRate) : null });
+      if (error) throw error;
+      setName(""); setDescription(""); setPhone(""); setCurrency("TRY"); setHourlyRate("");
+      await qc.invalidateQueries({ queryKey: ["business-profiles", me.data.id] });
+      toast.success("Usta profili oluşturuldu.");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Profil oluşturulamadı."); }
+    finally { setSaving(false); }
+  }
+  async function updateProfile(id: string, update: { name?: string; is_archived?: boolean; phone?: string | null; currency?: string; default_hourly_rate?: number | null }) {
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("business_profiles").update({ ...update, updated_at: new Date().toISOString() }).eq("id", id).eq("team_id", me.data?.id ?? "");
+      if (error) throw error;
+      if (update.is_archived && profileState.activeProfileId === id) {
+        const next = profileState.profiles.find((profile) => profile.is_default && !profile.is_archived && profile.id !== id);
+        if (next && !profileState.switchProfile(next.id)) return false;
+      }
+      await qc.invalidateQueries({ queryKey: ["business-profiles", me.data?.id] });
+      toast.success(update.is_archived === undefined ? (update.name ? "Profil adı güncellendi." : "Profil bilgileri güncellendi.") : update.is_archived ? "Profil arşivlendi; geçmiş kayıtlar korundu." : "Profil yeniden etkinleştirildi.");
+      return true;
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Profil güncellenemedi."); return false; }
+    finally { setSaving(false); }
+  }
+  const activeCount = profileState.profiles.filter((profile) => !profile.is_archived).length;
+  return <section className="space-y-3 rounded-2xl border bg-card p-4">
+    <div><h2 className="font-semibold">Usta / işletme profilleri</h2><p className="mt-1 text-xs leading-relaxed text-muted-foreground">Her profilin işleri, randevuları, yevmiyesi, gideri ve cari hareketleri ayrı kapsamda tutulur. Müşteri ve hesap erişim yetkileri değişmez. Eski kayıtlar mevcut varsayılan profile bağlı kalır.</p></div>
+    {!profileBackendReady && !profileState.loading && <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-100" role="status">Profil tablosu henüz erişilebilir değil. Uygulama eski kayıt görünümünde çalışıyor; 0016 migration uygulanıp erişim sağlandığında profil yönetimi açılacak.</p>}
+    <form onSubmit={(event) => void createProfile(event)} className="grid gap-2 sm:grid-cols-2">
+      <Input aria-label="Yeni profil adı" value={name} maxLength={100} required placeholder="Örn. Ahmet Usta" onChange={(event) => setName(event.target.value)}/>
+      <Input aria-label="Profil telefonu (isteğe bağlı)" value={phone} maxLength={40} placeholder="Telefon (isteğe bağlı)" onChange={(event) => setPhone(event.target.value)}/>
+      <Input aria-label="Profil açıklaması (isteğe bağlı)" className="sm:col-span-2" value={description} maxLength={300} placeholder="İşletme açıklaması (isteğe bağlı)" onChange={(event) => setDescription(event.target.value)}/>
+      <select aria-label="Profil varsayılan para birimi" value={currency} onChange={(event) => setCurrency(event.target.value)} className="h-11 rounded-xl border bg-background px-3 text-sm"><option value="TRY">TRY · Türk lirası</option><option value="USD">USD · ABD doları</option><option value="EUR">EUR · Euro</option><option value="GBP">GBP · İngiliz sterlini</option></select>
+      <Input aria-label="Varsayılan saat ücreti (isteğe bağlı)" type="number" min="0" step="0.01" value={hourlyRate} placeholder="Varsayılan saat ücreti (isteğe bağlı)" onChange={(event) => setHourlyRate(event.target.value)}/>
+      <Button type="submit" disabled={!profileBackendReady || saving || !name.trim()} className="sm:col-span-2"><Plus className="size-4"/>Profil ekle</Button>
+    </form>
+    {profileState.loading ? <p className="text-sm text-muted-foreground">Profiller yükleniyor…</p> : <ul className="space-y-2">{profileState.profiles.map((profile) => { const nextName = renames[profile.id]?.trim() ?? ""; const initial = { phone: profile.phone ?? "", currency: profile.currency, hourlyRate: profile.default_hourly_rate == null ? "" : String(profile.default_hourly_rate) }; const draft = details[profile.id] ?? initial; const detailsChanged = draft.phone !== initial.phone || draft.currency !== initial.currency || draft.hourlyRate !== initial.hourlyRate; return <li key={profile.id} className="grid gap-2 rounded-xl border p-2.5 sm:grid-cols-[minmax(0,1fr)_auto]">
+      <div className="flex flex-wrap items-center gap-2">
+      <Input aria-label={`${profile.name} profil adı`} className="min-w-40 flex-1" maxLength={100} value={renames[profile.id] ?? profile.name} onChange={(event) => setRenames((current) => ({ ...current, [profile.id]: event.target.value }))}/>
+      <span className="text-[10px] text-muted-foreground">{profile.is_default ? "Varsayılan" : profile.is_archived ? "Arşivli · geçmiş kayıtlar" : `${activeCount} etkin profil`}</span>
+      {renames[profile.id] !== undefined && nextName !== profile.name && <Button type="button" size="sm" variant="secondary" disabled={saving || !nextName} onClick={() => { if (!nextName) return; void updateProfile(profile.id, { name: nextName }).then((saved) => { if (saved) setRenames((current) => { const next = { ...current }; delete next[profile.id]; return next; }); }); }}><Save className="size-4"/>Adı kaydet</Button>}
+      {!profile.is_default && <Button type="button" size="sm" variant="outline" disabled={saving} onClick={() => void updateProfile(profile.id, { is_archived: !profile.is_archived })}><ArchiveRestore className="size-4"/>{profile.is_archived ? "Etkinleştir" : "Arşivle"}</Button>}
+      </div>
+      {!profile.is_archived && <div className="grid gap-2 sm:col-span-2 sm:grid-cols-[1fr_1fr_1fr_auto]"><Input aria-label={`${profile.name} telefon`} maxLength={40} value={draft.phone} placeholder="Telefon" onChange={(event) => setDetails((current) => ({ ...current, [profile.id]: { ...draft, phone: event.target.value } }))}/><select aria-label={`${profile.name} varsayılan para birimi`} value={draft.currency} onChange={(event) => setDetails((current) => ({ ...current, [profile.id]: { ...draft, currency: event.target.value } }))} className="h-11 rounded-xl border bg-background px-3 text-sm"><option value="TRY">TRY</option><option value="USD">USD</option><option value="EUR">EUR</option><option value="GBP">GBP</option></select><Input aria-label={`${profile.name} varsayılan saat ücreti`} type="number" min="0" step="0.01" value={draft.hourlyRate} placeholder="Varsayılan saat ücreti" onChange={(event) => setDetails((current) => ({ ...current, [profile.id]: { ...draft, hourlyRate: event.target.value } }))}/><Button type="button" size="sm" variant="secondary" disabled={saving || !detailsChanged} onClick={() => void updateProfile(profile.id, { phone: draft.phone.trim() || null, currency: draft.currency, default_hourly_rate: draft.hourlyRate ? Number(draft.hourlyRate) : null }).then((saved) => { if (saved) setDetails((current) => { const next = { ...current }; delete next[profile.id]; return next; }); })}><Save className="size-4"/>Detayları kaydet</Button></div>}
+    </li>; })}</ul>}
+  </section>;
 }
 const themeChoices = [
   ["ocean", "Okyanus", "Mavi · turkuaz"],

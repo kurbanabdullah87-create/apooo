@@ -5,25 +5,29 @@ export const CURRENCY_OPTIONS = [
   { code: "TRY", label: "Türk Lirası" },
   { code: "EUR", label: "Euro" },
   { code: "GBP", label: "İngiliz Sterlini" },
-  { code: "XAU", label: "Gram Altın" },
   { code: "CHF", label: "İsviçre Frangı" },
 ] as const;
 
 export type CurrencyCode = string;
 export type RatePoint = { date: string; rate: number };
-export type PairRate = { base: string; quote: string; rate: number; date: string; live?: boolean; warning?: string; availableCurrencies?: string[] };
+export type PairRate = {
+  base: string;
+  quote: string;
+  rate: number;
+  date: string;
+  fetchedAt: string;
+  refreshIntervalSeconds: number;
+  source: "FXAPI" | "Frankfurter" | "Aynı para birimi" | "Cihaz önbelleği";
+  dataType: "mid-market referans" | "günlük referans harmanı" | "sabit 1:1";
+  live?: boolean;
+  stale?: boolean;
+  warning?: string;
+  availableCurrencies?: string[];
+};
 
 const API = "https://api.frankfurter.dev/v2";
 const CACHE_PREFIX = "saha.currency.v1";
 const CACHE_TTL_MS = 30 * 60 * 1000;
-const GRAMS_PER_TROY_OUNCE = 31.1034768;
-
-function toGramRate(rate: number, base: CurrencyCode, quote: CurrencyCode) {
-  if (quote === "XAU") return rate * GRAMS_PER_TROY_OUNCE;
-  if (base === "XAU") return rate / GRAMS_PER_TROY_OUNCE;
-  return rate;
-}
-
 function cacheKey(key: string) {
   return `${CACHE_PREFIX}.${key}`;
 }
@@ -57,28 +61,46 @@ async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
 
 export async function fetchPairRate(base: CurrencyCode, quote: CurrencyCode, signal?: AbortSignal) {
   if (signal?.aborted) throw new DOMException("İstek iptal edildi", "AbortError");
-  if (base === quote) return { base, quote, rate: 1, date: new Date().toISOString(), live: true } satisfies PairRate;
+  if (base === quote) return { base, quote, rate: 1, date: new Date().toISOString(), fetchedAt: new Date().toISOString(), refreshIntervalSeconds: 86_400, source: "Aynı para birimi", dataType: "sabit 1:1", live: false } satisfies PairRate;
+  const key = `latest.${base}.${quote}`;
   try {
     const live = await getLiveCurrencyRates();
     if (signal?.aborted) throw new DOMException("İstek iptal edildi", "AbortError");
     const baseRate = live.rates[base];
     const quoteRate = live.rates[quote];
     if (!baseRate || !quoteRate) throw new Error(`${base} / ${quote} çifti canlı kur sağlayıcısında bulunamadı.`);
-    const rate = toGramRate(quoteRate / baseRate, base, quote);
+    const rate = quoteRate / baseRate;
     if (!Number.isFinite(rate) || rate <= 0) throw new Error("Canlı kur verisi geçersiz.");
-    return { base, quote, rate, date: live.lastUpdatedAt, live: true, availableCurrencies: Object.keys(live.rates) } satisfies PairRate;
+    const pair: PairRate = {
+      base, quote, rate, date: live.lastUpdatedAt, fetchedAt: live.fetchedAt,
+      refreshIntervalSeconds: live.updateIntervalSeconds,
+      source: live.provider === "fxapi" ? "FXAPI" : "Frankfurter",
+      dataType: live.dataType === "mid_market" ? "mid-market referans" : "günlük referans harmanı",
+      live: live.provider === "fxapi" && !live.isStale && !live.warning,
+      stale: live.isStale, ...(live.warning ? { warning: live.warning } : {}),
+      availableCurrencies: Object.keys(live.rates),
+    };
+    writeCache(key, pair);
+    return pair;
   } catch (error) {
     if (signal?.aborted) throw error;
-    const fallback = await getJson<{ date: string; rate: number }>(`${API}/rate/${base.toLowerCase()}/${quote.toLowerCase()}`, signal);
-    if (!Number.isFinite(fallback.rate) || fallback.rate <= 0) throw new Error("Çevrimiçi kur alınamadı.");
-    return {
-      base,
-      quote,
-      rate: toGramRate(fallback.rate, base, quote),
-      date: `${fallback.date}T12:00:00Z`,
-      live: false,
-      warning: error instanceof Error ? error.message : "Canlı servis kullanılamıyor; günlük yedek kur gösteriliyor.",
-    } satisfies PairRate;
+    try {
+      const fallback = await getJson<{ date: string; rate: number }>(`${API}/rate/${base.toLowerCase()}/${quote.toLowerCase()}`, signal);
+      if (!Number.isFinite(fallback.rate) || fallback.rate <= 0) throw new Error("Günlük referans servisi geçersiz yanıt verdi.");
+      const pair: PairRate = {
+        base, quote, rate: fallback.rate, date: fallback.date,
+        fetchedAt: new Date().toISOString(), refreshIntervalSeconds: 86_400, source: "Frankfurter",
+        dataType: "günlük referans harmanı", live: false,
+        warning: error instanceof Error ? `FXAPI kullanılamıyor; Frankfurter günlük referans kuru gösteriliyor. ${error.message}` : "FXAPI kullanılamıyor; Frankfurter günlük referans kuru gösteriliyor.",
+      };
+      writeCache(key, pair);
+      return pair;
+    } catch (fallbackError) {
+      if (signal?.aborted) throw fallbackError;
+      const cached = readCache<PairRate>(key);
+      if (cached) return { ...cached.value, source: "Cihaz önbelleği", live: false, stale: true, warning: "Kur sağlayıcılarına ulaşılamıyor; bu cihazda daha önce alınmış değer gösteriliyor." } satisfies PairRate;
+      throw new Error(fallbackError instanceof Error ? `Kur sağlayıcılarına ulaşılamadı: ${fallbackError.message}` : "Kur sağlayıcılarına ulaşılamadı.");
+    }
   }
 }
 
@@ -99,7 +121,7 @@ export async function fetchPairHistory(base: CurrencyCode, quote: CurrencyCode, 
     const rows = await getJson<Array<{ date: string; rate: number }>>(`${API}/rates?${params}`, signal);
     const points = rows
       .filter((row) => Number.isFinite(row.rate) && row.rate > 0)
-      .map((row) => ({ date: row.date, rate: toGramRate(row.rate, base, quote) }))
+      .map((row) => ({ date: row.date, rate: row.rate }))
       .sort((a, b) => a.date.localeCompare(b.date));
     if (points.length === 0) throw new Error("Bu dönem için kur geçmişi bulunamadı.");
     writeCache(key, points);
@@ -112,7 +134,6 @@ export async function fetchPairHistory(base: CurrencyCode, quote: CurrencyCode, 
 }
 
 export function formatCurrency(value: number, code: CurrencyCode, maximumFractionDigits = 4) {
-  if (code === "XAU") return `${new Intl.NumberFormat("tr-TR", { maximumFractionDigits }).format(value)} g altın`;
   return new Intl.NumberFormat("tr-TR", {
     style: "currency",
     currency: code,

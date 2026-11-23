@@ -5,6 +5,7 @@ import type { Expense, Tx } from "@/lib/finance";
 import { DEFAULT_TEMPLATES } from "@/lib/templates";
 import { haptic } from "@/lib/haptic";
 import { cachedRead, persistWrite } from "@/lib/offline";
+import { useBusinessProfile } from "@/lib/work-profile-context";
 
 export interface Customer {
   id: string;
@@ -39,27 +40,39 @@ export const useCustomers = () =>
     queryFn: () => cachedRead("customers", async () => check(await supabase.from("customers").select("*").order("name")) as Customer[]),
   });
 
-export const useTransactions = () =>
-  useQuery({
-    queryKey: ["transactions"],
+export const useTransactions = () => {
+  const profile = useBusinessProfile();
+  const scoped = profile.isUsta;
+  return useQuery({
+    queryKey: scoped ? ["transactions", "profile", profile.activeProfileId] : ["transactions"],
+    enabled: !profile.loading && (!scoped || Boolean(profile.activeProfileId)),
     networkMode: "always",
-    queryFn: () => cachedRead("transactions", async () => {
-      const rows = check(
-        await supabase.from("transactions").select("*").order("occurred_on", { ascending: false }).order("created_at", { ascending: false }),
-      );
+    queryFn: () => cachedRead("transactions" + (scoped ? ":profile:" + profile.activeProfileId : ""), async () => {
+      if (scoped && !profile.activeProfileId) return [];
+      let query = supabase.from("transactions").select("*");
+      if (scoped && profile.activeProfileId) query = query.eq("profile_id", profile.activeProfileId);
+      const rows = check(await query.order("occurred_on", { ascending: false }).order("created_at", { ascending: false }));
       return rows.map((r) => ({ ...r, amount: Number(r.amount), material_cost: Number(r.material_cost) })) as Tx[];
     }),
   });
+};
 
-export const useExpenses = () =>
-  useQuery({
-    queryKey: ["expenses"],
+export const useExpenses = () => {
+  const profile = useBusinessProfile();
+  const scoped = profile.isUsta;
+  return useQuery({
+    queryKey: scoped ? ["expenses", "profile", profile.activeProfileId] : ["expenses"],
+    enabled: !profile.loading && (!scoped || Boolean(profile.activeProfileId)),
     networkMode: "always",
-    queryFn: () => cachedRead("expenses", async () => {
-      const rows = check(await supabase.from("expenses").select("*").order("occurred_on", { ascending: false }));
+    queryFn: () => cachedRead("expenses" + (scoped ? ":profile:" + profile.activeProfileId : ""), async () => {
+      if (scoped && !profile.activeProfileId) return [];
+      let query = supabase.from("expenses").select("*");
+      if (scoped && profile.activeProfileId) query = query.eq("profile_id", profile.activeProfileId);
+      const rows = check(await query.order("occurred_on", { ascending: false }));
       return rows.map((r) => ({ ...r, amount: Number(r.amount) })) as Expense[];
     }),
   });
+};
 
 export const useTemplates = () =>
   useQuery({
@@ -83,11 +96,13 @@ const KEY: Record<Table, string> = {
 
 export function useUpsert(table: Table) {
   const qc = useQueryClient();
+  const profile = useBusinessProfile();
   return useMutation({
     networkMode: "always",
     mutationFn: async (row: Record<string, unknown>) => {
       const { id, ...rest } = row;
-      await persistWrite(table, id ? "update" : "insert", { ...rest, id: id ?? crypto.randomUUID() });
+      if ((table === "transactions" || table === "expenses") && profile.isUsta && (!profile.activeProfileId || profile.activeProfile?.is_archived)) throw new Error("Finans kaydı için etkin bir usta profili seçin.");
+      await persistWrite(table, id ? "update" : "insert", { ...rest, ...(!id && profile.isUsta && profile.activeProfileId && (table === "transactions" || table === "expenses") ? { profile_id: profile.activeProfileId } : {}), id: id ?? crypto.randomUUID() });
     },
     onSuccess: () => {
       haptic();
@@ -103,19 +118,23 @@ type DeleteTarget = Table | "equipment" | "shopping";
 /** Removes from view immediately, commits delete after 5s unless "Geri Al" is pressed. */
 export function useUndoableDelete(target: DeleteTarget) {
   const qc = useQueryClient();
+  const profile = useBusinessProfile();
   // Ekipman ve alınacaklar work_records tablosunda "kind" olarak saklanır.
   const isWork = target === "equipment" || target === "shopping";
+  const isProfileScoped = isWork || target === "transactions" || target === "expenses";
   const table = isWork ? "work_records" : target;
   return (id: string, label = "Kayıt silindi") => {
     haptic([10, 30, 10]);
-    const key = isWork ? ["work", target] : [KEY[target]];
+    const key = profile.isUsta && profile.activeProfileId && isProfileScoped
+      ? [isWork ? "work" : KEY[target], ...(isWork ? [target] : []), "profile", profile.activeProfileId]
+      : isWork ? ["work", target] : [KEY[target]];
     const prev = qc.getQueryData<{ id: string }[]>(key);
     qc.setQueryData<{ id: string }[]>(key, (old) => old?.filter((r) => r.id !== id));
     let undone = false;
     const timer = setTimeout(async () => {
       if (undone) return;
       let error: { message: string } | null = null;
-      try { await persistWrite(table, "delete", isWork ? { id, kind: target } : { id }); } catch (e) { error = { message: e instanceof Error ? e.message : "Silinemedi" }; }
+      try { await persistWrite(table, "delete", { id, ...(isWork ? { kind: target } : {}), ...(profile.isUsta && profile.activeProfileId && isProfileScoped ? { profile_id: profile.activeProfileId } : {}) }); } catch (e) { error = { message: e instanceof Error ? e.message : "Silinemedi" }; }
       if (error) {
         toast.error("Silinemedi: " + error.message);
         if (prev) qc.setQueryData(key, prev);

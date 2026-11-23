@@ -156,7 +156,7 @@ function Appointments() {
         label: "Kalıcı sil",
         onClick: async () => {
           try {
-            await persistWrite("work_records", "delete", { id: r.id });
+            await persistWrite("work_records", "delete", { id: r.id, profile_id: r.profile_id, kind: r.kind });
             qc.invalidateQueries({ queryKey: ["work"] });
             toast.success("Kalıcı olarak silindi");
           } catch (e) {
@@ -176,7 +176,7 @@ function Appointments() {
         label: "Hepsini sil",
         onClick: async () => {
           try {
-            for (const r of list) await persistWrite("work_records", "delete", { id: r.id });
+            for (const r of list) await persistWrite("work_records", "delete", { id: r.id, profile_id: r.profile_id, kind: r.kind });
             qc.invalidateQueries({ queryKey: ["work"] });
             toast.success("Arşiv temizlendi");
           } catch (e) {

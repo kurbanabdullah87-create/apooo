@@ -71,7 +71,8 @@ export async function persistWrite(
     const all = (await get<Pending[]>("saha-queue")) ?? [];
     await set("saha-queue", [...all, item]);
     // Update cached rows so queued records remain visible offline.
-    const key = table === "work_records" ? "work:" + String(row["kind"]) : table;
+    const profileSuffix = row["profile_id"] ? ":profile:" + String(row["profile_id"]) : "";
+    const key = table === "work_records" ? "work:" + String(row["kind"]) + profileSuffix : table + profileSuffix;
     const cache = "cache:" + user + ":" + key;
     const rows = (await get<Record<string, unknown>[]>(cache)) ?? [];
     const existing = rows.find((r) => r["id"] === item.row["id"]);

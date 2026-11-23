@@ -63,7 +63,7 @@ export function MediaTools({
   }, [sign]);
   useEffect(
     () => () => {
-      recorder.current?.state === "recording" && recorder.current.stop();
+      if (recorder.current?.state === "recording") recorder.current.stop();
       stream.current?.getTracks().forEach((t) => t.stop());
     },
     [],

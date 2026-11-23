@@ -28,6 +28,12 @@ export function CurrencyConverter() {
   const [rate, setRate] = useState<number | null>(null);
   const [rateDate, setRateDate] = useState("");
   const [rateLive, setRateLive] = useState(false);
+  const [rateFetchedAt, setRateFetchedAt] = useState("");
+  const [rateSource, setRateSource] = useState("");
+  const [rateDataType, setRateDataType] = useState("");
+  const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState(86_400);
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
   const [currencyOptions, setCurrencyOptions] = useState(() => supportedCurrencyOptions(CURRENCY_OPTIONS.map((option) => option.code)));
   const [points, setPoints] = useState<RatePoint[]>([]);
   const [rangeIndex, setRangeIndex] = useState(1);
@@ -40,25 +46,44 @@ export function CurrencyConverter() {
   const selectedRange = RANGES[rangeIndex] ?? RANGES[1];
 
   useEffect(() => {
+    const onOnline = () => { setOnline(true); setRefreshKey((key) => key + 1); };
+    const onOffline = () => setOnline(false);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => { window.removeEventListener("online", onOnline); window.removeEventListener("offline", onOffline); };
+  }, []);
+
+  useEffect(() => {
     const controller = new AbortController();
     let active = true;
     const load = async () => {
       setLoading(true);
       setError("");
       try {
+        const rateStartedAt = performance.now();
+        const rateRequest = fetchPairRate(base, quote, controller.signal).then((value) => ({ value, latency: Math.max(0, Math.round(performance.now() - rateStartedAt)) }));
         const [currentResult, historyResult] = await Promise.allSettled([
-          fetchPairRate(base, quote, controller.signal),
+          rateRequest,
           fetchPairHistory(base, quote, selectedRange.days, controller.signal),
         ]);
         if (!active) return;
         if (currentResult.status === "fulfilled") {
-          setRate(currentResult.value.rate);
-          setRateDate(currentResult.value.date);
-          const fresh = Date.now() - Date.parse(currentResult.value.date) <= 120_000;
-          setRateLive(Boolean(currentResult.value.live) && fresh);
-          setError(currentResult.value.warning ?? (fresh ? "" : "Kur sağlayıcısının güncelleme zamanı eski. Dakikalık veri için sağlayıcının 60 saniyelik planı gerekir."));
-          if (currentResult.value.availableCurrencies) setCurrencyOptions(supportedCurrencyOptions(currentResult.value.availableCurrencies));
+          const pair = currentResult.value.value;
+          setRate(pair.rate);
+          setRateDate(pair.date);
+          setRateFetchedAt(pair.fetchedAt);
+          setRateSource(pair.source);
+          setRateDataType(pair.dataType);
+          setRefreshIntervalSeconds(pair.refreshIntervalSeconds);
+          const isDailyReference = pair.dataType === "günlük referans harmanı";
+          const ageMs = Date.now() - Date.parse(pair.date);
+          const fresh = isDailyReference ? !pair.stale : Number.isFinite(ageMs) && ageMs <= pair.refreshIntervalSeconds * 1000 + 5 * 60_000;
+          setRateLive(Boolean(pair.live) && !pair.stale && fresh);
+          setLatencyMs(currentResult.value.latency);
+          setError(pair.warning ?? (!fresh ? "Kur sağlayıcısının son veri zamanı beklenen yenileme aralığını aştı." : ""));
+          if (pair.availableCurrencies) setCurrencyOptions(supportedCurrencyOptions(pair.availableCurrencies));
         } else {
+          setRateLive(false);
           setError(currentResult.reason instanceof Error ? currentResult.reason.message : "Canlı kur alınamadı.");
         }
         setPoints(historyResult.status === "fulfilled" ? historyResult.value : []);
@@ -71,14 +96,16 @@ export function CurrencyConverter() {
     };
 
     void load();
-    const interval = window.setInterval(() => setRefreshKey((key) => key + 1), 60 * 1000);
     return () => {
       active = false;
       controller.abort();
-      window.clearInterval(interval);
     };
   }, [base, quote, selectedRange.days, refreshKey]);
 
+  useEffect(() => {
+    const interval = window.setInterval(() => setRefreshKey((key) => key + 1), Math.max(60, refreshIntervalSeconds) * 1000);
+    return () => window.clearInterval(interval);
+  }, [refreshIntervalSeconds]);
   const amountValue = parseAmount(amount);
   const converted = useMemo(() => {
     if (!rate || rate <= 0) return 0;
@@ -89,7 +116,7 @@ export function CurrencyConverter() {
     ? ((points[points.length - 1]!.rate - points[0]!.rate) / points[0]!.rate) * 100
     : 0;
   const positiveTrend = changePercent >= 0;
-  const decimals = base === "XAU" || quote === "XAU" ? 6 : 4;
+  const decimals = 4;
 
   function swap() {
     setBase(quote);
@@ -112,7 +139,7 @@ export function CurrencyConverter() {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Canlı kur dönüştürücü</p>
-          <h2 id="currency-title" className="mt-1 font-display text-lg font-bold">Döviz ve altın kurları</h2>
+          <h2 id="currency-title" className="mt-1 font-display text-lg font-bold">Döviz kurları</h2>
         </div>
         <Button type="button" variant="ghost" size="icon" aria-label="Kuru yenile" disabled={loading} onClick={() => setRefreshKey((key) => key + 1)}>
           {loading ? <Loader2 className="animate-spin"/> : <RefreshCw/>}
@@ -131,14 +158,14 @@ export function CurrencyConverter() {
           <Button type="button" variant="secondary" size="icon" className="mt-1 shrink-0 rounded-full" onClick={swap} aria-label="Para birimlerini değiştir"><ArrowDownUp/></Button>
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-3 text-[11px]">
-          <span className={`inline-flex items-center gap-1.5 ${rateLive ? "text-emerald-300" : "text-amber-300"}`}><span className={`size-1.5 rounded-full ${rateLive ? "animate-pulse bg-emerald-400" : "bg-amber-400"}`}/>{rateLive ? "Canlı çevrimiçi kur" : "Günlük/yedek kur"}</span>
+          <span className={`inline-flex items-center gap-1.5 ${rateLive && online ? "text-emerald-300" : "text-amber-300"}`}><span className={`size-1.5 rounded-full ${rateLive && online ? "bg-emerald-400" : "bg-amber-400"}`}/>{!online ? "Çevrimdışı · son bilinen" : rateLive ? `Güncel · ${intervalLabel(refreshIntervalSeconds)}` : rate === null ? "Kur bekleniyor" : "Referans / son bilinen kur"}</span>
           <span className={`inline-flex items-center gap-1 ${positiveTrend ? "text-emerald-300" : "text-rose-300"}`}>
             {positiveTrend ? <TrendingUp className="size-3.5"/> : <TrendingDown className="size-3.5"/>}
             {positiveTrend ? "+" : ""}{new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(changePercent)}%
           </span>
         </div>
         <p className="mt-2 text-[10px] leading-4 text-muted-foreground">
-          {rateDate ? `Kur zamanı: ${new Date(rateDate).toLocaleString("tr-TR")} · çevrimiçi kontrol 60 sn’de bir` : "Canlı kur verisi bekleniyor"}
+          {rateDate ? <>Kaynak: {rateSource || "—"} · Veri türü: {rateDataType || "—"}<br/>Kur zamanı: {rateDate.length === 10 ? new Date(`${rateDate}T12:00:00`).toLocaleDateString("tr-TR") : new Date(rateDate).toLocaleString("tr-TR")} · Alınma zamanı: {rateFetchedAt ? new Date(rateFetchedAt).toLocaleString("tr-TR") : "—"}{latencyMs !== null && ` · istek ${latencyMs} ms`}</> : "Kur verisi bekleniyor"}
         </p>
       </div>
 
@@ -197,7 +224,13 @@ export function CurrencyConverter() {
       </div>
 
       {error && <div role="status" className="mt-3 flex items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs leading-5 text-amber-100"><CircleHelp className="mt-0.5 size-4 shrink-0"/><span>{error} Ekrandaki son değer sağlayıcının belirttiği zaman damgasına aittir.</span></div>}
-      <p className="mt-3 text-[10px] leading-4 text-muted-foreground">Kurlar sağlayıcının planına göre güncellenen çevrimiçi orta piyasa referans değerleridir; banka alış/satış fiyatı veya işlem kotasyonu değildir. Gram altın, ons altın değerinden hesaplanır.</p>
+      <p className="mt-3 text-[10px] leading-4 text-muted-foreground">Dönüşüm gösterge amaçlıdır: FXAPI mid-market veya günlük yedek referans kurudur; banka alış/satış fiyatı ve gerçekleşebilir işlem kotasyonu değildir. Grafik kaynağı günlük seridir; gün içi/saniyelik fiyat geçmişi anlamına gelmez.</p>
     </section>
   );
+}
+
+function intervalLabel(seconds: number) {
+  if (seconds <= 60) return "dakikalık veri";
+  if (seconds < 86_400) return "saatlik veri";
+  return "günlük veri";
 }

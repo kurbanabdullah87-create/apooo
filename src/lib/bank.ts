@@ -44,15 +44,22 @@ export interface BankDocument {
 }
 type BankVault = { accounts: BankAccountOption[]; transactions: BankMovement[]; documents?: BankDocument[] };
 type EncryptedVault = { version: 1; salt: string; iv: string; ciphertext: string };
+type EncryptedVaultBackup = { format: "saha-encrypted-bank-vault"; version: 1; createdAt: string; vault: EncryptedVault };
 type EncryptedBiometricPassphrase = { credentialId: string; prfSalt: string; iv: string; ciphertext: string };
 
 const PBKDF2_ITERATIONS = 600_000;
 const vaultKey = (ownerId: string) => `saha-bank-vault-v1:${ownerId}`;
 const biometricVaultKey = (ownerId: string) => `saha-bank-vault-biometric-v1:${ownerId}`;
+const vaultLockDurationKey = (ownerId: string) => `saha-bank-vault-lock-duration-v1:${ownerId}`;
 const keyCache = new Map<string, CryptoKey>();
 const utf8 = new TextEncoder();
 const decoder = new TextDecoder();
 const vaultAad = (ownerId: string) => utf8.encode(`saha-bank-vault-v1:${ownerId}`);
+export function clearBankQueryData(queryClient: ReturnType<typeof useQueryClient>, ownerId: string) {
+  queryClient.removeQueries({ queryKey: ["bank-accounts", ownerId] });
+  queryClient.removeQueries({ queryKey: ["bank-movements", ownerId] });
+  queryClient.removeQueries({ queryKey: ["bank-documents", ownerId] });
+}
 const bytesToBase64 = (bytes: Uint8Array) => btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(""));
 const base64ToBytes = (value: string) => Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
 const bytesToBuffer = (value: Uint8Array) => Uint8Array.from(value).buffer;
@@ -126,13 +133,13 @@ async function encryptVault(ownerId: string, passphrase: string, vault: BankVaul
   return { version: 1, salt: bytesToBase64(salt), iv: bytesToBase64(iv), ciphertext: bytesToBase64(new Uint8Array(ciphertext)) } satisfies EncryptedVault;
 }
 
-async function decryptVault(ownerId: string, passphrase: string, encrypted: EncryptedVault): Promise<BankVault> {
+async function decryptVault(ownerId: string, passphrase: string, encrypted: EncryptedVault, rememberKey = true): Promise<BankVault> {
   if (encrypted.version !== 1) throw new Error("Kasa biçimi desteklenmiyor.");
   const key = await deriveKey(passphrase, base64ToBytes(encrypted.salt));
   const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: base64ToBytes(encrypted.iv), additionalData: vaultAad(ownerId) }, key, base64ToBytes(encrypted.ciphertext));
   const parsed = JSON.parse(decoder.decode(plaintext)) as BankVault;
   if (!Array.isArray(parsed.accounts) || !Array.isArray(parsed.transactions)) throw new Error("Kasa verisi doğrulanamadı.");
-  keyCache.set(ownerId, key);
+  if (rememberKey) keyCache.set(ownerId, key);
   return parsed;
 }
 
@@ -161,6 +168,43 @@ async function writeVault(ownerId: string, vault: BankVault) {
   await set(vaultKey(ownerId), { ...previous, iv: bytesToBase64(iv), ciphertext: bytesToBase64(new Uint8Array(ciphertext)) });
 }
 
+/** Create a portable file containing only ciphertext. The encryption key is never written into the backup. */
+export async function createEncryptedBankBackup(ownerId: string) {
+  await readVault(ownerId);
+  const encrypted = await get<EncryptedVault>(vaultKey(ownerId));
+  if (!encrypted) throw new Error("Şifreli kasa bulunamadı.");
+  const backup: EncryptedVaultBackup = { format: "saha-encrypted-bank-vault", version: 1, createdAt: new Date().toISOString(), vault: encrypted };
+  return new Blob([JSON.stringify(backup)], { type: "application/json" });
+}
+
+function parseEncryptedBankBackup(value: unknown): EncryptedVaultBackup {
+  if (!value || typeof value !== "object") throw new Error("Yedek dosyası biçimi geçersiz.");
+  const backup = value as Partial<EncryptedVaultBackup>;
+  const vault = backup.vault as Partial<EncryptedVault> | undefined;
+  if (backup.format !== "saha-encrypted-bank-vault" || backup.version !== 1 || vault?.version !== 1 || typeof vault.salt !== "string" || typeof vault.iv !== "string" || typeof vault.ciphertext !== "string") {
+    throw new Error("Bu dosya desteklenen Saha şifreli kasa yedeği değil.");
+  }
+  if (vault.ciphertext.length > 140_000_000 || vault.salt.length > 256 || vault.iv.length > 256) throw new Error("Yedek dosyası izin verilen boyutu aşıyor.");
+  return backup as EncryptedVaultBackup;
+}
+
+export async function inspectEncryptedBankBackup(ownerId: string, file: File, passphrase: string) {
+  if (file.size > 105 * 1024 * 1024) throw new Error("Şifreli yedek en fazla 100 MB olabilir.");
+  let backup: EncryptedVaultBackup;
+  try { backup = parseEncryptedBankBackup(JSON.parse(await file.text()) as unknown); }
+  catch (error) { throw new Error(error instanceof Error ? error.message : "Yedek dosyası okunamadı."); }
+  const data = await decryptVault(ownerId, passphrase, backup.vault, false);
+  if (data.accounts.length > 2_000 || data.transactions.length > 500_000 || (data.documents?.length ?? 0) > 10_000) throw new Error("Yedekteki kayıt sayısı güvenli sınırın üzerinde.");
+  return { backup, counts: { accounts: data.accounts.length, movements: data.transactions.length, documents: data.documents?.length ?? 0 } };
+}
+
+/** Restore only after a separate UI preview and confirmation; AES-GCM verifies the encrypted contents. */
+export async function restoreEncryptedBankBackup(ownerId: string, backup: EncryptedVaultBackup, passphrase: string) {
+  const data = await decryptVault(ownerId, passphrase, backup.vault);
+  await set(vaultKey(ownerId), backup.vault);
+  return { accounts: data.accounts.length, movements: data.transactions.length, documents: data.documents?.length ?? 0 };
+}
+
 /** Resolve the signed-in identity without requesting financial data from the server. */
 export function useBankOwnerId() {
   const [ownerId, setOwnerId] = useState<string | null | undefined>(undefined);
@@ -178,9 +222,11 @@ export function useBankOwnerId() {
 }
 
 export function useBankVault(ownerId: string | null | undefined) {
+  const queryClient = useQueryClient();
   const [exists, setExists] = useState<boolean | null>(null);
   const [unlocked, setUnlocked] = useState(false);
   const [biometricReady, setBiometricReady] = useState(false);
+  const [lockDurationMinutes, setLockDurationMinutesState] = useState<1 | 5 | 10>(5);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let active = true;
@@ -188,7 +234,16 @@ export function useBankVault(ownerId: string | null | undefined) {
     setUnlocked(false);
     if (ownerId) void get<EncryptedVault>(vaultKey(ownerId)).then((saved) => { if (active) setExists(Boolean(saved)); });
     else setExists(false);
-    return () => { active = false; if (ownerId) keyCache.delete(ownerId); };
+    return () => { active = false; if (ownerId) { keyCache.delete(ownerId); clearBankQueryData(queryClient, ownerId); } };
+  }, [ownerId, queryClient]);
+
+  useEffect(() => {
+    let active = true;
+    if (ownerId) void get<number>(vaultLockDurationKey(ownerId)).then((minutes) => {
+      if (active && (minutes === 1 || minutes === 5 || minutes === 10)) setLockDurationMinutesState(minutes);
+    });
+    else setLockDurationMinutesState(5);
+    return () => { active = false; };
   }, [ownerId]);
 
   useEffect(() => {
@@ -205,10 +260,11 @@ export function useBankVault(ownerId: string | null | undefined) {
       clearTimeout(timer);
       keyCache.delete(ownerId);
       setUnlocked(false);
+      window.setTimeout(() => clearBankQueryData(queryClient, ownerId), 0);
     };
     const resetTimer = () => {
       clearTimeout(timer);
-      timer = setTimeout(lockNow, 5 * 60 * 1000);
+      timer = setTimeout(lockNow, lockDurationMinutes * 60 * 1000);
     };
     const handleVisibility = () => document.visibilityState === "hidden" ? lockNow() : resetTimer();
     const activityEvents: Array<keyof WindowEventMap> = ["pointerdown", "keydown", "touchstart"];
@@ -220,7 +276,12 @@ export function useBankVault(ownerId: string | null | undefined) {
       activityEvents.forEach((event) => window.removeEventListener(event, resetTimer));
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [ownerId, unlocked]);
+  }, [ownerId, unlocked, lockDurationMinutes, queryClient]);
+
+  async function setLockDurationMinutes(minutes: 1 | 5 | 10) {
+    if (ownerId) await set(vaultLockDurationKey(ownerId), minutes);
+    setLockDurationMinutesState(minutes);
+  }
 
   async function create(passphrase: string) {
     if (!ownerId) throw new Error("Oturum gerekli.");
@@ -275,6 +336,7 @@ export function useBankVault(ownerId: string | null | undefined) {
   function lock() {
     if (ownerId) keyCache.delete(ownerId);
     setUnlocked(false);
+    if (ownerId) window.setTimeout(() => clearBankQueryData(queryClient, ownerId), 0);
   }
 
   async function erase() {
@@ -282,8 +344,9 @@ export function useBankVault(ownerId: string | null | undefined) {
     if (ownerId) await del(vaultKey(ownerId));
     setExists(false);
     setUnlocked(false);
+    if (ownerId) clearBankQueryData(queryClient, ownerId);
   }
-  return { exists, unlocked, busy, biometricReady, create, unlock, unlockBiometric, enableBiometric, disableBiometric, lock, erase };
+  return { exists, unlocked, busy, biometricReady, lockDurationMinutes, setLockDurationMinutes, create, unlock, unlockBiometric, enableBiometric, disableBiometric, lock, erase };
 }
 
 /** One-time user-triggered migration: encrypt legacy cloud rows locally, verify write, then delete plaintext cloud rows. */
@@ -367,7 +430,20 @@ export function useBankDocuments(ownerId: string | null | undefined, unlocked: b
 }
 
 /** Save the original statement and its parsed movements together in the encrypted local vault. */
-export async function importBankStatementFile(ownerId: string, accountId: string, file: File, parsedRows: ImportedBankMovement[]) {
+export function countPotentialBankMovementDuplicates(existingRows: BankMovement[], importedRows: ImportedBankMovement[], accountId: string) {
+  const existing = new Set(existingRows.filter((row) => row.account_id === accountId).map((row) => bankMovementFingerprint(accountId, row)));
+  const seen = new Set<string>();
+  let possibleDuplicates = 0;
+  for (const row of importedRows) {
+    const key = bankMovementFingerprint(accountId, row);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (!row.reference?.trim() && existing.has(key)) possibleDuplicates++;
+  }
+  return possibleDuplicates;
+}
+
+export async function importBankStatementFile(ownerId: string, accountId: string, file: File, parsedRows: ImportedBankMovement[], includePossibleDuplicates = false) {
   const { data: auth, error } = await supabase.auth.getUser();
   if (error || auth.user?.id !== ownerId) throw new Error("Oturum değişti. Yeniden giriş yap.");
   if (file.size > 8 * 1024 * 1024) throw new Error("Ekstre dosyası en fazla 8 MB olabilir.");
@@ -381,16 +457,15 @@ export async function importBankStatementFile(ownerId: string, accountId: string
   let binaryString = "";
   for (let offset = 0; offset < binary.length; offset += 0x8000) binaryString += String.fromCharCode(...binary.subarray(offset, offset + 0x8000));
   const fileData = btoa(binaryString);
-  const existing = new Set(vault.transactions.map((row) => {
-    const key = row.reference?.trim().toLocaleLowerCase("tr-TR");
-    return key ? `${row.account_id}|ref|${key}` : `${row.account_id}|${row.date}|${row.direction}|${row.amount.toFixed(2)}|${row.counterparty.trim().toLocaleLowerCase("tr-TR")}|${row.description.trim().toLocaleLowerCase("tr-TR")}`;
-  }));
+  const existing = new Set(vault.transactions.map((row) => bankMovementFingerprint(row.account_id, row)));
+  const seenInFile = new Set<string>();
   const now = new Date().toISOString();
   let importedCount = 0;
   for (const row of parsedRows) {
-    const ref = row.reference?.trim().toLocaleLowerCase("tr-TR");
-    const key = ref ? `${account.id}|ref|${ref}` : `${account.id}|${row.date}|${row.direction}|${row.amount.toFixed(2)}|${row.counterparty.trim().toLocaleLowerCase("tr-TR")}|${row.description.trim().toLocaleLowerCase("tr-TR")}`;
-    if (existing.has(key)) continue;
+    const key = bankMovementFingerprint(account.id, row);
+    if (seenInFile.has(key)) continue;
+    seenInFile.add(key);
+    if (existing.has(key) && (row.reference?.trim() || !includePossibleDuplicates)) continue;
     existing.add(key);
     vault.transactions.unshift({
       id: crypto.randomUUID(), owner_id: ownerId, account_id: account.id,
@@ -412,34 +487,44 @@ export async function importBankStatementFile(ownerId: string, accountId: string
 }
 
 /** Store only extracted transaction fields in the already encrypted, device-local vault. */
-export async function importEmailBankMovements(ownerId: string, accountId: string, rows: ImportedBankMovement[]) {
+export async function importEmailBankMovements(ownerId: string, accountId: string, rows: ImportedBankMovement[], includePossibleDuplicates = false) {
   const { data: auth, error } = await supabase.auth.getUser();
   if (error || auth.user?.id !== ownerId) throw new Error("Oturum değişti. Yeniden giriş yap.");
   if (rows.length === 0) return { importedCount: 0, duplicateCount: 0 };
   const vault = await readVault(ownerId);
   const account = vault.accounts.find((candidate) => candidate.id === accountId);
   if (!account) throw new Error("Aktarım hesabı bulunamadı.");
-  const existing = new Set(vault.transactions.map((row) => row.reference?.trim().toLocaleLowerCase("tr-TR")).filter(Boolean));
+  const existing = new Set(vault.transactions.map((row) => bankMovementFingerprint(row.account_id, row)));
+  const seenInEmail = new Set<string>();
   const now = new Date().toISOString();
   let importedCount = 0;
   for (const row of rows) {
     const reference = row.reference?.trim().toLocaleLowerCase("tr-TR");
-    if (!reference || existing.has(reference)) continue;
     if (!(row.amount > 0) || !Number.isFinite(row.amount) || !row.date || !["incoming", "outgoing"].includes(row.direction)) continue;
-    existing.add(reference);
+    const fingerprint = bankMovementFingerprint(account.id, row);
+    if (seenInEmail.has(fingerprint)) continue;
+    seenInEmail.add(fingerprint);
+    if (existing.has(fingerprint) && (reference || !includePossibleDuplicates)) continue;
+    existing.add(fingerprint);
     vault.transactions.unshift({
       id: crypto.randomUUID(), owner_id: ownerId, account_id: account.id,
       direction: row.direction, amount: row.amount, date: row.date,
       counterparty: row.counterparty.slice(0, 120), description: row.description.slice(0, 500),
-      reference: reference!.slice(0, 120),
+      ...(reference ? { reference: reference.slice(0, 120) } : {}),
       ...(row.transaction_reason ? { transaction_reason: row.transaction_reason.slice(0, 300) } : {}),
-      ...(row.raw_source_snippet ? { raw_source_snippet: row.raw_source_snippet.slice(0, 1000) } : {}),
       bank_name: account.bank_name, status: "completed", source: "email_auto", created_at: now,
     });
     importedCount++;
   }
   if (importedCount) await writeVault(ownerId, vault);
   return { importedCount, duplicateCount: rows.length - importedCount };
+}
+
+export function bankMovementFingerprint(accountId: string, row: Pick<BankMovement, "reference" | "date" | "direction" | "amount" | "counterparty" | "description">) {
+  const normalize = (value: string) => value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/ı/g, "i").toLocaleLowerCase("tr-TR").replace(/\s+/g, " ").trim();
+  const reference = row.reference?.trim();
+  if (reference) return `${accountId}|ref|${normalize(reference)}`;
+  return `${accountId}|${row.date.trim()}|${row.direction}|${row.amount.toFixed(2)}|${normalize(row.counterparty)}|${normalize(row.description)}`;
 }
 
 export async function getBankDocumentFile(ownerId: string, documentId: string) {

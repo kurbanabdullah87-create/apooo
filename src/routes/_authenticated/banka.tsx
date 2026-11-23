@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDate, formatTL, monthKey, todayISO } from "@/lib/finance";
 import { pageHead } from "@/lib/work";
-import { deleteLegacyBankDocuments, getBankDocumentFile, importBankStatementFile, importEmailBankMovements, migrateLegacyBankData, useAddBankMovement, useBankAccounts, useBankDocuments, useBankMovements, useBankOwnerId, useBankVault, useDeleteBankMovement, type BankDirection } from "@/lib/bank";
+import { countPotentialBankMovementDuplicates, createEncryptedBankBackup, deleteLegacyBankDocuments, getBankDocumentFile, importBankStatementFile, importEmailBankMovements, inspectEncryptedBankBackup, migrateLegacyBankData, restoreEncryptedBankBackup, useAddBankMovement, useBankAccounts, useBankDocuments, useBankMovements, useBankOwnerId, useBankVault, useDeleteBankMovement, type BankDirection } from "@/lib/bank";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { parseBankSms } from "@/lib/bank-sms";
@@ -56,6 +56,9 @@ function Bank() {
   const [showVaultPassword, setShowVaultPassword] = useState(false);
   const [biometricSetupOpen, setBiometricSetupOpen] = useState(false);
   const [biometricPassphrase, setBiometricPassphrase] = useState("");
+  const [backupFile, setBackupFile] = useState<File | null>(null);
+  const [backupPassphrase, setBackupPassphrase] = useState("");
+  const [backupPreview, setBackupPreview] = useState<Awaited<ReturnType<typeof inspectEncryptedBankBackup>> | null>(null);
   const [smsImportOpen, setSmsImportOpen] = useState(false);
   const [smsText, setSmsText] = useState("");
   const [statementFile, setStatementFile] = useState<File | null>(null);
@@ -74,6 +77,23 @@ function Bank() {
       queryClient.removeQueries({ queryKey: ["bank-accounts"] });
       queryClient.removeQueries({ queryKey: ["bank-movements"] });
       queryClient.removeQueries({ queryKey: ["bank-documents"] });
+      setStatementRows([]);
+      setStatementFile(null);
+      setGmailRows([]);
+      setGmailScannedCount(0);
+      setSelectedMovementId(null);
+      setSmsText("");
+      setAdding(false);
+      setCounterparty("");
+      setDescription("");
+      setAmount("");
+      setVaultPassphrase("");
+      setVaultConfirm("");
+      setBiometricPassphrase("");
+      setBiometricSetupOpen(false);
+      setBackupFile(null);
+      setBackupPassphrase("");
+      setBackupPreview(null);
     }
   }, [vault.unlocked, ownerId, queryClient]);
 
@@ -96,6 +116,8 @@ function Bank() {
   }, [outgoingRows]);
   const largestExpense = outgoingRows.reduce((largest, row) => Math.max(largest, row.amount), 0);
   const averageExpense = outgoingRows.length ? outgoing / outgoingRows.length : 0;
+  const statementDuplicateCandidates = useMemo(() => activeAccount ? countPotentialBankMovementDuplicates(records.data ?? [], statementRows, activeAccount.id) : 0, [activeAccount, records.data, statementRows]);
+  const gmailDuplicateCandidates = useMemo(() => activeAccount ? countPotentialBankMovementDuplicates(records.data ?? [], gmailRows, activeAccount.id) : 0, [activeAccount, records.data, gmailRows]);
   const monthLabel = month === "all" ? "Tüm zamanlar" : new Date(`${month}-01T00:00:00`).toLocaleDateString("tr-TR", { month: "long", year: "numeric" });
 
   async function downloadReport() {
@@ -773,6 +795,58 @@ function Bank() {
     } finally { setVaultBusy(false); }
   }
 
+  async function downloadEncryptedBackup() {
+    if (!ownerId) return;
+    try {
+      const blob = await createEncryptedBankBackup(ownerId);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `saha-banka-kasa-yedegi-${todayISO()}.json`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      toast.success("Şifreli kasa yedeği indirildi. Açma parolası yedek dosyasına eklenmedi.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Şifreli yedek hazırlanamadı.");
+    }
+  }
+
+  async function previewEncryptedBackup() {
+    if (!ownerId || !backupFile || !backupPassphrase) return;
+    setVaultBusy(true);
+    try {
+      const preview = await inspectEncryptedBankBackup(ownerId, backupFile, backupPassphrase);
+      setBackupPreview(preview);
+      toast.success("Yedek parolası ve şifreli içerik doğrulandı.");
+    } catch (error) {
+      setBackupPreview(null);
+      toast.error(error instanceof Error ? error.message : "Yedek doğrulanamadı.");
+    } finally { setVaultBusy(false); }
+  }
+
+  async function restoreEncryptedBackup() {
+    if (!ownerId || !backupPreview) return;
+    const current = { accounts: accounts.data?.length ?? 0, movements: records.data?.length ?? 0, documents: bankDocuments.data?.length ?? 0 };
+    const incoming = backupPreview.counts;
+    const confirmed = window.confirm(`Mevcut kasadaki ${current.accounts} hesap, ${current.movements} hareket ve ${current.documents} belge yedek içeriğiyle değiştirilecek. Yedekte ${incoming.accounts} hesap, ${incoming.movements} hareket ve ${incoming.documents} belge var. Bu işlem geri alınamaz. Devam edilsin mi?`);
+    if (!confirmed) return;
+    setVaultBusy(true);
+    try {
+      await restoreEncryptedBankBackup(ownerId, backupPreview.backup, backupPassphrase);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["bank-accounts", ownerId] }),
+        queryClient.invalidateQueries({ queryKey: ["bank-movements", ownerId] }),
+        queryClient.invalidateQueries({ queryKey: ["bank-documents", ownerId] }),
+      ]);
+      setBackupFile(null);
+      setBackupPassphrase("");
+      setBackupPreview(null);
+      toast.success("Şifreli kasa yedeği geri yüklendi.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Yedek geri yüklenemedi.");
+    } finally { setVaultBusy(false); }
+  }
+
   function importSmsLocally() {
     const parsed = parseBankSms(smsText);
     if (!parsed) {
@@ -824,9 +898,10 @@ function Bank() {
 
   async function saveStatementImport() {
     if (!ownerId || !activeAccount || !statementFile || !statementRows.length) return;
+    const includePossibleDuplicates = statementDuplicateCandidates > 0 && window.confirm(`${statementDuplicateCandidates} satır, aynı hesapta referans numarası olmadığı için mevcut bir hareketle benzer görünüyor. Evet: benzer satırları da içe aktar. Hayır: benzer satırları atla, diğerlerini aktar.`);
     setImportBusy(true);
     try {
-      const result = await importBankStatementFile(ownerId, activeAccount.id, statementFile, statementRows);
+      const result = await importBankStatementFile(ownerId, activeAccount.id, statementFile, statementRows, includePossibleDuplicates);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["bank-movements", ownerId] }),
         queryClient.invalidateQueries({ queryKey: ["bank-documents", ownerId] }),
@@ -863,9 +938,10 @@ function Bank() {
 
   async function saveGmailImport() {
     if (!ownerId || !activeAccount || !gmailRows.length) return;
+    const includePossibleDuplicates = gmailDuplicateCandidates > 0 && window.confirm(`${gmailDuplicateCandidates} e-posta hareketi, sabit referans numarası olmadan mevcut kayıtla benzer görünüyor. Evet: benzerleri de ekle. Hayır: benzerleri atla, diğer hareketleri kaydet.`);
     setImportBusy(true);
     try {
-      const result = await importEmailBankMovements(ownerId, activeAccount.id, gmailRows);
+      const result = await importEmailBankMovements(ownerId, activeAccount.id, gmailRows, includePossibleDuplicates);
       await queryClient.invalidateQueries({ queryKey: ["bank-movements", ownerId] });
       await queryClient.refetchQueries({ queryKey: ["bank-movements", ownerId, activeAccount.id, true], type: "active" });
       setSearch("");
@@ -941,8 +1017,27 @@ function Bank() {
     {accounts.error && <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">Şifreli kasa açılamadı. Kapatıp parolanla yeniden aç.</p>}
     <section className="flex flex-col gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.04] p-4 sm:flex-row sm:items-center sm:justify-between">
       <div><p className="flex items-center gap-2 font-semibold"><LockKeyhole className="size-4 text-emerald-600"/>Bu cihazdaki kasa açık</p><p className="mt-1 text-xs text-muted-foreground">Kayıtlar Supabase’e gitmez. İşin bitince kasayı kilitle.</p></div>
-      <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" disabled={vaultBusy} onClick={() => void migrateLegacy()}><ShieldCheck className="size-4"/>Eski bulut hareketlerini taşı ve sil</Button><Button variant="outline" size="sm" disabled={vaultBusy} onClick={() => void removeCloudPdfs()}><FileText className="size-4"/>Eski bulut PDF’lerini sil</Button>{vault.biometricReady ? <Button variant="outline" size="sm" disabled={vaultBusy} onClick={() => void vault.disableBiometric().then(() => toast.success("Kasa biyometrisi bu cihazdan kaldırıldı."))}><Fingerprint className="size-4"/>Biyometrik açmayı kapat</Button> : <Button variant="outline" size="sm" disabled={vaultBusy} onClick={() => setBiometricSetupOpen(true)}><Fingerprint className="size-4"/>Face ID / parmak izi kur</Button>}<Button variant="secondary" size="sm" onClick={() => { vault.lock(); queryClient.removeQueries({ queryKey: ["bank-accounts", ownerId] }); queryClient.removeQueries({ queryKey: ["bank-movements", ownerId] }); queryClient.removeQueries({ queryKey: ["bank-documents", ownerId] }); }}><LockKeyhole className="size-4"/>Kasayı kilitle</Button></div>
+      <div className="flex flex-wrap items-center gap-2"><label className="flex items-center gap-2 rounded-lg border border-white/15 bg-slate-900 px-3 py-1.5 text-xs text-slate-200">Otomatik kilit<select aria-label="Banka kasası otomatik kilit süresi" className="bg-transparent font-semibold text-white outline-none" value={vault.lockDurationMinutes} onChange={(event) => void vault.setLockDurationMinutes(Number(event.target.value) as 1 | 5 | 10)}><option className="text-black" value={1}>1 dakika</option><option className="text-black" value={5}>5 dakika</option><option className="text-black" value={10}>10 dakika</option></select></label><Button variant="outline" size="sm" disabled={vaultBusy} onClick={() => void migrateLegacy()}><ShieldCheck className="size-4"/>Eski bulut hareketlerini taşı ve sil</Button><Button variant="outline" size="sm" disabled={vaultBusy} onClick={() => void removeCloudPdfs()}><FileText className="size-4"/>Eski bulut PDF’lerini sil</Button>{vault.biometricReady ? <Button variant="outline" size="sm" disabled={vaultBusy} onClick={() => void vault.disableBiometric().then(() => toast.success("Kasa biyometrisi bu cihazdan kaldırıldı."))}><Fingerprint className="size-4"/>Biyometrik açmayı kapat</Button> : <Button variant="outline" size="sm" disabled={vaultBusy} onClick={() => setBiometricSetupOpen(true)}><Fingerprint className="size-4"/>Face ID / parmak izi kur</Button>}<Button variant="secondary" size="sm" onClick={() => { vault.lock(); queryClient.removeQueries({ queryKey: ["bank-accounts", ownerId] }); queryClient.removeQueries({ queryKey: ["bank-movements", ownerId] }); queryClient.removeQueries({ queryKey: ["bank-documents", ownerId] }); }}><LockKeyhole className="size-4"/>Kasayı kilitle</Button></div>
     </section>
+
+    <details className="rounded-2xl border bg-card p-4">
+      <summary className="cursor-pointer font-semibold">Şifreli kasayı yedekle veya geri yükle</summary>
+      <div className="mt-3 grid gap-4 md:grid-cols-2">
+        <div className="space-y-2 rounded-xl border p-3">
+          <p className="text-sm font-medium">Bu cihazdan yedek al</p>
+          <p className="text-xs leading-relaxed text-muted-foreground">Dosyada yalnızca şifreli kasa verisi bulunur. Parolanı yedekten ayrı ve güvenli sakla; parola dosyaya eklenmez.</p>
+          <Button type="button" variant="outline" size="sm" onClick={() => void downloadEncryptedBackup()}><Download className="size-4"/>Şifreli yedeği indir</Button>
+        </div>
+        <div className="space-y-2 rounded-xl border p-3">
+          <p className="text-sm font-medium">Şifreli yedekten geri yükle</p>
+          <p className="text-xs leading-relaxed text-muted-foreground">Önce dosyayı ve kasanın parolasını doğrula. Mevcut ve yedek kayıt sayıları karşılaştırılmadan üzerine yazılmaz.</p>
+          <Input aria-label="Şifreli banka kasası yedek dosyası" type="file" accept=".json,application/json" onChange={(event) => { setBackupFile(event.target.files?.[0] ?? null); setBackupPreview(null); }} />
+          <Input aria-label="Yedek kasasının parolası" type="password" autoComplete="current-password" placeholder="Yedek oluşturulurken kullanılan kasa parolası" value={backupPassphrase} onChange={(event) => { setBackupPassphrase(event.target.value); setBackupPreview(null); }} />
+          {backupPreview && <p className="rounded-lg bg-muted p-2 text-xs">Yedek: {backupPreview.counts.accounts} hesap · {backupPreview.counts.movements} hareket · {backupPreview.counts.documents} belge<br/>Mevcut: {accounts.data?.length ?? 0} hesap · {records.data?.length ?? 0} hareket · {bankDocuments.data?.length ?? 0} belge</p>}
+          <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" disabled={vaultBusy || !backupFile || !backupPassphrase} onClick={() => void previewEncryptedBackup()}>{vaultBusy ? <RefreshCw className="size-4 animate-spin"/> : <ShieldCheck className="size-4"/>}Yedeği doğrula ve önizle</Button>{backupPreview && <Button type="button" size="sm" disabled={vaultBusy} onClick={() => void restoreEncryptedBackup()}><Download className="size-4"/>Yedeği geri yükle</Button>}</div>
+        </div>
+      </div>
+    </details>
     <section className="space-y-4 rounded-3xl border border-primary/20 bg-card p-4 shadow-sm sm:p-5">
       <div className="flex items-start gap-3"><div className="rounded-2xl bg-primary/10 p-3 text-primary"><Mail className="size-5"/></div><div className="min-w-0 flex-1"><p className="text-xs font-bold uppercase tracking-wider text-primary">E-posta eki / banka ekstresi</p><h2 className="mt-1 text-lg font-semibold">Ekstre dosyasını içe aktar</h2><p className="mt-1 text-sm leading-relaxed text-muted-foreground">Bankanın e-postayla gönderdiği PDF, CSV, OFX, QIF veya TSV/TXT ekini indirip seç. Okunabilen tarih, saat, yön, tutar, açıklama, taraf ve referans bilgileri çıkarılır; kaydetmeden önce örnek satırları kontrol et.</p></div></div>
       <input ref={statementInput} type="file" accept=".csv,.tsv,.txt,.ofx,.qif,.pdf,text/csv,text/plain,application/x-ofx,application/pdf" className="sr-only" onChange={(event) => void inspectStatement(event.target.files?.[0])}/>

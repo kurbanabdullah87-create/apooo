@@ -66,15 +66,50 @@ try {
     } else {
       console.log("[db:migrate] Exchange-rate snapshots are already secured.");
     }
+
+    if (!(await tableExists(tx, "business_profiles"))) {
+      await applyMigration(tx, "0016_business_profiles.sql", "0016_business_profiles");
+    } else {
+      const profileColumns = await tx`
+        SELECT table_name, column_name FROM information_schema.columns
+        WHERE table_schema='public' AND (
+          (table_name='business_profiles' AND column_name IN ('id','team_id','name','is_default','is_archived','created_by')) OR
+          (table_name IN ('work_records','transactions','expenses') AND column_name='profile_id')
+        )
+      `;
+      const expectedProfileColumns = [
+        'business_profiles:id','business_profiles:team_id','business_profiles:name',
+        'business_profiles:is_default','business_profiles:is_archived','business_profiles:created_by',
+        'work_records:profile_id','transactions:profile_id','expenses:profile_id',
+      ];
+      const found = new Set(profileColumns.map((row) => `${row.table_name}:${row.column_name}`));
+      const absent = expectedProfileColumns.filter((column) => !found.has(column));
+      if (absent.length) throw new Error(`Business profile migration is partially present; missing ${absent.join(', ')}. Refusing an automatic production repair.`);
+      const policies = await tx`SELECT policyname FROM pg_policies WHERE schemaname='public' AND tablename='business_profiles'`;
+      const triggers = await tx`SELECT tgname FROM pg_trigger WHERE tgrelid IN ('public.work_records'::regclass,'public.transactions'::regclass,'public.expenses'::regclass) AND NOT tgisinternal AND tgname LIKE 'assign_profile_%'`;
+      const profileTriggers = await tx`SELECT tgname FROM pg_trigger WHERE tgrelid='public.business_profiles'::regclass AND NOT tgisinternal AND tgname IN ('audit_business_profile','protect_default_business_profile','touch_business_profile_updated_at')`;
+      if (policies.length < 3 || triggers.length !== 3 || profileTriggers.length !== 3 || !(await tableExists(tx, 'business_profile_audit'))) throw new Error('Business profile schema is present but its access policies, audit table or validation triggers are incomplete. Refusing to continue.');
+      console.log('[db:migrate] Business profile schema and ownership safeguards already exist.');
+    }
   });
 
-  const requiredTables = ["debt_records", "debt_installments", "debt_payments", "credit_card_records"];
+  const requiredTables = ["debt_records", "debt_installments", "debt_payments", "credit_card_records", "business_profiles", "business_profile_audit"];
   const missing = [];
   for (const name of requiredTables) {
     if (!(await tableExists(client, name))) missing.push(name);
   }
   if (missing.length) throw new Error(`Migration verification failed; missing tables: ${missing.join(", ")}`);
-  console.log("[db:migrate] Production schema verified for debt and credit-card installments.");
+  const unassigned = await client`
+    SELECT
+      (SELECT count(*)::int FROM public.work_records WHERE kind <> 'settings' AND profile_id IS NULL) AS work_records,
+      (SELECT count(*)::int FROM public.transactions WHERE profile_id IS NULL) AS transactions,
+      (SELECT count(*)::int FROM public.expenses WHERE profile_id IS NULL) AS expenses
+  `;
+  const totals = unassigned[0];
+  if (totals && (totals.work_records || totals.transactions || totals.expenses)) {
+    throw new Error(`Profile migration verification found unassigned records (work=${totals.work_records}, transactions=${totals.transactions}, expenses=${totals.expenses}).`);
+  }
+  console.log("[db:migrate] Production schema verified for debt, installments and business profiles.");
 } catch (error) {
   console.error(`[db:migrate] Failed: ${error?.code ? `${error.code} ` : ""}${error?.message ?? "unknown database error"}`);
   process.exitCode = 1;

@@ -16,6 +16,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { initializeOffline } from "@/lib/pwa";
+import { clearQueriesForIdentityChange } from "@/lib/auth-cache";
 
 function NotFoundComponent() {
   return (
@@ -110,10 +111,18 @@ function RootComponent() {
       document.documentElement.dataset.fieldMode = localStorage.getItem("saha-field-mode") === "sunlight" ? "sunlight" : "standard";
     } catch { /* Device storage can be disabled. */ }
     void initializeOffline();
-    const { data } = supabase.auth.onAuthStateChange((event) => {
-      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
+    let currentUserId: string | null | undefined;
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "INITIAL_SESSION") {
+        currentUserId = session?.user.id ?? null;
+        return;
+      }
+      const nextUserId = session?.user.id ?? null;
+      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED" && event !== "TOKEN_REFRESHED") return;
+      clearQueriesForIdentityChange(queryClient, currentUserId, nextUserId, event);
+      currentUserId = nextUserId;
       router.invalidate();
-      if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
+      if (event !== "SIGNED_OUT") void queryClient.invalidateQueries();
     });
     return () => data.subscription.unsubscribe();
   }, [router, queryClient]);
