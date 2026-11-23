@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, BriefcaseBusiness, CalendarDays, ChevronLeft, ChevronRight, Clock3, Download, FileText, Plus, TrendingUp, Wallet, X, UserCheck } from "lucide-react";
+import { Banknote, BriefcaseBusiness, Building2, CalendarDays, ChevronLeft, ChevronRight, Clock3, Download, FileText, Plus, TrendingUp, Wallet, X, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,7 +55,16 @@ function Payroll() {
   const [advanceConfirmed, setAdvanceConfirmed] = useState(false);
   const [placeForm, setPlaceForm] = useState<{ id?: string; payload: Payload } | null>(null);
   const [workplaceSearch, setWorkplaceSearch] = useState("");
-  const newWorkplace = () => ({ ...blankWorkplace(), currency: businessProfile.activeProfile?.currency ?? "TRY" });
+  const newWorkplace = () => {
+    const defaultHourlyRate = businessProfile.activeProfile?.default_hourly_rate;
+    return {
+      ...blankWorkplace(),
+      currency: businessProfile.activeProfile?.currency ?? "TRY",
+      ...(defaultHourlyRate !== null && defaultHourlyRate !== undefined
+        ? { pay_type: "hourly", rate: defaultHourlyRate }
+        : {}),
+    };
+  };
 
   useEffect(() => {
     void supabase.from("profiles").select("id,username").then(({ data }) => setMembers(data ?? []));
@@ -222,7 +231,19 @@ function Payroll() {
         <div><p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[.2em] text-emerald-300"><TrendingUp className="size-4"/>SAHA · ÇALIŞMA TAKİBİ</p><h1 className="mt-2 text-2xl font-bold sm:text-3xl">Yevmiye ve bordro</h1><p className="mt-1 max-w-lg text-sm text-slate-300">İşyeri ücretlerini, günlük çalışmalarını, mesaileri ve ödemeleri tek yerden yönetin.</p></div>
         <div className="flex flex-wrap gap-2">{me.data?.isUsta && <Button asChild variant="outline" className="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"><Link to="/puantaj"><UserCheck/>Puantaj</Link></Button>}{me.data?.isUsta && <Button className="bg-white text-slate-950 hover:bg-slate-100" onClick={() => openEntry("payroll")}><Plus/>Çalışma ekle</Button>}</div>
       </div>
-      {me.data?.isUsta && <div className="relative mt-5 max-w-xs"><Label className="mb-1 block text-xs text-slate-300" htmlFor="payroll-employee">Çalışan görünümü</Label><select id="payroll-employee" className="h-10 w-full rounded-xl border border-white/20 bg-white/10 px-3 text-sm text-white" value={ownerId} onChange={(e) => setSelectedOwner(e.target.value)}>{members.map((m) => <option className="text-slate-900" key={m.id} value={m.id}>{m.id === me.data?.id ? selectedMasterName : m.username}</option>)}</select></div>}
+      {me.data?.isUsta && <div className="relative mt-5 grid max-w-2xl gap-3 sm:grid-cols-2">
+        {businessProfile.isUsta && businessProfile.profiles.filter((profile) => !profile.is_archived || profile.id === businessProfile.activeProfileId).length > 1 && <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[.045] p-3 transition-colors duration-150">
+          <Label className="mb-1.5 flex items-center gap-2 text-xs text-slate-300" htmlFor="payroll-business-profile"><Building2 className="size-3.5 text-emerald-300"/>Usta / işletme</Label>
+          <select id="payroll-business-profile" className="h-10 w-full rounded-xl border border-white/20 bg-white/10 px-3 text-sm text-white focus-visible:ring-2 focus-visible:ring-emerald-300/70" value={businessProfile.activeProfileId ?? ""} onChange={(event) => { if (businessProfile.switchProfile(event.target.value)) setSelectedOwner(""); }} aria-describedby="payroll-profile-help">
+            {businessProfile.profiles.filter((profile) => !profile.is_archived || profile.id === businessProfile.activeProfileId).map((profile) => <option className="text-slate-900" key={profile.id} value={profile.id}>{profile.name}{profile.is_default ? " · Varsayılan" : ""}</option>)}
+          </select>
+          <p id="payroll-profile-help" className="mt-1.5 text-[11px] leading-relaxed text-slate-400">Bu seçime göre takvim, bordro ve yeni kayıtların kapsamı değişir.</p>
+        </div>}
+        <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[.045] p-3 transition-colors duration-150">
+          <Label className="mb-1.5 block text-xs text-slate-300" htmlFor="payroll-employee">Çalışan görünümü</Label>
+          <select id="payroll-employee" className="h-10 w-full rounded-xl border border-white/20 bg-white/10 px-3 text-sm text-white focus-visible:ring-2 focus-visible:ring-emerald-300/70" value={ownerId} onChange={(e) => setSelectedOwner(e.target.value)}>{members.map((m) => <option className="text-slate-900" key={m.id} value={m.id}>{m.id === me.data?.id ? selectedMasterName : m.username}</option>)}</select>
+        </div>
+      </div>}
       <div className="relative mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
         {[["Hak edilen", earned, "text-emerald-300"], ["Avans", advanced, "text-amber-300"], ["Ödenen", paid, "text-sky-300"], ["Kalan", outstanding, "text-white"]].map(([label, value, color]) => <div key={String(label)} className="rounded-2xl border border-white/10 bg-white/[.06] p-3"><p className="text-xs text-slate-300">{label}</p><p className={`mt-1 break-words text-lg font-bold ${color}`}>{amountText(Number(value), "TRY")}</p></div>)}
       </div>
