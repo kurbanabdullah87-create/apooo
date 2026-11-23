@@ -1,11 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, AlertTriangle, MapPin, MessageCircle, Wallet, HardHat, WalletCards, TrendingUp, TrendingDown, BriefcaseBusiness, UserPlus, Camera, QrCode, RefreshCw, ArrowUpRight, ArrowDownRight, Clock3, CircleDollarSign, FileText, Info } from "lucide-react";
+import { AlertTriangle, MapPin, MessageCircle, Wallet, HardHat, WalletCards, TrendingUp, TrendingDown, UserPlus, Camera, QrCode, RefreshCw, ArrowUpRight, Clock3, FileText, Info, CalendarDays } from "lucide-react";
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCustomers, useExpenses, useTransactions } from "@/lib/data";
-import { customerBalance, customerRestriction, EXPENSE_LABELS, formatTL, monthKey, monthSummary, overdueAmount, profitBreakdown, todayISO, type ExpenseCategory } from "@/lib/finance";
+import { customerRestriction, EXPENSE_LABELS, formatTL, monthKey, monthSummary, overdueAmount, todayISO, type ExpenseCategory } from "@/lib/finance";
 import { pageHead, useSaveRecord } from "@/lib/work";
 import { MaintenanceAlerts } from "@/components/app/MaintenanceAlerts";
 import { getPosition, coordsOf, distanceMeters } from "@/lib/geo";
@@ -37,13 +37,10 @@ function shiftMonth(m: string, d: number) {
 
 
 function Panel() {
-  const [month, setMonth] = useState(monthKey(todayISO()));
+  const [month] = useState(monthKey(todayISO()));
   const [financePeriod, setFinancePeriod] = useState<FinancePeriod>("month");
   const [customFrom, setCustomFrom] = useState(() => `${todayISO().slice(0, 7)}-01`);
   const [customTo, setCustomTo] = useState(todayISO());
-  const [quickNote, setQuickNote] = useState(() => { try { return localStorage.getItem("panel_note") ?? ""; } catch { return ""; } });
-  const saveNote = (v: string) => { setQuickNote(v); try { localStorage.setItem("panel_note", v); } catch { /* local note storage is optional */ } };
-  useEffect(() => { const syncNote = () => { try { setQuickNote(localStorage.getItem("panel_note") ?? ""); } catch { /* optional local note */ } }; window.addEventListener("saha-panel-note", syncNote); return () => window.removeEventListener("saha-panel-note", syncNote); }, []);
   const txs = useTransactions();
   const exps = useExpenses();
   const customers = useCustomers();
@@ -101,9 +98,6 @@ function Panel() {
   const data = useMemo(() => {
     const t = txs.data ?? [];
     const e = exps.data ?? [];
-    const s = monthSummary(t, e, month);
-    const monthDebts = t.filter((x) => x.kind === "debt" && monthKey(x.occurred_on) === month);
-    const profit = monthDebts.reduce((acc, x) => acc + profitBreakdown(x.amount, x.material_cost, x.vat_rate).profit, 0);
     const byCat = (Object.keys(EXPENSE_LABELS) as ExpenseCategory[])
       .map((c) => ({ name: EXPENSE_LABELS[c], value: e.filter((x) => x.category === c && monthKey(x.occurred_on) === month).reduce((a, x) => a + x.amount, 0) }))
       .filter((x) => x.value > 0);
@@ -115,7 +109,7 @@ function Panel() {
     const overdue = (customers.data ?? [])
       .map((c) => {
         const ct = t.filter((x) => x.customer_id === c.id);
-        return { c, overdue: overdueAmount(ct, new Date(), c.payment_due_days ?? 15), balance: customerBalance(ct) };
+        return { c, overdue: overdueAmount(ct, new Date(), c.payment_due_days ?? 15) };
       })
       .filter((x) => x.overdue > 0)
       .sort((a, b) => b.overdue - a.overdue);
@@ -129,24 +123,24 @@ function Panel() {
       const key = localKey(d);
       return { key, name: d.toLocaleDateString("tr-TR", { weekday: "short" }).replace(".", ""), count: weekJobs.filter((j) => String(j.payload.completed_at ?? j.payload.date ?? "").slice(0, 10) === key).length, today: key === todayISO() };
     });
-    const allPayments = [...(payrollPayments.data ?? []), ...(payrollAdvances.data ?? [])].filter((row) => String(row.payload.currency ?? "TRY") === "TRY").reduce((sum, row) => sum + Number(row.payload.amount ?? 0), 0);
-    const totalIncome = t.filter((row) => row.kind === "payment").reduce((sum, row) => sum + Number(row.amount), 0);
-    const totalExpenses = e.reduce((sum, row) => sum + Number(row.amount), 0);
-    const openJobs = jobRows.filter((row) => !["Tamamlandı", "İptal"].includes(String(row.payload.status))).length;
-    const since = new Date(); since.setDate(since.getDate() - 7); const prev = new Date(since); prev.setDate(prev.getDate() - 7);
-    const inPeriod = (date: string, from: Date, to: Date) => { const ts = Date.parse(`${date.slice(0, 10)}T12:00:00`); return ts >= from.getTime() && ts < to.getTime(); };
-    const thisWeekIncome = t.filter((row) => row.kind === "payment" && inPeriod(row.occurred_on, since, new Date(Date.now() + 1))).reduce((sum, row) => sum + Number(row.amount), 0);
-    const prevWeekIncome = t.filter((row) => row.kind === "payment" && inPeriod(row.occurred_on, prev, since)).reduce((sum, row) => sum + Number(row.amount), 0);
-    const thisWeekExpense = e.filter((row) => inPeriod(row.occurred_on, since, new Date(Date.now() + 1))).reduce((sum, row) => sum + Number(row.amount), 0);
-    const prevWeekExpense = e.filter((row) => inPeriod(row.occurred_on, prev, since)).reduce((sum, row) => sum + Number(row.amount), 0);
-    const allTimeNet = totalIncome - totalExpenses - allPayments;
+    const todayJobs = jobRows
+      .filter((row) => String(row.payload.date ?? "").slice(0, 10) === todayISO() && row.payload.status !== "İptal")
+      .sort((a, b) => String(a.payload.start_time ?? "").localeCompare(String(b.payload.start_time ?? "")))
+      .slice(0, 6)
+      .map((row) => ({
+        id: row.id,
+        title: String(row.payload.title ?? "Saha işi"),
+        customer: customers.data?.find((customer) => customer.id === row.payload.customer_id)?.name ?? "Müşteri seçilmemiş",
+        status: String(row.payload.status ?? "Planlandı"),
+        time: String(row.payload.start_time ?? "").slice(0, 5),
+      }));
     const activity = [
       ...jobRows.map((row) => ({ id: row.id, kind: "job", date: row.created_at, title: String(row.payload.title ?? "İş kaydı"), amount: Number(row.payload.price ?? 0) })),
       ...t.map((row) => ({ id: row.id, kind: row.kind === "payment" ? "payment" : "debt", date: row.occurred_on, title: row.description || (row.kind === "payment" ? "Tahsilat" : "İş / alacak"), amount: Number(row.amount) })),
       ...e.map((row) => ({ id: row.id, kind: "expense", date: row.occurred_on, title: row.description || "Gider", amount: Number(row.amount) })),
     ].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
-    return { s, profit, byCat, bars, overdue, weekly, weekCount: weekJobs.length, allTimeNet, kpis: { totalIncome, totalExpenses, net: allTimeNet, openJobs, incomeChange: changePct(thisWeekIncome, prevWeekIncome), expenseChange: changePct(thisWeekExpense, prevWeekExpense) }, activity };
-  }, [txs.data, exps.data, customers.data, month, jobs.data, payrollPayments.data, payrollAdvances.data]);
+    return { byCat, bars, overdue, todayJobs, weekly, weekCount: weekJobs.length, activity };
+  }, [txs.data, exps.data, customers.data, month, jobs.data]);
 
   const financeBounds = periodDateBounds(financePeriod, customFrom, customTo);
   const periodFinance = useMemo(() => calculatePeriodFinance({
@@ -156,7 +150,6 @@ function Panel() {
     from: financeBounds.from, to: financeBounds.to,
   }), [txs.data, exps.data, payrollEntries.data, payrollPayments.data, payrollAdvances.data, financeBounds.from, financeBounds.to]);
 
-  const label = new Date(month + "-01T00:00:00").toLocaleDateString("tr-TR", { month: "long", year: "numeric" });
   const today = todayISO();
   useEffect(() => {
     let active = true;
@@ -217,31 +210,13 @@ function Panel() {
           </div>
         </>}
       </section>
-      {/* Hızlı Not */}
-      <section className="rounded-2xl border border-amber-500/15 bg-gradient-to-br from-amber-500/[0.07] to-card p-3.5 sm:p-4">
-        <div className="mb-2 flex items-center gap-2">
-          <span className="flex size-7 items-center justify-center rounded-lg bg-amber-500/10 text-sm">📝</span>
-          <span className="text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">Hızlı not</span>
-          <span className="ml-auto text-[10px] text-muted-foreground">Bu cihazda saklanır</span>
-        </div>
-        <textarea
-          value={quickNote}
-          onChange={e => saveNote(e.target.value)}
-          placeholder="Bugün için kısa bir not bırak…"
-          className="min-h-[56px] w-full resize-y bg-transparent text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground"
-          rows={2}
-        />
-      </section>
-
       {nearby && <section className="rounded-2xl border-2 border-emerald-500/50 bg-emerald-500/10 p-4"><div className="flex items-start gap-3"><MapPin className="mt-0.5 size-5 shrink-0 text-emerald-700 dark:text-emerald-300"/><div className="min-w-0 flex-1"><p className="font-semibold">Şu an {nearby.customer.name} konumuna yakınsınız</p><p className="text-xs text-muted-foreground">Yaklaşık {Math.round(nearby.meters)} metre · konum yalnızca cihazda karşılaştırılır</p><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" disabled={saveJob.isPending} onClick={() => startNearbyJob(nearby.customer)}><HardHat/>Hızlı iş başlat</Button><Button asChild size="sm" variant="secondary"><Link to="/cari/$id" params={{ id: nearby.customer.id }}><Wallet/>Tahsilat al</Link></Button></div></div></div></section>}
       <MaintenanceAlerts />
-      {txs.isLoading || exps.isLoading || customers.isLoading || jobs.isLoading || payrollEntries.isLoading || payrollPayments.isLoading || payrollAdvances.isLoading ? <div className="space-y-3" aria-label="Panel verileri yükleniyor" aria-busy="true"><div className="rounded-3xl border bg-card p-4"><Skeleton className="h-5 w-40"/><Skeleton className="mt-4 h-24 w-full"/></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-24 rounded-2xl"/>)}</div><div className="rounded-2xl border bg-card p-4"><Skeleton className="h-5 w-32"/><Skeleton className="mt-4 h-48 w-full"/></div></div> : <>
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Kpi label="Toplam gelir" value={data.kpis.totalIncome} icon={TrendingUp} tone="text-emerald-600 bg-emerald-500/10" change={data.kpis.incomeChange} />
-        <Kpi label="Toplam gider" value={data.kpis.totalExpenses} icon={TrendingDown} tone="text-rose-600 bg-rose-500/10" change={data.kpis.expenseChange} invert />
-        <Kpi label="Net kâr / zarar" value={data.kpis.net} icon={CircleDollarSign} tone="text-sky-600 bg-sky-500/10" />
-        <div className="rounded-2xl border bg-card p-3.5 transition-all duration-200 hover:scale-[1.02] hover:shadow-md sm:p-4"><span className="flex size-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600"><BriefcaseBusiness className="size-5"/></span><p className="num mt-3 text-2xl font-bold">{data.kpis.openJobs}</p><p className="text-xs text-muted-foreground">Açık işler</p></div>
+      <section className="overflow-hidden rounded-3xl border bg-card p-4 shadow-sm sm:p-5">
+        <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Saha akışı</p><h2 className="mt-1 text-lg font-bold">Bugünün işleri</h2><p className="text-xs text-muted-foreground">{todayISO()} · seçili usta profili</p></div><Link to="/isler" className="inline-flex min-h-10 items-center gap-1 rounded-xl px-3 text-xs font-semibold text-primary hover:bg-primary/10">Tüm işler <ArrowUpRight className="size-4"/></Link></div>
+        {data.todayJobs.length ? <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{data.todayJobs.map((job) => <li key={job.id}><Link to="/isler" className="flex h-full min-h-20 items-center gap-3 rounded-2xl border bg-background/55 p-3 transition-colors hover:border-primary/40 hover:bg-primary/[0.04]"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><HardHat className="size-5"/></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{job.title}</span><span className="mt-1 block truncate text-xs text-muted-foreground">{job.customer}{job.time ? ` · ${job.time}` : ""}</span></span><span className="max-w-24 shrink-0 truncate rounded-full bg-secondary px-2 py-1 text-[10px] font-semibold">{job.status}</span></Link></li>)}</ul> : <div className="flex flex-col items-center rounded-2xl border border-dashed bg-background/35 px-4 py-6 text-center"><span className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground"><CalendarDays className="size-5"/></span><p className="mt-2 text-sm font-semibold">Bugün için planlanmış iş yok</p><p className="mt-1 text-xs text-muted-foreground">Randevu veya iş kaydı eklediğinde günlük planın burada görünür.</p><Button asChild variant="secondary" size="sm" className="mt-3"><Link to="/randevu">Takvimi aç</Link></Button></div>}
       </section>
+      {txs.isLoading || exps.isLoading || customers.isLoading || jobs.isLoading || payrollEntries.isLoading || payrollPayments.isLoading || payrollAdvances.isLoading ? <div className="space-y-3" aria-label="Panel verileri yükleniyor" aria-busy="true"><div className="rounded-3xl border bg-card p-4"><Skeleton className="h-5 w-40"/><Skeleton className="mt-4 h-24 w-full"/></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-24 rounded-2xl"/>)}</div><div className="rounded-2xl border bg-card p-4"><Skeleton className="h-5 w-32"/><Skeleton className="mt-4 h-48 w-full"/></div></div> : <>
       <section className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-2xl border bg-card p-4">
           <div className="mb-2 flex items-start justify-between"><div><h2 className="text-sm font-semibold">Bu Hafta</h2><p className="mt-1 text-xs text-muted-foreground">Son 7 gündeki tamamlanan işler</p></div><span className="num rounded-full bg-primary/10 px-2.5 py-1 text-sm font-bold text-primary">{data.weekCount}</span></div>
@@ -254,31 +229,14 @@ function Panel() {
           <button type="button" onClick={() => setScannerOpen(true)} className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-2xl bg-secondary text-sm font-medium transition-transform active:scale-95"><QrCode className="size-7 text-primary"/>QR Tara</button>
         </div></div>
       </section>
-      <section className="grid grid-cols-2 gap-2" aria-label="Rapor ve hesaplama araçları"><Link to="/rapor" className="flex min-h-14 items-center gap-2 rounded-2xl border bg-card px-3 text-sm font-semibold transition hover:border-primary/40 hover:bg-primary/5"><FileText className="size-5 text-primary"/>Aylık rapor</Link><Link to="/hesaplayici" className="flex min-h-14 items-center gap-2 rounded-2xl border bg-card px-3 text-sm font-semibold transition hover:border-primary/40 hover:bg-primary/5"><CircleDollarSign className="size-5 text-primary"/>Maliyet hesaplayıcı</Link></section>
+      <section aria-label="Hesaplama aracı"><Link to="/hesaplayici" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-card px-3 text-sm font-semibold transition hover:border-primary/40 hover:bg-primary/5"><WalletCards className="size-4 text-primary"/>Maliyet hesaplayıcı</Link></section>
       <section className="rounded-2xl border bg-card p-4"><div className="mb-3 flex items-center justify-between"><div><h2 className="text-sm font-semibold">Son Hareketler</h2><p className="text-xs text-muted-foreground">İşler, tahsilatlar ve giderler</p></div><Link to="/isler" className="flex items-center gap-1 text-xs font-semibold text-primary">Tümünü gör <ArrowUpRight className="size-3.5"/></Link></div>
         {data.activity.length ? <ul className="animate-in slide-in-from-bottom-2 space-y-1 duration-300">{data.activity.map((item) => <li key={`${item.kind}-${item.id}`} className="flex items-center gap-3 rounded-xl px-2 py-2"><span className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${activityTone(item.kind)}`}>{item.kind === "job" ? <HardHat className="size-4"/> : item.kind === "expense" ? <TrendingDown className="size-4"/> : <Wallet className="size-4"/>}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{item.title}</p><p className="flex items-center gap-1 text-[10px] text-muted-foreground"><Clock3 className="size-3"/>{relativeTime(item.date)}</p></div><span className={`num whitespace-nowrap text-xs font-semibold ${item.kind === "expense" ? "text-destructive" : "text-foreground"}`}>{item.kind === "expense" ? "−" : item.kind === "job" ? "" : "+"}{formatTL(item.amount)}</span></li>)}</ul> : <p className="py-5 text-center text-sm text-muted-foreground">Henüz hareket yok</p>}
       </section>
-      <section className="relative overflow-hidden rounded-3xl border bg-card p-4 shadow-sm sm:p-5">
-        <div className="flex items-center justify-between gap-3">
-          <div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Finans görünümü</p><h2 className="mt-1 text-lg font-bold capitalize">{label}</h2></div>
-          <div className="flex items-center gap-1"><Button variant="secondary" size="icon" className="size-9 rounded-xl" onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Önceki ay"><ChevronLeft className="size-4"/></Button><Button variant="secondary" size="icon" className="size-9 rounded-xl" onClick={() => setMonth(shiftMonth(month, 1))} aria-label="Sonraki ay"><ChevronRight className="size-4"/></Button></div>
-        </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-2xl bg-gradient-to-br from-slate-950 to-slate-800 p-4 text-white sm:p-5"><p className="flex items-center gap-2 text-xs text-slate-300"><WalletCards className="size-4 text-emerald-300"/>Net nakit akışı</p><p className={`num mt-2 text-3xl font-bold tracking-tight sm:text-4xl ${data.s.net < 0 ? "text-rose-300" : "text-emerald-300"}`}>{formatTL(data.s.net)}</p><p className="mt-2 text-xs text-slate-400">Tahsilat eksi gider</p></div>
-          <div className="flex flex-col justify-center rounded-2xl border bg-background/70 p-4"><p className="text-xs text-muted-foreground">İş kârı</p><p className="num mt-1 text-xl font-bold text-success">{formatTL(data.profit)}</p><p className="mt-1 text-[11px] leading-5 text-muted-foreground">KDV ve malzeme maliyeti sonrası</p></div>
-        </div>
-      </section>
-
-      <div className="grid grid-cols-3 gap-3">
-        <Stat label="Gelir" value={data.s.income} tone="text-success" />
-        <Stat label="Gider" value={data.s.expense} tone="text-destructive" />
-        <Stat label="Alacak" value={data.s.receivable} tone="text-warning" />
-      </div>
-
       {data.overdue.length > 0 && (
         <div className="rounded-2xl border border-destructive/50 bg-destructive/10 p-4">
           <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-destructive">
-            <AlertTriangle className="size-4" /> 30 günü geçen alacaklar
+            <AlertTriangle className="size-4" /> Vadesi geçmiş alacaklar
           </div>
           {data.overdue.slice(0, 3).map(({ c, overdue }) => (
             <div key={c.id} className="flex items-center gap-2 border-b border-destructive/15 py-2"><Link to="/cari/$id" params={{ id: c.id }} className="min-w-0 flex-1 truncate text-sm font-medium">{c.name}</Link><span className="num whitespace-nowrap text-sm font-semibold text-destructive">{formatTL(overdue)}</span>{c.phone && <Button asChild size="icon" variant="secondary" className="size-9"><a target="_blank" rel="noreferrer" href={whatsappLink(c.phone, `Merhaba ${c.name}, ${formatTL(overdue)} tutarında vadesi geçmiş bakiyeniz bulunuyor. Uygun olduğunuzda ödeme bilgisini paylaşabilir misiniz?`)} aria-label={`${c.name} için WhatsApp ödeme hatırlatması`}><MessageCircle/></a></Button>}</div>
@@ -286,6 +244,7 @@ function Panel() {
         </div>
       )}
 
+      <section className="grid gap-4 lg:grid-cols-2">
       <div className="rounded-2xl border bg-card p-4">
         <h2 className="mb-3 text-sm font-semibold">Son 6 ay</h2>
         {data.bars.every((row) => row.Gelir === 0 && row.Gider === 0) ? (
@@ -344,22 +303,14 @@ function Panel() {
           </div>
         )}
       </div>
-
-      <section className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-card via-card to-primary/[0.06] p-4 shadow-sm sm:p-5">
-        <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">{rates.data?.provider === "fxapi" ? "Mid-market referans kuru" : "Günlük referans kuru"}</p><h2 className="mt-1 text-lg font-bold">Dövizle yaklaşık değer</h2><p className="mt-1 text-xs text-muted-foreground">Tüm zamanlar · tahsilat − gider − yevmiye ödemeleri</p></div><Button variant="secondary" size="icon" className="size-9 shrink-0 rounded-xl" aria-label="Kurları yenile" disabled={rates.isFetching} onClick={() => void rates.refetch().then((result) => { if (result.data) toast.success("Kur kontrol edildi."); else toast.error("Kur bilgisi alınamadı."); })}><RefreshCw className={`size-4 ${rates.isFetching ? "animate-spin" : ""}`}/></Button></div>
-        {data.allTimeNet < 0 ? <p className="num mt-4 text-3xl font-bold text-destructive sm:text-4xl">{formatTL(data.allTimeNet)}</p> : <p className="num mt-4 text-3xl font-bold text-emerald-600 sm:text-4xl">{formatTL(data.allTimeNet)}</p>}
-        {rates.isLoading && !rates.data ? <div className="mt-4 grid grid-cols-3 gap-2">{[0,1,2].map((i)=><Skeleton key={i} className="h-16 rounded-xl"/>)}</div> : rates.isError && !rates.data ? <div className="mt-3 rounded-xl border border-destructive/20 bg-destructive/5 p-3 text-sm"><span className="text-muted-foreground">Kur bilgisi alınamadı</span><Button variant="link" size="sm" onClick={() => void rates.refetch()}>Tekrar deneyin</Button></div> : <>
-          <div className="mt-3 grid grid-cols-3 gap-2">{(["USD", "EUR", "GBP"] as const).map((code) => { const raw = rates.data?.rates; const tryPerUsd = Number(raw?.TRY); const currencyPerUsd = Number(raw?.[code]); const perTry = code === "USD" ? 1 / tryPerUsd : currencyPerUsd / tryPerUsd; const converted = data.allTimeNet * perTry; const symbol = code === "USD" ? "$" : code === "EUR" ? "€" : "£"; return <div key={code} className="rounded-xl border bg-background/70 p-3"><p className="text-[10px] font-semibold text-muted-foreground">{code === "USD" ? "🇺🇸" : code === "EUR" ? "🇪🇺" : "🇬🇧"} {code}</p><p className={`num mt-1 truncate text-sm font-bold ${converted < 0 ? "text-destructive" : "text-foreground"}`}>{symbol}{Number.isFinite(converted) ? new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(converted) : "—"}</p><p className="num mt-1 text-[10px] text-muted-foreground">1 {code} = {Number.isFinite(perTry) && perTry > 0 ? formatTL(1 / perTry) : "—"}</p></div>; })}</div>
-          <p className="mt-3 text-[10px] leading-4 text-muted-foreground">Kaynak: {rates.data?.provider ?? "—"} · Veri: {rates.data?.dataType === "mid_market" ? "mid-market" : "günlük referans harmanı"} · Kur zamanı: {rates.data?.lastUpdatedAt ? relativeTime(rates.data.lastUpdatedAt) : "—"} · Kontrol sıklığı: {intervalText(rates.data?.updateIntervalSeconds ?? 86_400)}{rates.data?.warning || rates.data?.isStale || !online || rates.isError ? " · Son bilinen / gecikmiş veri" : ""}. TRY neti ana tutardır; döviz karşılıkları bugünkü referans kurla yaklaşık değerlerdir, banka işlem fiyatı veya tarihsel yeniden değerleme değildir.</p>
-        </>}
       </section>
+
       </>}
       {scannerOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"><div className="w-full max-w-lg rounded-2xl border bg-card p-4"><div className="mb-3 flex items-center justify-between"><h2 className="font-semibold">QR kodu tara</h2><Button variant="ghost" size="sm" onClick={() => setScannerOpen(false)}>Kapat</Button></div><CodeScanner onRead={() => { setScannerOpen(false); toast.success("QR kodu okundu."); }} onClose={() => setScannerOpen(false)}/></div></div>}
     </div>
   );
 }
 
-function changePct(current: number, previous: number) { return previous === 0 ? current === 0 ? 0 : null : Math.round(((current - previous) / Math.abs(previous)) * 100); }
 function readCachedRates(): { value: Awaited<ReturnType<typeof getLiveCurrencyRates>>; savedAt: number } | undefined {
   if (typeof window === "undefined") return undefined;
   try { const value = JSON.parse(localStorage.getItem("saha.market-rates.v1") ?? "null") as { value?: Awaited<ReturnType<typeof getLiveCurrencyRates>>; savedAt?: number } | null; return value?.value && typeof value.savedAt === "number" ? { value: value.value, savedAt: value.savedAt } : undefined; } catch { return undefined; }
@@ -379,22 +330,6 @@ function intervalText(seconds: number) {
   return "günde bir";
 }
 function activityTone(kind: string) { return kind === "job" ? "bg-sky-500/10 text-sky-600" : kind === "expense" ? "bg-rose-500/10 text-rose-600" : kind === "payment" ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"; }
-function Kpi({ label, value, icon: Icon, tone, change, invert = false }: { label: string; value: number; icon: typeof TrendingUp; tone: string; change?: number | null; invert?: boolean }) {
-  const [shown, setShown] = useState(0);
-  useEffect(() => { let frame = 0; const start = performance.now(); const tick = (now: number) => { const progress = Math.min(1, (now - start) / 800); setShown(value * (1 - (1 - progress) ** 3)); if (progress < 1) frame = requestAnimationFrame(tick); }; frame = requestAnimationFrame(tick); return () => cancelAnimationFrame(frame); }, [value]);
-  const positive = (change ?? 0) >= 0; const favorable = invert ? !positive : positive;
-  return <div className="rounded-2xl border bg-card p-3.5 transition-all duration-200 hover:scale-[1.02] hover:shadow-md sm:p-4"><span className={`flex size-9 items-center justify-center rounded-xl ${tone}`}><Icon className="size-5"/></span><p className={`num mt-3 truncate text-xl font-bold sm:text-2xl ${value < 0 ? "text-destructive" : ""}`}>{formatTL(shown)}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{label}</p>{change !== undefined && <p className={`mt-2 flex items-center gap-1 text-[10px] font-semibold ${favorable ? "text-emerald-600" : "text-rose-600"}`}>{positive ? <ArrowUpRight className="size-3"/> : <ArrowDownRight className="size-3"/>}{change === null ? "Yeni" : `${Math.abs(change)}%`} bu haftaya göre</p>}</div>;
-}
-
-function Stat({ label, value, tone }: { label: string; value: number; tone: string }) {
-  return (
-    <div className="rounded-2xl border bg-card p-3">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className={`num mt-1 truncate text-sm font-semibold ${tone}`}>{formatTL(value)}</div>
-    </div>
-  );
-}
-
 function SummaryCard({ label, value, helper, tone }: { label: string; value: number; helper: string; tone: string }) {
   return <div className="min-w-0 rounded-2xl border bg-background/70 p-3 sm:p-4">
     <p className="text-xs font-semibold text-muted-foreground">{label}</p>

@@ -53,6 +53,15 @@ This is an implementation ledger, not a claim that every item in the earlier 1,2
 
 ## Newly implemented bank safeguards
 
+## Follow-up after the first production review (2026-11-23)
+
+- The dashboard keeps the period based finance summary as its primary finance area and removes the duplicate lifetime finance/FX cards. The full currency converter remains in its dedicated Döviz route; the summary keeps only the small reference conversion requested by the finance summary specification.
+- Added a profile-scoped “Bugünün işleri” list with job title, customer, status and planned time; cancelled jobs are excluded. The empty state links to the appointment calendar.
+- The six month chart now shows an explicit empty state and an action when all six months have no recorded income or expense. Non-empty charts include a readable TRY axis. The overdue section is labelled “Vadesi geçmiş alacaklar” instead of incorrectly claiming a 30-day threshold.
+- TypeScript, 49 unit tests, production build and `git diff --check` passed before the source was pushed. These checks do not establish full coverage of the 1,200+ proposal items, visual QA on physical screen sizes, production database migration, or live deployment.
+
+## Newly implemented bank safeguards
+
 - Repeated statement and Gmail imports compare account-scoped references. When the reference is missing but the normalized date/direction/amount/counterparty/description matches, the user chooses whether those possible duplicates are included; exact duplicate rows within the same import are discarded. This is a heuristic, not proof that two similar transactions are identical.
 - Email-derived records no longer persist the parsed source snippet in the encrypted movement record. Message text remains temporary for user review and is cleared when the vault locks.
 - The encrypted bank backup contains ciphertext only; its password is never included. AES-GCM authentication and the current account-specific vault context are checked before restore. Restore shows existing and backup counts and requires a separate confirmation before replacing the local vault.
