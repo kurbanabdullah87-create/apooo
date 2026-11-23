@@ -59,6 +59,19 @@ export function whatsappLink(phone: string, text: string) {
   return `https://wa.me/${normalizePhone(phone)}?text=${encodeURIComponent(text)}`;
 }
 
+/** Reuse one named WhatsApp window instead of opening a new tab on every tap. */
+export function openWhatsApp(phone: string, text: string) {
+  const url = whatsappLink(phone, text);
+  const whatsappWindow = window.open("about:blank", "saha-whatsapp");
+  if (!whatsappWindow) {
+    // Popup blocking should never make the send action silently fail.
+    window.location.assign(url);
+    return;
+  }
+  whatsappWindow.opener = null;
+  whatsappWindow.location.replace(url);
+}
+
 export function smsLink(phone: string, text: string) {
   return `sms:+${normalizePhone(phone)}?body=${encodeURIComponent(text)}`;
 }

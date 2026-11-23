@@ -15,7 +15,7 @@ import { customerBalance, formatDate, todayISO, type Tx } from "@/lib/finance";
 import { useMembers } from "@/lib/job-fields";
 import { persistWrite } from "@/lib/offline";
 import { REMIND_OPTIONS, apptStart, askNotifyPermission, notifySupported } from "@/lib/reminders";
-import { whatsappLink } from "@/lib/templates";
+import { openWhatsApp } from "@/lib/templates";
 import { appointmentReminderText } from "@/lib/statement";
 import { useTransactions } from "@/lib/data";
 import { customerRestriction } from "@/lib/finance";
@@ -381,8 +381,8 @@ function Appointments() {
             <div key={r.id} className="flex items-center justify-between gap-2 text-sm">
               <span className="truncate">{String(r.payload.time)} · {String(r.payload.name)}</span>
               {r.payload.phone ? (
-                <Button asChild size="sm" variant="secondary">
-                  <a href={whatsappLink(String(r.payload.phone), appointmentReminderText(profile, r.payload))} target="_blank" rel="noreferrer"><MessageCircle />Gönder</a>
+                <Button size="sm" variant="secondary" onClick={() => openWhatsApp(String(r.payload.phone), appointmentReminderText(profile, r.payload))}>
+                  <MessageCircle />Gönder
                 </Button>
               ) : <span className="text-xs text-muted-foreground">Telefon yok</span>}
             </div>
@@ -488,10 +488,8 @@ function Appointments() {
                           <Button asChild variant="secondary" size="icon" className="h-11 w-11" title="Ara">
                             <a href={"tel:" + phone}><Phone /></a>
                           </Button>
-                          <Button asChild variant="secondary" size="icon" className="h-11 w-11" title="WhatsApp ile hatırlat">
-                            <a target="_blank" rel="noreferrer" href={whatsappLink(phone, appointmentReminderText(profile, r.payload))}>
-                              <MessageCircle />
-                            </a>
+                          <Button variant="secondary" size="icon" className="h-11 w-11" title="WhatsApp ile hatırlat" onClick={() => openWhatsApp(phone, appointmentReminderText(profile, r.payload))}>
+                            <MessageCircle />
                           </Button>
                         </>
                       )}

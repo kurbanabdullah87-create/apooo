@@ -21,7 +21,7 @@ import { customerBalance, customerRestriction, formatDate, formatTL, todayISO, t
 import { buildReceipt, shareOrDownload } from "@/lib/receipt";
 import { pageHead, useRecords, useSaveRecord } from "@/lib/work";
 import { buildStatementText } from "@/lib/statement";
-import { whatsappLink } from "@/lib/templates";
+import { openWhatsApp } from "@/lib/templates";
 export const Route = createFileRoute("/_authenticated/cari/$id")({
   head: () => pageHead("Müşteri Ekstresi", "Müşteri hesabı, parçalı tahsilatlar ve makbuzlar."),
   component: CustomerDetail,
@@ -118,11 +118,9 @@ function CustomerDetail() {
                 {c.phone}
               </a>
             </Button>
-            <Button asChild variant="outline" size="sm">
-              <a href={whatsappLink(c.phone, buildStatementText({ customer: c, txs: rows, profile: settings.data?.[0]?.payload }))} target="_blank" rel="noreferrer">
-                <MessageCircle />
-                Ekstreyi WhatsApp'a gönder
-              </a>
+            <Button variant="outline" size="sm" onClick={() => openWhatsApp(c.phone!, buildStatementText({ customer: c, txs: rows, profile: settings.data?.[0]?.payload }))}>
+              <MessageCircle />
+              Ekstreyi WhatsApp'a gönder
             </Button>
             <Button variant="outline" size="sm" onClick={() => setMessage(true)}>
               <MessageCircle />

@@ -11,7 +11,7 @@ import { MaintenanceAlerts } from "@/components/app/MaintenanceAlerts";
 import { getPosition, coordsOf, distanceMeters } from "@/lib/geo";
 import { useMe } from "@/hooks/use-me";
 import { toast } from "sonner";
-import { whatsappLink } from "@/lib/templates";
+import { openWhatsApp } from "@/lib/templates";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getLiveCurrencyRates } from "@/lib/currency.functions";
@@ -239,7 +239,7 @@ function Panel() {
             <AlertTriangle className="size-4" /> Vadesi geçmiş alacaklar
           </div>
           {data.overdue.slice(0, 3).map(({ c, overdue }) => (
-            <div key={c.id} className="flex items-center gap-2 border-b border-destructive/15 py-2"><Link to="/cari/$id" params={{ id: c.id }} className="min-w-0 flex-1 truncate text-sm font-medium">{c.name}</Link><span className="num whitespace-nowrap text-sm font-semibold text-destructive">{formatTL(overdue)}</span>{c.phone && <Button asChild size="icon" variant="secondary" className="size-9"><a target="_blank" rel="noreferrer" href={whatsappLink(c.phone, `Merhaba ${c.name}, ${formatTL(overdue)} tutarında vadesi geçmiş bakiyeniz bulunuyor. Uygun olduğunuzda ödeme bilgisini paylaşabilir misiniz?`)} aria-label={`${c.name} için WhatsApp ödeme hatırlatması`}><MessageCircle/></a></Button>}</div>
+            <div key={c.id} className="flex items-center gap-2 border-b border-destructive/15 py-2"><Link to="/cari/$id" params={{ id: c.id }} className="min-w-0 flex-1 truncate text-sm font-medium">{c.name}</Link><span className="num whitespace-nowrap text-sm font-semibold text-destructive">{formatTL(overdue)}</span>{c.phone && <Button size="icon" variant="secondary" className="size-9" onClick={() => openWhatsApp(c.phone!, `Merhaba ${c.name}, ${formatTL(overdue)} tutarında vadesi geçmiş bakiyeniz bulunuyor. Uygun olduğunuzda ödeme bilgisini paylaşabilir misiniz?`)} aria-label={`${c.name} için WhatsApp ödeme hatırlatması`}><MessageCircle/></Button>}</div>
           ))}
         </div>
       )}

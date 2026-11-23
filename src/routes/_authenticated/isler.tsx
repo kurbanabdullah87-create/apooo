@@ -32,7 +32,7 @@ import {
 } from "@/lib/work";
 import { todayISO, formatTL } from "@/lib/finance";
 import { applyVoiceJob, parseVoiceJob } from "@/lib/voice-job";
-import { whatsappLink } from "@/lib/templates";
+import { openWhatsApp } from "@/lib/templates";
 import { SwipeRow } from "@/components/app/SwipeRow";
 import { Skeleton } from "@/components/ui/skeleton";
 import { scanJobRequestEmails, type GmailJobRequest } from "@/lib/gmail-bank";
@@ -473,7 +473,7 @@ function Jobs() {
                         : Number(p.price ?? 0),
                     )}
                   </p>
-                  {customer?.phone && <div className="flex flex-wrap gap-2"><Button asChild variant="outline" size="sm"><a href={`tel:${customer.phone}`} aria-label={`${customer.name} müşterisini ara`}><Phone className="size-4"/>Ara</a></Button><Button asChild variant="outline" size="sm"><a href={whatsappLink(customer.phone, `Merhaba ${customer.name}, ${String(p.title ?? "işiniz")} için iletişime geçiyorum.`)} target="_blank" rel="noreferrer"><MessageCircle className="size-4"/>WhatsApp</a></Button></div>}
+                  {customer?.phone && <div className="flex flex-wrap gap-2"><Button asChild variant="outline" size="sm"><a href={`tel:${customer.phone}`} aria-label={`${customer.name} müşterisini ara`}><Phone className="size-4"/>Ara</a></Button><Button variant="outline" size="sm" onClick={() => openWhatsApp(customer.phone!, `Merhaba ${customer.name}, ${String(p.title ?? "işiniz")} için iletişime geçiyorum.`)}><MessageCircle className="size-4"/>WhatsApp</Button></div>}
                   <div className="flex flex-wrap gap-2">
                     <Button
                       variant="secondary"
