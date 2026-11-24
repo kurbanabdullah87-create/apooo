@@ -286,7 +286,9 @@ export function AppShell() {
             </p>
           </div>
         ) : (
-          <Outlet />
+          <div key={path} className="app-page-enter min-w-0">
+            <Outlet />
+          </div>
         )}
       </main>
 
