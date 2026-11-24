@@ -4,7 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { normalizeUsername, USERNAME_RE, usernameToEmail } from "@/lib/username";
 export const createApprentice = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({ username: z.string(), password: z.string().min(6), name: z.string().min(1) })
       .parse(input),
