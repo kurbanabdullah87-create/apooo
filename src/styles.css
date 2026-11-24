@@ -252,6 +252,9 @@
   .glass-dock-item { transition: color 180ms ease, background-color 220ms ease, transform 100ms ease; }
   .glass-dock-item:active { transform: scale(0.94); }
 
+  .app-button { transition-property: color, background-color, border-color, box-shadow, transform; }
+  .app-page-enter { animation: page-enter 240ms cubic-bezier(.2,.75,.25,1) both; }
+
   .animate-slide-up-fade { animation: slide-up-fade 320ms cubic-bezier(.2,.75,.25,1) both; }
   .liquid-fill {
     background: linear-gradient(90deg, var(--liquid-color, var(--primary)) 0%, color-mix(in oklch, var(--liquid-color, var(--primary)) 78%, white) 50%, var(--liquid-color, var(--primary)) 100%);
@@ -280,6 +283,24 @@
 
 @keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
 @keyframes slide-up-fade { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes page-enter { from { opacity: .78; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Calm, lightweight dashboard motion. Reduced-motion preferences are honored below. */
+@keyframes dashboard-arrive { from { opacity: 0; transform: translateY(10px) scale(.995); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes dashboard-card-arrive { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes focus-halo { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--primary) 0%, transparent); } 50% { box-shadow: 0 0 0 4px color-mix(in oklch, var(--primary) 10%, transparent); } }
+.dashboard-enter { animation: dashboard-arrive 360ms cubic-bezier(.2,.75,.25,1) both; }
+.dashboard-reveal { animation: dashboard-card-arrive 420ms cubic-bezier(.2,.75,.25,1) both; }
+.dashboard-enter > section:nth-of-type(2) { animation-delay: 45ms; }
+.dashboard-enter > section:nth-of-type(3) { animation-delay: 90ms; }
+.dashboard-enter > section:nth-of-type(4) { animation-delay: 135ms; }
+.dashboard-enter > section:nth-of-type(5) { animation-delay: 180ms; }
+.dashboard-focus .dashboard-reveal { animation-duration: 280ms; }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .dashboard-reveal.border.bg-card { transition: transform 220ms cubic-bezier(.2,.75,.25,1), border-color 180ms ease, box-shadow 220ms ease; }
+  .dashboard-reveal.border.bg-card:hover { transform: translateY(-2px); box-shadow: 0 18px 34px -28px color-mix(in oklch, var(--primary) 42%, transparent); }
+  .dashboard-enter button:active { transition: transform 90ms ease; transform: scale(.975); }
+}
 
 body[data-route="isler"] { --page-accent: oklch(0.7 0.14 220); }
 body[data-route="cari"], body[data-route^="cari/"] { --page-accent: oklch(0.7 0.13 295); }
@@ -292,11 +313,15 @@ body[data-route] main {
 
 @media (max-width: 767px) {
   body { background-attachment: scroll; }
+  .app-button { touch-action: manipulation; }
+  main { scroll-margin-top: 5rem; }
+  main .rounded-2xl.border.bg-card { border-radius: 1.35rem; }
 }
 
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   main .border.bg-card { transition: border-color 160ms ease, box-shadow 180ms ease; }
   main .border.bg-card:hover { border-color: color-mix(in oklch, var(--page-accent, var(--primary)) 24%, var(--border)); }
+  .app-button:not(:disabled):hover { box-shadow: 0 8px 22px -16px color-mix(in oklch, var(--primary) 62%, transparent); }
 }
 
 .scrollbar-soft { scrollbar-color: color-mix(in oklch, var(--muted-foreground) 38%, transparent) transparent; scrollbar-width: thin; }

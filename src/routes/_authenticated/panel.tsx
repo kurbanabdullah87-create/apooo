@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useMemo, useRef } from "react";
-import { AlertTriangle, MapPin, MessageCircle, Wallet, HardHat, WalletCards, TrendingUp, TrendingDown, UserPlus, Camera, QrCode, RefreshCw, ArrowUpRight, Clock3, FileText, Info, CalendarDays } from "lucide-react";
+import { AlertTriangle, MapPin, MessageCircle, Wallet, HardHat, WalletCards, TrendingUp, TrendingDown, UserPlus, Camera, QrCode, RefreshCw, ArrowUpRight, Clock3, FileText, Info, CalendarDays, Eye, EyeOff } from "lucide-react";
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,7 +56,20 @@ function Panel() {
   const navigate = useNavigate();
   const [nearby, setNearby] = useState<{ customer: CustomerRow; meters: number } | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
   const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
+  useEffect(() => {
+    try { setFocusMode(localStorage.getItem("saha.panel.focus.v1") === "1"); }
+    catch { /* Focus mode is an optional local preference. */ }
+  }, []);
+  function toggleFocusMode() {
+    setFocusMode((current) => {
+      const next = !current;
+      try { localStorage.setItem("saha.panel.focus.v1", next ? "1" : "0"); }
+      catch { /* Keep the preference for this session if storage is unavailable. */ }
+      return next;
+    });
+  }
   const lastRateSnapshotAttempt = useRef<string | null>(null);
   const cachedRates = readCachedRates();
   const rates = useQuery({ queryKey: ["live-currency-rates"], queryFn: () => getLiveCurrencyRates(), ...(cachedRates ? { initialData: cachedRates.value, initialDataUpdatedAt: cachedRates.savedAt } : {}), staleTime: 5 * 60_000, gcTime: 24 * 60 * 60_000, refetchInterval: (query) => Math.max(60, query.state.data?.updateIntervalSeconds ?? 86_400) * 1000, refetchOnWindowFocus: true, retry: 1 });
@@ -202,11 +215,18 @@ function Panel() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4 pb-6 sm:space-y-6 sm:pb-8">
+    <div className={`dashboard-enter mx-auto max-w-7xl space-y-4 pb-6 sm:space-y-6 sm:pb-8 ${focusMode ? "dashboard-focus" : ""}`}>
       <section aria-labelledby="panel-finance-summary" className="overflow-hidden rounded-[1.65rem] border border-primary/20 bg-gradient-to-br from-card via-card to-primary/[0.08] p-3.5 shadow-[0_18px_55px_-42px_color-mix(in_oklch,var(--primary)_55%,transparent)] sm:rounded-3xl sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Finans özeti</p><h1 id="panel-finance-summary" className="mt-1 text-xl font-bold sm:text-2xl">Döneminin finans görünümü</h1><p className="mt-1 text-xs text-muted-foreground">{financeBounds.from === financeBounds.to ? financeBounds.from : `${financeBounds.from} – ${financeBounds.to}`} · kayıtlı operasyon verileri</p></div>
-          <Link to="/rapor" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background/80 px-3 text-sm font-semibold text-primary hover:bg-primary/5"><FileText className="size-4"/>Aylık rapor</Link>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="secondary" className="min-h-11 rounded-xl" aria-pressed={focusMode} onClick={toggleFocusMode}>
+              {focusMode ? <Eye className="size-4"/> : <EyeOff className="size-4"/>}
+              <span className="hidden sm:inline">{focusMode ? "Tüm panel" : "Odak modu"}</span>
+              <span className="sm:hidden">{focusMode ? "Tümü" : "Odak"}</span>
+            </Button>
+            <Link to="/rapor" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background/80 px-3 text-sm font-semibold text-primary hover:bg-primary/5"><FileText className="size-4"/><span className="hidden sm:inline">Aylık rapor</span><span className="sm:hidden">Rapor</span></Link>
+          </div>
         </div>
         <div role="group" aria-label="Finans özeti dönemi" className="scrollbar-soft -mx-3.5 mt-4 flex flex-nowrap gap-2 overflow-x-auto px-3.5 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
           {([ ["today", "Bugün"], ["week", "Bu hafta"], ["month", "Bu ay"], ["year", "Bu yıl"], ["custom", "Özel"] ] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={financePeriod === value} onClick={() => setFinancePeriod(value)} className={`min-h-10 shrink-0 rounded-xl border px-3.5 text-[13px] font-semibold transition duration-200 active:scale-[.97] ${financePeriod === value ? "border-primary bg-primary text-primary-foreground shadow-md shadow-primary/20" : "bg-background/70 text-muted-foreground hover:text-foreground"}`}>{label}</button>)}
@@ -235,27 +255,27 @@ function Panel() {
       </section>
       {nearby && <section className="rounded-2xl border-2 border-emerald-500/50 bg-emerald-500/10 p-4"><div className="flex items-start gap-3"><MapPin className="mt-0.5 size-5 shrink-0 text-emerald-700 dark:text-emerald-300"/><div className="min-w-0 flex-1"><p className="font-semibold">Şu an {nearby.customer.name} konumuna yakınsınız</p><p className="text-xs text-muted-foreground">Yaklaşık {Math.round(nearby.meters)} metre · konum yalnızca cihazda karşılaştırılır</p><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" disabled={saveJob.isPending} onClick={() => startNearbyJob(nearby.customer)}><HardHat/>Hızlı iş başlat</Button><Button asChild size="sm" variant="secondary"><Link to="/cari/$id" params={{ id: nearby.customer.id }}><Wallet/>Tahsilat al</Link></Button></div></div></div></section>}
       <MaintenanceAlerts />
-      <section className="overflow-hidden rounded-3xl border bg-card p-4 shadow-sm sm:p-5">
+      <section className="dashboard-reveal overflow-hidden rounded-3xl border bg-card p-4 shadow-sm sm:p-5">
         <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Saha akışı</p><h2 className="mt-1 text-lg font-bold">Bugünün işleri</h2><p className="text-xs text-muted-foreground">{todayISO()} · seçili usta profili</p></div><Link to="/isler" className="inline-flex min-h-10 items-center gap-1 rounded-xl px-3 text-xs font-semibold text-primary hover:bg-primary/10">Tüm işler <ArrowUpRight className="size-4"/></Link></div>
         {data.todayJobs.length ? <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{data.todayJobs.map((job) => <li key={job.id}><Link to="/isler" className="flex h-full min-h-20 items-center gap-3 rounded-2xl border bg-background/55 p-3 transition-colors hover:border-primary/40 hover:bg-primary/[0.04]"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><HardHat className="size-5"/></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{job.title}</span><span className="mt-1 block truncate text-xs text-muted-foreground">{job.customer}{job.time ? ` · ${job.time}` : ""}</span></span><span className="max-w-24 shrink-0 truncate rounded-full bg-secondary px-2 py-1 text-[10px] font-semibold">{job.status}</span></Link></li>)}</ul> : <div className="flex flex-col items-center rounded-2xl border border-dashed bg-background/35 px-4 py-6 text-center"><span className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground"><CalendarDays className="size-5"/></span><p className="mt-2 text-sm font-semibold">Bugün için planlanmış iş yok</p><p className="mt-1 text-xs text-muted-foreground">Randevu veya iş kaydı eklediğinde günlük planın burada görünür.</p><Button asChild variant="secondary" size="sm" className="mt-3"><Link to="/randevu">Takvimi aç</Link></Button></div>}
       </section>
       {txs.isLoading || exps.isLoading || customers.isLoading || jobs.isLoading || payrollEntries.isLoading || payrollPayments.isLoading || payrollAdvances.isLoading ? <div className="space-y-3" aria-label="Panel verileri yükleniyor" aria-busy="true"><div className="rounded-3xl border bg-card p-4"><Skeleton className="h-5 w-40"/><Skeleton className="mt-4 h-24 w-full"/></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-24 rounded-2xl"/>)}</div><div className="rounded-2xl border bg-card p-4"><Skeleton className="h-5 w-32"/><Skeleton className="mt-4 h-48 w-full"/></div></div> : <>
-      <section className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-2xl border bg-card p-4">
+      <section className={`grid gap-3 ${focusMode ? "grid-cols-1" : "sm:grid-cols-2"}`}>
+        {!focusMode && <div className="dashboard-reveal rounded-2xl border bg-card p-4">
           <div className="mb-2 flex items-start justify-between"><div><h2 className="text-sm font-semibold">Bu Hafta</h2><p className="mt-1 text-xs text-muted-foreground">Son 7 gündeki tamamlanan işler</p></div><span className="num rounded-full bg-primary/10 px-2.5 py-1 text-sm font-bold text-primary">{data.weekCount}</span></div>
           <div className="h-40 sm:h-48"><ResponsiveContainer width="100%" height="100%"><BarChart data={data.weekly} margin={{ top: 6, right: 0, bottom: 0, left: -24 }}><XAxis dataKey="name" stroke="var(--muted-foreground)" fontSize={10} tickLine={false} axisLine={false}/><YAxis allowDecimals={false} stroke="var(--muted-foreground)" fontSize={10} tickLine={false} axisLine={false}/><Tooltip cursor={{ fill: "var(--secondary)" }} contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 12 }} formatter={(value: number) => [`${value} iş tamamlandı`, ""]}/><Bar dataKey="count" radius={[6, 6, 0, 0]}>{data.weekly.map((row) => <Cell key={row.key} fill={row.today ? "var(--primary)" : "var(--muted-foreground)"} opacity={row.today ? 1 : 0.38}/>)}</Bar></BarChart></ResponsiveContainer></div>
-        </div>
-        <div className="rounded-2xl border bg-card p-4"><div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-semibold">Hızlı Eylemler</h2><span className="text-[10px] text-muted-foreground">Kısayollar</span></div><div className="grid grid-cols-2 gap-2">
+        </div>}
+        <div className="dashboard-reveal rounded-2xl border bg-card p-4"><div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-semibold">Hızlı Eylemler</h2><span className="text-[10px] text-muted-foreground">{focusMode ? "Odak görünümü" : "Kısayollar"}</span></div><div className="grid grid-cols-2 gap-2">
           <button type="button" onClick={() => openJobs("job")} className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-2xl bg-secondary text-sm font-medium transition-transform active:scale-95"><HardHat className="size-7 text-primary"/>Yeni İş</button>
           <button type="button" onClick={() => openCustomers()} className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-2xl bg-secondary text-sm font-medium transition-transform active:scale-95"><UserPlus className="size-7 text-primary"/>Yeni Müşteri</button>
           <button type="button" onClick={() => openJobs("camera")} className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-2xl bg-secondary text-sm font-medium transition-transform active:scale-95"><Camera className="size-7 text-primary"/>İş Fotoğrafı</button>
           <button type="button" onClick={() => setScannerOpen(true)} className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-2xl bg-secondary text-sm font-medium transition-transform active:scale-95"><QrCode className="size-7 text-primary"/>QR Tara</button>
         </div></div>
       </section>
-      <section aria-label="Hesaplama aracı"><Link to="/hesaplayici" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-card px-3 text-sm font-semibold transition hover:border-primary/40 hover:bg-primary/5"><WalletCards className="size-4 text-primary"/>Maliyet hesaplayıcı</Link></section>
-      <section className="rounded-2xl border bg-card p-4"><div className="mb-3 flex items-center justify-between"><div><h2 className="text-sm font-semibold">Son Hareketler</h2><p className="text-xs text-muted-foreground">İşler, tahsilatlar ve giderler</p></div><Link to="/isler" className="flex items-center gap-1 text-xs font-semibold text-primary">Tümünü gör <ArrowUpRight className="size-3.5"/></Link></div>
+      {!focusMode && <section aria-label="Hesaplama aracı"><Link to="/hesaplayici" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-card px-3 text-sm font-semibold transition hover:border-primary/40 hover:bg-primary/5"><WalletCards className="size-4 text-primary"/>Maliyet hesaplayıcı</Link></section>}
+      {!focusMode && <section className="dashboard-reveal rounded-2xl border bg-card p-4"><div className="mb-3 flex items-center justify-between"><div><h2 className="text-sm font-semibold">Son Hareketler</h2><p className="text-xs text-muted-foreground">İşler, tahsilatlar ve giderler</p></div><Link to="/isler" className="flex items-center gap-1 text-xs font-semibold text-primary">Tümünü gör <ArrowUpRight className="size-3.5"/></Link></div>
         {data.activity.length ? <ul className="animate-in slide-in-from-bottom-2 space-y-1 duration-300">{data.activity.map((item) => <li key={`${item.kind}-${item.id}`} className="flex items-center gap-3 rounded-xl px-2 py-2"><span className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${activityTone(item.kind)}`}>{item.kind === "job" ? <HardHat className="size-4"/> : item.kind === "expense" ? <TrendingDown className="size-4"/> : <Wallet className="size-4"/>}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{item.title}</p><p className="flex items-center gap-1 text-[10px] text-muted-foreground"><Clock3 className="size-3"/>{relativeTime(item.date)}</p></div><span className={`num whitespace-nowrap text-xs font-semibold ${item.kind === "expense" ? "text-destructive" : "text-foreground"}`}>{item.kind === "expense" ? "−" : item.kind === "job" ? "" : "+"}{formatTL(item.amount)}</span></li>)}</ul> : <p className="py-5 text-center text-sm text-muted-foreground">Henüz hareket yok</p>}
-      </section>
+      </section>}
       {data.overdue.length > 0 && (
         <div className="rounded-2xl border border-destructive/50 bg-destructive/10 p-4">
           <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-destructive">
@@ -267,7 +287,7 @@ function Panel() {
         </div>
       )}
 
-      <section className="grid gap-4 lg:grid-cols-2">
+      {!focusMode && <section className="dashboard-reveal grid gap-4 lg:grid-cols-2">
       <div className="rounded-2xl border bg-card p-4">
         <h2 className="mb-3 text-sm font-semibold">Son 6 ay</h2>
         {data.bars.every((row) => row.Gelir === 0 && row.Gider === 0) ? (
@@ -326,7 +346,7 @@ function Panel() {
           </div>
         )}
       </div>
-      </section>
+      </section>}
 
       </>}
       {scannerOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"><div className="w-full max-w-lg rounded-2xl border bg-card p-4"><div className="mb-3 flex items-center justify-between"><h2 className="font-semibold">QR kodu tara</h2><Button variant="ghost" size="sm" onClick={() => setScannerOpen(false)}>Kapat</Button></div><CodeScanner onRead={() => { setScannerOpen(false); toast.success("QR kodu okundu."); }} onClose={() => setScannerOpen(false)}/></div></div>}
