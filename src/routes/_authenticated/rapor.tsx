@@ -45,8 +45,8 @@ function MonthlyReport() {
     const topCustomers = (customers.data ?? []).map((customer) => ({ customer, income: txs.filter((row) => row.customer_id === customer.id && row.kind === "payment").reduce((sum, row) => sum + row.amount, 0) })).filter((row) => row.income > 0).sort((a, b) => b.income - a.income).slice(0, 5);
     const repeatWork = (customers.data ?? []).map((customer) => {
       const dates = (jobs.data ?? []).filter((row) => row.payload.status === "Tamamlandı" && row.payload.customer_id === customer.id).map((row) => Date.parse(`${String(row.payload.date ?? "").slice(0, 10)}T12:00:00`)).filter(Number.isFinite).sort((a, b) => a - b);
-      const intervals = dates.slice(1).map((date, index) => (date - dates[index]) / 86_400_000);
-      return { id: customer.id, name: customer.name, completedJobs: dates.length, averageGapDays: intervals.length ? intervals.reduce((sum, days) => sum + days, 0) / intervals.length : null, lastWorkDays: dates.length ? Math.max(0, Math.floor((Date.now() - dates[dates.length - 1]) / 86_400_000)) : null };
+      const intervals = dates.slice(1).map((date, index) => (date - (dates[index] ?? date)) / 86_400_000);
+      return { id: customer.id, name: customer.name, completedJobs: dates.length, averageGapDays: intervals.length ? intervals.reduce((sum, days) => sum + days, 0) / intervals.length : null, lastWorkDays: dates.length ? Math.max(0, Math.floor((Date.now() - (dates[dates.length - 1] ?? Date.now())) / 86_400_000)) : null };
     }).filter((row) => row.completedJobs > 1).sort((a, b) => b.completedJobs - a.completedJobs).slice(0, 8);
     const staff = members.map((member) => {
       const worked = (payroll.data ?? []).filter((row) => row.owner_id === member.id && String(row.payload.date ?? "").startsWith(month));
