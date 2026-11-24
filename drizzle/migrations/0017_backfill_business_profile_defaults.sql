@@ -11,26 +11,22 @@ SELECT p.id,
        p.id
 FROM public.profiles p
 WHERE p.id = p.team_id
-  AND EXISTS (
-    SELECT 1 FROM public.user_roles ur
-    WHERE ur.user_id = p.id AND ur.role = 'usta'
-  )
+  AND EXISTS (SELECT 1 FROM public.user_roles ur WHERE ur.user_id = p.id AND ur.role = 'usta')
   AND NOT EXISTS (
     SELECT 1 FROM public.business_profiles bp
     WHERE bp.team_id = p.id AND bp.is_default
   )
 ON CONFLICT DO NOTHING;
 
--- A team may already have a named profile but no default due to a prior
--- interrupted/manual setup. Promote its oldest active profile as default.
+-- If the suggested owner name already exists as a non-default profile, the
+-- unique team/name index makes the insert above a no-op. Reuse the oldest
+-- active profile as the default for that team instead of leaving records
+-- unassigned. Only teams backed by an existing owner profile are touched.
 WITH teams_without_default AS (
-  SELECT DISTINCT p.id AS team_id
+  SELECT p.id AS team_id
   FROM public.profiles p
   WHERE p.id = p.team_id
-    AND EXISTS (
-      SELECT 1 FROM public.user_roles ur
-      WHERE ur.user_id = p.id AND ur.role = 'usta'
-    )
+    AND EXISTS (SELECT 1 FROM public.user_roles ur WHERE ur.user_id = p.id AND ur.role = 'usta')
     AND EXISTS (
       SELECT 1 FROM public.work_records w
       WHERE w.team_id = p.id AND w.kind <> 'settings' AND w.profile_id IS NULL
@@ -55,6 +51,12 @@ SET is_default = true
 FROM candidates c
 WHERE bp.id = c.id;
 
+-- Only backfill legacy NULL profile_id values. Existing assignments remain
+-- protected by the normal trigger and are never rewritten by this migration.
+ALTER TABLE public.work_records DISABLE TRIGGER assign_profile_work_records;
+ALTER TABLE public.transactions DISABLE TRIGGER assign_profile_transactions;
+ALTER TABLE public.expenses DISABLE TRIGGER assign_profile_expenses;
+
 UPDATE public.work_records w
 SET profile_id = bp.id
 FROM public.business_profiles bp
@@ -76,3 +78,7 @@ FROM public.business_profiles bp
 WHERE e.team_id = bp.team_id
   AND bp.is_default
   AND e.profile_id IS NULL;
+
+ALTER TABLE public.work_records ENABLE TRIGGER assign_profile_work_records;
+ALTER TABLE public.transactions ENABLE TRIGGER assign_profile_transactions;
+ALTER TABLE public.expenses ENABLE TRIGGER assign_profile_expenses;
