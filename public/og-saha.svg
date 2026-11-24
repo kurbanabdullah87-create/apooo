@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
-  <title id="title">Saha360 — İş, ekip ve finans yönetimi</title>
-  <desc id="desc">Saha işleri, müşteriler, ekip ve günlük finans için tek çalışma alanı.</desc>
+  <title id="title">İşvera — İş, ekip ve finans yönetimi</title>
+  <desc id="desc">İşler, müşteriler, ekip ve günlük finans için tek çalışma alanı.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#071713"/><stop offset=".56" stop-color="#111827"/><stop offset="1" stop-color="#05080d"/></linearGradient>
     <radialGradient id="glow"><stop stop-color="#10b981" stop-opacity=".35"/><stop offset="1" stop-color="#10b981" stop-opacity="0"/></radialGradient>
@@ -9,13 +9,13 @@
   <rect width="1200" height="630" fill="url(#bg)"/>
   <ellipse cx="985" cy="120" rx="430" ry="330" fill="url(#glow)"/>
   <image href="/brand-mark.svg" x="78" y="84" width="66" height="66"/>
-  <text x="166" y="130" fill="#f8fafc" font-family="Arial,sans-serif" font-size="36" font-weight="700">Saha360</text>
-  <text x="78" y="258" fill="#f8fafc" font-family="Arial,sans-serif" font-size="62" font-weight="700">Sahanız, işleriniz,</text>
+  <text x="166" y="130" fill="#f8fafc" font-family="Arial,sans-serif" font-size="36" font-weight="700">İşvera</text>
+  <text x="78" y="258" fill="#f8fafc" font-family="Arial,sans-serif" font-size="62" font-weight="700">İşiniz, ekibiniz,</text>
   <text x="78" y="332" fill="#34d399" font-family="Arial,sans-serif" font-size="62" font-weight="700">tek bir düzende.</text>
   <text x="82" y="392" fill="#cbd5e1" font-family="Arial,sans-serif" font-size="25">İş • müşteri • ekip • tahsilat • gider • yevmiye</text>
   <rect x="78" y="468" width="428" height="74" rx="22" fill="url(#card)" stroke="#ffffff" stroke-opacity=".13"/>
   <circle cx="116" cy="505" r="8" fill="#34d399"/>
-  <text x="141" y="514" fill="#e2e8f0" font-family="Arial,sans-serif" font-size="21" font-weight="600">İş, ekip ve finans için tek çalışma alanı</text>
+  <text x="141" y="514" fill="#e2e8f0" font-family="Arial,sans-serif" font-size="21" font-weight="600">İşin düzeni. Hesabın neti.</text>
   <g transform="translate(755 205)">
     <rect width="345" height="270" rx="30" fill="url(#card)" stroke="#ffffff" stroke-opacity=".15"/>
     <text x="30" y="51" fill="#94a3b8" font-family="Arial,sans-serif" font-size="14" font-weight="700" letter-spacing="2">SAHA ÖZETİ</text>

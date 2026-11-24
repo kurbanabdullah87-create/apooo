@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Saha360 · İş, Ekip ve Finans Yönetimi",
-  "short_name": "Saha360",
-  "description": "Saha işleri, müşteriler, ekip ve günlük finansı tek yerde yönetin.",
+  "name": "İşvera · İş, Ekip ve Finans Yönetimi",
+  "short_name": "İşvera",
+  "description": "İşlerinizi, müşterilerinizi, ekibinizi ve günlük finansınızı tek yerde yönetin.",
   "start_url": "/auth",
   "scope": "/",
   "display": "standalone",

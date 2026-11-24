@@ -1,25 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none" role="img" aria-labelledby="title">
-  <title id="title">Saha360 saha ve iş yönetimi simgesi</title>
+  <title id="title">İşvera iş yönetimi simgesi</title>
   <defs>
-    <linearGradient id="field" x1="13" y1="9" x2="112" y2="119" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#173a50"/>
-      <stop offset="1" stop-color="#101a2b"/>
-    </linearGradient>
-    <linearGradient id="mint" x1="31" y1="27" x2="100" y2="97" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#8cf5da"/>
-      <stop offset="1" stop-color="#37d0ae"/>
-    </linearGradient>
-    <linearGradient id="gold" x1="80" y1="32" x2="98" y2="68" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#ffe29a"/>
-      <stop offset="1" stop-color="#ffb84d"/>
-    </linearGradient>
+    <linearGradient id="bg" x1="12" y1="8" x2="116" y2="122" gradientUnits="userSpaceOnUse"><stop stop-color="#172b48"/><stop offset="1" stop-color="#101522"/></linearGradient>
+    <linearGradient id="flow" x1="26" y1="92" x2="100" y2="33" gradientUnits="userSpaceOnUse"><stop stop-color="#61e6c4"/><stop offset="1" stop-color="#56b8ff"/></linearGradient>
+    <linearGradient id="spark" x1="85" y1="24" x2="105" y2="45" gradientUnits="userSpaceOnUse"><stop stop-color="#ffe29a"/><stop offset="1" stop-color="#ffad57"/></linearGradient>
   </defs>
-  <rect x="3" y="3" width="122" height="122" rx="36" fill="url(#field)"/>
-  <rect x="4" y="4" width="120" height="120" rx="35" stroke="#a5f3e3" stroke-opacity=".2" stroke-width="2"/>
-  <path d="M25 59 64 29l39 30v37a8 8 0 0 1-8 8H33a8 8 0 0 1-8-8V59Z" fill="#14283a" stroke="#d9fff5" stroke-opacity=".78" stroke-width="4" stroke-linejoin="round"/>
-  <path d="M44 57a20 20 0 0 1 40 0" stroke="url(#gold)" stroke-width="9" stroke-linecap="round"/>
-  <path d="M39 58h50a5 5 0 0 1 0 10H39a5 5 0 0 1 0-10Z" fill="url(#gold)"/>
-  <path d="M50 91h9v13h-9zM69 83h9v21h-9zM87 73h9v31h-9z" fill="url(#mint)"/>
-  <path d="m48 82 14-10 11 5 17-16" stroke="#f2fffb" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="90" cy="61" r="4" fill="#fff"/>
+  <rect x="3" y="3" width="122" height="122" rx="36" fill="url(#bg)"/>
+  <rect x="4" y="4" width="120" height="120" rx="35" stroke="#dbeafe" stroke-opacity=".15" stroke-width="2"/>
+  <path d="M30 39h28M30 64h20M30 89h28" stroke="#dbeafe" stroke-opacity=".28" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="30" cy="39" r="5" fill="#60dfc0"/><circle cx="30" cy="64" r="5" fill="#60dfc0"/><circle cx="30" cy="89" r="5" fill="#60dfc0"/>
+  <path d="M54 39c12 0 10 16 21 16h5c9 0 10-15 20-15" stroke="url(#flow)" stroke-width="8" stroke-linecap="round"/>
+  <path d="M54 64h36" stroke="url(#flow)" stroke-width="8" stroke-linecap="round"/>
+  <path d="M54 89c12 0 10-16 21-16h5c9 0 10 15 20 15" stroke="url(#flow)" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="101" cy="40" r="10" fill="url(#spark)"/>
+  <path d="m97 40 3 3 6-7" stroke="#392b24" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="101" cy="64" r="6" fill="#61e6c4"/>
+  <circle cx="101" cy="88" r="6" fill="#61e6c4"/>
 </svg>

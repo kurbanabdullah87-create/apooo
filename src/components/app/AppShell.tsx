@@ -198,7 +198,7 @@ export function AppShell() {
       <aside className="glass-sidebar fixed inset-y-4 left-4 z-40 hidden w-60 flex-col rounded-[1.8rem] p-3 lg:flex" aria-label="Ana gezinme">
         <Link to="/panel" className="flex items-center gap-3 rounded-2xl px-3 py-3 transition hover:bg-white/[0.06]">
           <img src="/brand-mark.svg" alt="" className="size-10 rounded-2xl shadow-lg shadow-primary/20" />
-          <span className="min-w-0"><span className="block text-base font-bold tracking-tight">Saha360</span><span className="block text-[11px] text-muted-foreground">İş · ekip · finans yönetimi</span></span>
+          <span className="min-w-0"><span className="block text-base font-bold tracking-tight">İşvera</span><span className="block text-[11px] text-muted-foreground">İş · ekip · finans yönetimi</span></span>
         </Link>
         <div className="mx-3 my-3 h-px bg-white/10" />
         <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/75">Çalışma alanı</p>

@@ -80,7 +80,7 @@ export function depreciation(price:number,years:number,purchased:string,now=new 
  const age=Math.max(0,(now.getTime()-new Date(purchased+'T00:00:00').getTime())/(365.25*86400000));
  return Math.round(Math.max(0,price*(1-age/Math.max(1,years)))*100)/100;
 }
-export function pageHead(title:string,description:string) {return {meta:[{title:title+' — Saha360'},{name:'description',content:description},{property:'og:title',content:title+' — Saha360'},{property:'og:description',content:description},{property:'og:type',content:'website'},{name:'twitter:card',content:'summary'}]};}
+export function pageHead(title:string,description:string) {return {meta:[{title:title+' — İşvera'},{name:'description',content:description},{property:'og:title',content:title+' — İşvera'},{property:'og:description',content:description},{property:'og:type',content:'website'},{name:'twitter:card',content:'summary'}]};}
 export type MaintLevel='ok'|'warn'|'over'|'none';
 export const MAINT_WARN=0.8; // bakım aralığının %80'inde "yaklaşıyor", %100'de "geçti"
 /** Makinenin toplam çalışma süresi (sn) = elle kronometre (+çalışıyorsa akan süre) + tamamlanan işlerden gelen süre. */
