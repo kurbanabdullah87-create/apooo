@@ -242,7 +242,6 @@ try {
         AND EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='bank_accounts' AND policyname='premium owner manages bank accounts')
         AND has_function_privilege('authenticated', 'public.get_current_access()', 'EXECUTE')
         AND NOT has_function_privilege('anon', 'public.get_current_access()', 'EXECUTE')
-        AND EXISTS (SELECT 1 FROM public.authorized_emails WHERE email='abdullahkurban670@gmail.com' AND enabled AND is_admin)
         AS "accessSchemaReady"
     `;
     if (!accessSchemaReady) {
