@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useMe } from "@/hooks/use-me";
 import { useMembers } from "@/lib/job-fields";
-import { pageHead, useRecords, type WorkRecord } from "@/lib/work";
+import { elapsedSeconds, pageHead, useRecords, type WorkRecord } from "@/lib/work";
 import { formatDate, todayISO } from "@/lib/finance";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -31,6 +31,7 @@ function Attendance() {
   const me = useMe();
   const members = useMembers();
   const attendance = useRecords("attendance");
+  const jobs = useRecords("job");
   const [month, setMonth] = useState(monthNow());
   const [selectedOwner, setSelectedOwner] = useState("");
   const [includeLocation, setIncludeLocation] = useState(true);
@@ -83,6 +84,29 @@ function Attendance() {
   }
 
   const selectedName = members.find((member) => member.id === ownerId)?.username ?? me.data?.profile?.display_name ?? "Çalışan";
+  const productivity = useMemo(() => members.map((member) => {
+    const completed = (jobs.data ?? []).filter((job) => job.owner_id === member.id && job.payload.status === "Tamamlandı");
+    const durationHours = completed.map((job) => elapsedSeconds(job.payload) / 3600).filter((hours) => hours > 0);
+    const onTime = completed.filter((job) => {
+      const completedAt = String(job.payload.completed_at ?? "").slice(0, 10);
+      const plannedDate = String(job.payload.date ?? "").slice(0, 10);
+      return Boolean(completedAt && plannedDate && completedAt <= plannedDate);
+    }).length;
+    const recent = completed.filter((job) => {
+      const date = String(job.payload.completed_at ?? job.payload.date ?? "").slice(0, 10);
+      const days = Math.floor((Date.now() - new Date(`${date}T12:00:00`).getTime()) / 86_400_000);
+      return days >= 0 && days < 7;
+    }).length;
+    const previous = completed.filter((job) => {
+      const date = String(job.payload.completed_at ?? job.payload.date ?? "").slice(0, 10);
+      const days = Math.floor((Date.now() - new Date(`${date}T12:00:00`).getTime()) / 86_400_000);
+      return days >= 7 && days < 14;
+    }).length;
+    const avgHours = durationHours.length ? durationHours.reduce((sum, hours) => sum + hours, 0) / durationHours.length : 0;
+    const punctuality = completed.length ? onTime / completed.length * 100 : 0;
+    const score = completed.length ? Math.round(Math.min(100, completed.length * 8) * 0.35 + Math.max(0, 100 - Math.min(100, avgHours * 10)) * 0.25 + punctuality * 0.4) : 0;
+    return { id: member.id, name: member.username, completed: completed.length, avgHours, punctuality, score, recent, previous, hours: ownRows.filter((row) => row.owner_id === member.id && String(row.payload.date ?? "").startsWith(month)).reduce((sum, row) => sum + shiftDuration(row, now) / 3_600_000, 0) };
+  }), [members, jobs.data, ownRows, month, now]);
   return <div className="mx-auto max-w-4xl space-y-5 pb-8">
     <header className="rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-5 text-white sm:p-7">
       <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[.18em] text-sky-300"><Clock3 className="size-4"/>YEVMİYE VE FİNANS · VARDİYA TAKİBİ</p>
@@ -97,6 +121,8 @@ function Attendance() {
       </div>
       {!navigator.onLine && <p className="mt-3 text-xs text-amber-200">Çevrimdışıyken giriş/çıkış sunucuda güvenli kaydedilemez.</p>}
     </header>
+
+    {me.data?.isUsta && <section className="space-y-3 rounded-2xl border bg-card p-4"><div><h2 className="font-semibold">Ekip verimlilik skorkartı</h2><p className="mt-1 text-xs text-muted-foreground">Atanan iş kayıtları ve puantajdan hesaplanır. Şikâyet verisi tutulmadığı için skora dahil değildir; zamanında ölçütü planlanan gün içinde tamamlamadır.</p></div>{productivity.length ? <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead><tr className="border-b text-xs text-muted-foreground"><th className="py-2 pr-3">Çalışan</th><th className="py-2 pr-3">Tamamlanan</th><th className="py-2 pr-3">Ort. saat</th><th className="py-2 pr-3">Zamanında</th><th className="py-2 pr-3">Bu hafta</th><th className="py-2">Skor</th></tr></thead><tbody>{productivity.map((row) => <tr key={row.id} className="border-b last:border-0"><td className="py-2 pr-3 font-medium">{row.name}</td><td className="num py-2 pr-3">{row.completed}</td><td className="num py-2 pr-3">{row.avgHours.toFixed(1)} sa</td><td className="num py-2 pr-3">{row.punctuality.toFixed(0)}%</td><td className="py-2 pr-3">{row.recent > row.previous ? "↑" : row.recent < row.previous ? "↓" : "→"} {row.recent} / {row.previous}</td><td className="py-2"><span className={`rounded-full px-2 py-1 text-xs font-bold ${row.score <= 40 ? "bg-rose-500/15 text-rose-700 dark:text-rose-300" : row.score <= 70 ? "bg-amber-500/15 text-amber-800 dark:text-amber-200" : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"}`}>{row.score}/100</span></td></tr>)}</tbody></table></div> : <p className="text-sm text-muted-foreground">Henüz ekip kaydı yok.</p>}</section>}
 
     <section className="space-y-4 rounded-2xl border bg-card p-4">
       <div className="flex flex-wrap items-end justify-between gap-3">

@@ -77,6 +77,34 @@ export function overdueAmount(txs: Tx[], today: Date = new Date(), dueDays = OVE
   return round2(overdue);
 }
 
+export type ReceivableAgeBucket = "0-30" | "31-60" | "61-90" | "90+";
+
+/** Remaining customer debts grouped by age, settling payments FIFO. */
+export function receivableAging(txs: Tx[], today: Date = new Date()) {
+  const result: Record<ReceivableAgeBucket, { amount: number; customers: Set<string>; invoices: number }> = {
+    "0-30": { amount: 0, customers: new Set(), invoices: 0 },
+    "31-60": { amount: 0, customers: new Set(), invoices: 0 },
+    "61-90": { amount: 0, customers: new Set(), invoices: 0 },
+    "90+": { amount: 0, customers: new Set(), invoices: 0 },
+  };
+  const sorted = [...txs].sort((a, b) => a.occurred_on.localeCompare(b.occurred_on));
+  let paid = sorted.filter((row) => row.kind === "payment").reduce((sum, row) => sum + Number(row.amount), 0);
+  for (const debt of sorted) {
+    if (debt.kind !== "debt") continue;
+    const amount = Number(debt.amount);
+    const settled = Math.min(paid, amount);
+    paid -= settled;
+    const remaining = Math.max(0, amount - settled);
+    if (!remaining) continue;
+    const ageDays = Math.max(0, daysBetween(debt.occurred_on, today));
+    const bucket: ReceivableAgeBucket = ageDays <= 30 ? "0-30" : ageDays <= 60 ? "31-60" : ageDays <= 90 ? "61-90" : "90+";
+    result[bucket].amount = round2(result[bucket].amount + remaining);
+    result[bucket].customers.add(debt.customer_id);
+    result[bucket].invoices += 1;
+  }
+  return Object.fromEntries(Object.entries(result).map(([key, value]) => [key, { amount: value.amount, customers: value.customers.size, invoices: value.invoices }])) as Record<ReceivableAgeBucket, { amount: number; customers: number; invoices: number }>;
+}
+
 export function customerRestriction(customer: { is_blocked?: boolean; credit_limit?: number; payment_due_days?: number }, txs: Tx[]) {
   const balance = customerBalance(txs);
   const overdue = overdueAmount(txs, new Date(), customer.payment_due_days ?? 15);

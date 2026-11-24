@@ -204,9 +204,13 @@ function Equipment() {
               const minimum = Number(item.payload.minimum ?? 0);
               const low = quantity <= minimum;
               const history = (stockMovements.data ?? []).filter((movement) => movement.payload.item_id === item.id).slice(0, 3);
+              const usageCutoff = new Date(now - 90 * 86_400_000).toISOString().slice(0, 10);
+              const usedLast90 = (stockMovements.data ?? []).filter((movement) => movement.payload.item_id === item.id && movement.payload.operation === "use" && String(movement.payload.date ?? "") >= usageCutoff).reduce((sum, movement) => sum + Number(movement.payload.quantity ?? 0), 0);
+              const daysToDepletion = usedLast90 > 0 ? quantity / (usedLast90 / 90) : null;
               return <article key={item.id} className="space-y-3 rounded-2xl border bg-card p-4">
                 <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="font-semibold">{String(item.payload.name)}</h2><p className="mt-0.5 text-xs text-muted-foreground">{item.payload.sku ? `Kod: ${String(item.payload.sku)} · ` : ""}Asgari {minimum} {String(item.payload.unit ?? "adet")}</p></div><Button type="button" variant="ghost" size="sm" onClick={() => openStockForm(item)}>Düzenle</Button></div>
                 <div className="flex items-end justify-between rounded-xl bg-secondary/60 p-3"><div><p className="text-xs text-muted-foreground">Mevcut miktar</p><p className={`num text-2xl font-bold ${low ? "text-amber-600 dark:text-amber-300" : ""}`}>{quantity} <span className="text-sm font-medium">{String(item.payload.unit ?? "adet")}</span></p></div><p className="text-right text-xs text-muted-foreground">Birim maliyet<br/><span className="num font-semibold text-foreground">{formatTL(Number(item.payload.unit_cost ?? 0))}</span></p></div>
+                <p className={`rounded-xl border px-3 py-2 text-xs ${daysToDepletion != null && daysToDepletion <= 14 ? "border-rose-500/30 bg-rose-500/5 text-rose-700 dark:text-rose-300" : "border-border bg-background/50 text-muted-foreground"}`}>{daysToDepletion != null ? `Son 90 günlük kullanıma göre tahmini tükenme: ${Math.max(0, Math.ceil(daysToDepletion))} gün · yalnızca kayıtlı saha çıkışları` : "Tükenme tahmini için en az bir stok kullanım hareketi kaydedin."}</p>
                 {item.payload.notes && <p className="text-xs text-muted-foreground">{String(item.payload.notes)}</p>}
                 <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => openMovement(item, "purchase")}><PackagePlus className="size-4"/>Stok girişi</Button><Button size="sm" variant="secondary" disabled={quantity <= 0} onClick={() => openMovement(item, "use")}><PackageMinus className="size-4"/>Sahaya çıkar</Button><Button size="sm" variant="ghost" disabled={quantity <= 0} onClick={() => openMovement(item, "return")}><ArrowRightLeft className="size-4"/>İade al</Button></div>
                 {history.length > 0 && <details className="border-t pt-2"><summary className="cursor-pointer text-xs font-semibold text-muted-foreground">Son stok hareketleri</summary><div className="mt-2 space-y-1.5">{history.map((movement) => <div key={movement.id} className="flex items-center justify-between gap-2 text-xs"><span>{String(movement.payload.date ?? "")} · {movement.payload.operation === "use" ? "Sahaya çıkış" : movement.payload.operation === "return" ? "İade" : "Stok girişi"}{movement.payload.job_id ? ` · İş ${String(movement.payload.job_id).slice(0, 8)}` : ""}</span><span className="num font-semibold">{movement.payload.operation === "use" ? "−" : "+"}{Number(movement.payload.quantity)} {String(item.payload.unit ?? "adet")}</span></div>)}</div></details>}
@@ -285,6 +289,12 @@ function Equipment() {
             const mine = (jobs.data ?? []).filter((j) => j.payload.equipment_id === item.id && j.payload.billed);
             const earned = mine.reduce((t, j) => t + (Number(j.payload.hourly_rate) > 0 ? hourlyCharge(Number(j.payload.seconds ?? 0), Number(j.payload.hourly_rate)) : Number(j.payload.price ?? 0)), 0);
             const price = Number(p.price ?? 0);
+            const maintenanceCost = (maintenance.data ?? []).filter((row) => row.payload.equipment_id === item.id).reduce((sum, row) => sum + Number(row.payload.cost ?? 0), 0);
+            const monthsOwned = Math.max(1, (now - new Date(`${String(p.purchased ?? todayISO()).slice(0, 10)}T12:00:00`).getTime()) / (30.4375 * 86_400_000));
+            const equipmentNet = earned - maintenanceCost;
+            const equipmentRoi = price > 0 ? equipmentNet / price * 100 : null;
+            const monthlyEquipmentNet = equipmentNet / monthsOwned;
+            const paybackMonths = monthlyEquipmentNet > 0 && price > 0 ? price / monthlyEquipmentNet : null;
             return (
               <article key={item.id} className="space-y-3 rounded-lg border bg-card p-4">
                 <div className="flex items-center justify-between gap-3">
@@ -384,6 +394,7 @@ function Equipment() {
                     <p className="text-sm text-muted-foreground">
                       {p.notes} · Kod: {p.code || item.id}
                     </p>
+                    <div className="rounded-xl border border-primary/20 bg-primary/[0.04] p-3"><p className="text-xs font-semibold uppercase tracking-wide text-primary">Ekipman yatırım getirisi · kayıtlı işler</p><div className="mt-2 grid grid-cols-2 gap-2 text-sm"><div><p className="text-xs text-muted-foreground">Bağlı iş geliri</p><p className="num font-semibold">{formatTL(earned)}</p></div><div><p className="text-xs text-muted-foreground">Bakım maliyeti</p><p className="num font-semibold">{formatTL(maintenanceCost)}</p></div><div><p className="text-xs text-muted-foreground">Net katkı</p><p className="num font-semibold">{formatTL(equipmentNet)}</p></div><div><p className="text-xs text-muted-foreground">Kayıtlı ROI</p><p className={`num font-semibold ${equipmentRoi != null && equipmentRoi < 0 ? "text-destructive" : "text-emerald-700 dark:text-emerald-300"}`}>{equipmentRoi == null ? "Alış bedeli yok" : `${equipmentRoi.toFixed(1)}%`}</p></div></div><p className="mt-2 text-xs text-muted-foreground">{paybackMonths != null ? `Kayıtlı katkı hızına göre yaklaşık geri dönüş: ${paybackMonths.toFixed(0)} ay` : equipmentNet < 0 ? "Bakım maliyeti kayıtlı iş gelirini aşmış; yenileme değerlendirmesi yapılabilir." : "Geri dönüş süresi için pozitif kayıtlı aylık katkı ve alış bedeli gerekir."}</p><p className="mt-1 text-[10px] text-muted-foreground">Bu gösterge yalnızca bu ekipmana bağlanan ve faturalanmış işlerle kayıtlı bakım maliyetini kullanır; genel gider ve tahsilat durumu dahil değildir.</p></div>
                     <Button variant="outline" size="sm" onClick={() => edit(item)}>
                       Sicili düzenle
                     </Button>

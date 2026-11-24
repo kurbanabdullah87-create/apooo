@@ -44,9 +44,10 @@ function Settings() {
   const [count, setCount] = useState(0);
   const [fieldMode, setFieldMode] = useState(() => { try { return localStorage.getItem("saha-field-mode") === "sunlight"; } catch { return false; } });
   const [theme, setTheme] = useState(() => { try { return localStorage.getItem("saha-theme") ?? "ocean"; } catch { return "ocean"; } });
+  const settingsRecord = settings.data?.find((row) => row.payload.key !== "navigation-preferences");
   useEffect(() => {
-    if (settings.data?.[0]) setForm(settings.data[0].payload);
-  }, [settings.data]);
+    if (settingsRecord) setForm(settingsRecord.payload);
+  }, [settingsRecord]);
   useEffect(() => {
     void pendingCount()
       .then(setCount)
@@ -85,6 +86,7 @@ function Settings() {
           <section className="space-y-3">
             <AccessibilitySettings />
             <ThemeSettings value={theme} onChange={setTheme} />
+            <NavigationSettings />
             <BusinessHoursSettings value={String(form.working_hours_json ?? "")} onChange={(value) => setForm({ ...form, working_hours_json: value })}/>
             <h2 className="font-semibold">İşletme</h2>
             <label className="flex min-h-14 items-center justify-between gap-3 rounded-2xl border bg-card p-3"><span><span className="block font-semibold">Saha modu · yüksek kontrast</span><span className="text-xs text-muted-foreground">Güneş ışığında daha net metin ve kenarlıklar</span></span><input type="checkbox" checked={fieldMode} onChange={(e) => setFieldMode(e.target.checked)}/></label>
@@ -114,9 +116,10 @@ function Settings() {
               value={String(form.target ?? 0)}
               onChange={(e) => setForm({ ...form, target: Number(e.target.value) })}
             />
+            <div className="grid gap-3 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="monthly-jobs-target">Aylık tamamlanan iş hedefi</Label><Input id="monthly-jobs-target" type="number" min="0" step="1" value={String(form.monthly_jobs_target ?? 0)} onChange={(e) => setForm({ ...form, monthly_jobs_target: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}/></div><div className="space-y-2"><Label htmlFor="monthly-customers-target">Aylık yeni müşteri hedefi</Label><Input id="monthly-customers-target" type="number" min="0" step="1" value={String(form.monthly_customers_target ?? 0)} onChange={(e) => setForm({ ...form, monthly_customers_target: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}/></div></div>
             <Button
               disabled={save.isPending}
-              onClick={() => save.mutate({ id: settings.data?.[0]?.id, payload: form })}
+              onClick={() => save.mutate({ id: settingsRecord?.id, payload: form })}
             >
               <Save />
               Kaydet
@@ -125,7 +128,7 @@ function Settings() {
           <LaunchReadinessChecklist
             value={String(form.launch_checklist_v1 ?? "")}
             onChange={(value) => setForm((current) => ({ ...current, launch_checklist_v1: value }))}
-            onSave={() => save.mutate({ id: settings.data?.[0]?.id, payload: form })}
+              onSave={() => save.mutate({ id: settingsRecord?.id, payload: form })}
             saving={save.isPending}
           />
           <section className="space-y-3 border-t pt-5">
@@ -499,13 +502,53 @@ function LaunchReadinessChecklist({
 }
 function AccessibilitySettings() {
   const [scale, setScale] = useState(() => { try { return localStorage.getItem("saha-text-scale") ?? "normal"; } catch { return "normal"; } });
-  const [colorblind, setColorblind] = useState(() => { try { return localStorage.getItem("saha-colorblind") === "true"; } catch { return false; } });
+  const [vision, setVision] = useState(() => { try { return localStorage.getItem("saha-color-vision") ?? (localStorage.getItem("saha-colorblind") === "true" ? "deuteranopia" : "standard"); } catch { return "standard"; } });
+  const [highContrast, setHighContrast] = useState(() => { try { return localStorage.getItem("saha-high-contrast") === "true"; } catch { return false; } });
   useEffect(() => {
     document.documentElement.dataset.textScale = scale;
-    document.documentElement.dataset.colorblind = colorblind ? "true" : "false";
-    try { localStorage.setItem("saha-text-scale", scale); localStorage.setItem("saha-colorblind", String(colorblind)); } catch { /* browser storage can be disabled */ }
-  }, [scale, colorblind]);
-  return <div className="space-y-3 rounded-2xl border bg-card p-4"><div><h3 className="font-semibold">Erişilebilirlik</h3><p className="text-xs text-muted-foreground">Yalnızca bu cihazda saklanır.</p></div><div className="space-y-2"><Label htmlFor="text-scale">Metin boyutu</Label><select id="text-scale" className="h-11 w-full rounded-xl border bg-background px-3 text-sm" value={scale} onChange={(event) => setScale(event.target.value)}><option value="small">Küçük</option><option value="normal">Normal</option><option value="large">Büyük</option><option value="xlarge">Çok büyük</option></select></div><label className="flex min-h-12 items-center justify-between gap-3 rounded-xl border px-3"><span><span className="block text-sm font-medium">Renk körlüğüne uygun işaretler</span><span className="text-xs text-muted-foreground">Durum renklerine ek olarak farklı çizgi desenleri kullan</span></span><input type="checkbox" checked={colorblind} onChange={(event) => setColorblind(event.target.checked)}/></label></div>;
+    document.documentElement.dataset.colorVision = vision;
+    document.documentElement.dataset.highContrast = highContrast ? "true" : "false";
+    try { localStorage.setItem("saha-text-scale", scale); localStorage.setItem("saha-color-vision", vision); localStorage.setItem("saha-high-contrast", String(highContrast)); } catch { /* browser storage can be disabled */ }
+  }, [scale, vision, highContrast]);
+  const scales = [["tiny", "Çok küçük · 12px"], ["small", "Küçük · 14px"], ["normal", "Normal · 16px"], ["large", "Büyük · 18px"], ["xlarge", "Çok büyük · 20px"], ["accessible", "Erişilebilir · 22px"], ["lowvision", "Görme güçlüğü · 26px"]] as const;
+  const changeScale = (direction: -1 | 1) => { const index = scales.findIndex(([id]) => id === scale); setScale(scales[Math.max(0, Math.min(scales.length - 1, (index < 0 ? 2 : index) + direction))]![0]); };
+  return <div className="space-y-3 rounded-2xl border bg-card p-4"><div><h3 className="font-semibold">Erişilebilirlik</h3><p className="text-xs text-muted-foreground">Seçimler bu cihazda saklanır ve anında uygulanır.</p></div><div className="space-y-2"><Label htmlFor="text-scale">Metin boyutu</Label><div className="flex gap-2"><Button type="button" variant="outline" aria-label="Metin boyutunu küçült" onClick={() => changeScale(-1)}>A−</Button><select id="text-scale" className="h-11 min-w-0 flex-1 rounded-xl border bg-background px-3 text-sm" value={scale} onChange={(event) => setScale(event.target.value)}>{scales.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select><Button type="button" variant="outline" aria-label="Metin boyutunu büyüt" onClick={() => changeScale(1)}>A+</Button></div><p className="rounded-lg bg-secondary/60 p-2 text-[length:1em]">Örnek metin · seçili boyut anında uygulanır.</p></div><div className="space-y-2"><Label htmlFor="color-vision">Renk ayırt etme paleti</Label><select id="color-vision" className="h-11 w-full rounded-xl border bg-background px-3 text-sm" value={vision} onChange={(event) => setVision(event.target.value)}><option value="standard">Standart</option><option value="deuteranopia">Kırmızı-yeşil · deuteranopi</option><option value="protanopia">Kırmızı-yeşil · protanopi</option><option value="tritanopia">Mavi-sarı · tritanopi</option></select><p className="text-[11px] text-muted-foreground">Durum renkleri her palette farklı tonlara çevrilir ve ikon/metin işaretleri korunur; tıbbi renk testi değildir.</p></div><label className="flex min-h-12 items-center justify-between gap-3 rounded-xl border px-3"><span><span className="block text-sm font-medium">Yüksek kontrast</span><span className="text-xs text-muted-foreground">Metin, sınır ve klavye odaklarını belirginleştir</span></span><input type="checkbox" checked={highContrast} onChange={(event) => setHighContrast(event.target.checked)}/></label></div>;
+}
+
+const mobileNavigationChoices = [
+  ["/panel", "Panel"], ["/isler", "İşler"], ["/cari", "Cari"], ["/yevmiye", "Yevmiye"], ["/ekipman", "Ekipman"], ["/doviz", "Döviz"],
+  ["/randevu", "Randevular"], ["/rapor", "Rapor"], ["/banka", "Banka"], ["/giderler", "Giderler"], ["/hava", "Hava"], ["/borc", "Borç"], ["/ayarlar", "Ayarlar"],
+] as const;
+const defaultMobileNavigation = ["/panel", "/isler", "/cari", "/yevmiye", "/ekipman"];
+function NavigationSettings() {
+  const me = useMe();
+  const settings = useRecords("settings");
+  const save = useSaveRecord("settings");
+  const [selected, setSelected] = useState<string[]>(() => { try { const saved = localStorage.getItem("saha-mobile-nav"); const list = saved?.split("|").filter((path) => mobileNavigationChoices.some(([route]) => route === path)); return list?.length === 5 ? list : [...defaultMobileNavigation]; } catch { return [...defaultMobileNavigation]; } });
+  const [quickAdd, setQuickAdd] = useState(() => { try { return localStorage.getItem("saha-mobile-quick-add") !== "false"; } catch { return true; } });
+  const [dragged, setDragged] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const row = settings.data?.find((item) => item.payload.key === "navigation-preferences");
+  useEffect(() => {
+    if (typeof row?.payload.mobile_nav !== "string") return;
+    const list = row.payload.mobile_nav.split("|").filter((path) => mobileNavigationChoices.some(([route]) => route === path));
+    if (list.length === 5) setSelected(list);
+    if (typeof row.payload.quick_add_visible === "boolean") setQuickAdd(row.payload.quick_add_visible);
+  }, [row]);
+  function move(path: string, target: number) {
+    setSelected((current) => { const from = current.indexOf(path); if (from < 0 || target < 0 || target >= current.length) return current; const next = [...current]; next.splice(from, 1); next.splice(target, 0, path); return next; });
+  }
+  async function persist() {
+    if (selected.length !== 5 || !me.data?.id) { toast.error("Alt menüde tam 5 sayfa seçin."); return; }
+    setBusy(true);
+    try {
+      await save.mutateAsync({ id: row?.id, owner_id: me.data.id, payload: { ...(row?.payload ?? {}), key: "navigation-preferences", mobile_nav: selected.join("|"), quick_add_visible: quickAdd } });
+      try { localStorage.setItem("saha-mobile-nav", selected.join("|")); localStorage.setItem("saha-mobile-quick-add", String(quickAdd)); } catch { /* cloud preference is primary */ }
+      toast.success("Mobil gezinme tercihiniz kaydedildi.");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Gezinme tercihi kaydedilemedi."); }
+    finally { setBusy(false); }
+  }
+  return <section className="space-y-3 rounded-2xl border bg-card p-4"><div><h3 className="font-semibold">Mobil alt menü</h3><p className="text-xs text-muted-foreground">En sık kullandığınız 5 bölümü seçip sıralayın. Diğer tüm bölümler “Daha fazla” menüsünde kalır.</p></div><div className="space-y-1.5" aria-label="Seçili alt menü sırası">{selected.map((path, index) => <div key={path} draggable onDragStart={() => setDragged(path)} onDragOver={(event) => event.preventDefault()} onDrop={() => { if (dragged) move(dragged, index); setDragged(null); }} className="flex min-h-11 items-center gap-2 rounded-xl border bg-background px-2.5"><span aria-hidden="true" className="select-none text-muted-foreground">⠿</span><span className="flex-1 text-sm font-medium">{mobileNavigationChoices.find(([route]) => route === path)?.[1] ?? path}</span><button type="button" disabled={index === 0} onClick={() => move(path, index - 1)} className="min-h-9 rounded-lg px-2 text-xs text-primary disabled:opacity-35" aria-label="Yukarı taşı">Yukarı</button><button type="button" disabled={index === selected.length - 1} onClick={() => move(path, index + 1)} className="min-h-9 rounded-lg px-2 text-xs text-primary disabled:opacity-35" aria-label="Aşağı taşı">Aşağı</button><button type="button" onClick={() => setSelected((current) => current.filter((route) => route !== path))} className="min-h-9 rounded-lg px-2 text-xs text-destructive" aria-label={`${mobileNavigationChoices.find(([route]) => route === path)?.[1]} seçimini kaldır`}>Kaldır</button></div>)}</div><div className="grid grid-cols-2 gap-2">{mobileNavigationChoices.filter(([path]) => !selected.includes(path)).map(([path, label]) => <label key={path} className="flex min-h-10 items-center gap-2 rounded-lg border px-2 text-xs"><input type="checkbox" checked={false} disabled={selected.length >= 5} onChange={() => { if (selected.length < 5) setSelected((current) => [...current, path]); }}/>{label}</label>)}</div><p className="text-[11px] text-muted-foreground">Seçili: {selected.length}/5 · Sıralamayı sürükleyerek veya Yukarı/Aşağı düğmeleriyle değiştirebilirsiniz.</p><label className="flex min-h-11 items-center justify-between gap-3 rounded-xl border px-3"><span className="text-sm font-medium">Ortadaki hızlı ekle düğmesi</span><input type="checkbox" checked={quickAdd} onChange={(event) => setQuickAdd(event.target.checked)}/></label><div className="flex gap-2"><Button type="button" variant="outline" onClick={() => setSelected([...defaultMobileNavigation])}>Varsayılana dön</Button><Button type="button" disabled={busy || selected.length !== 5} onClick={() => void persist()}>{busy ? "Kaydediliyor…" : "Alt menüyü kaydet"}</Button></div></section>;
 }
 
 function BusinessProfilesSettings() {

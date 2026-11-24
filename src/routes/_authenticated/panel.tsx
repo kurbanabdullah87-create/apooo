@@ -19,6 +19,7 @@ import { useRecords } from "@/lib/work";
 import { CodeScanner } from "@/components/app/CodeScanner";
 import { calculatePeriodFinance, periodDateBounds, type FinancePeriod } from "@/lib/finance-period";
 import { useBusinessProfile } from "@/lib/work-profile-context";
+import { forecastRevenueNext30Days } from "@/lib/revenue-forecast";
 
 export const Route = createFileRoute("/_authenticated/panel")({
   head: () => pageHead("Panel", "Aylık gelir, gider ve kâr özeti."),
@@ -48,15 +49,39 @@ function Panel() {
   const payrollEntries = useRecords("payroll");
   const payrollPayments = useRecords("payment");
   const payrollAdvances = useRecords("advance");
+  const settings = useRecords("settings");
   const customerRows = customers.data;
   const saveJob = useSaveRecord("job");
   const me = useMe();
   const businessProfile = useBusinessProfile();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const revenueForecast = useQuery({
+    queryKey: ["revenue_forecast", businessProfile.activeProfileId, jobs.dataUpdatedAt],
+    enabled: !jobs.isLoading && !businessProfile.loading,
+    queryFn: () => forecastRevenueNext30Days(jobs.data ?? []),
+    staleTime: 60 * 60_000,
+    gcTime: 24 * 60 * 60_000,
+    refetchInterval: 60 * 60_000,
+  });
+  const monthlyGoalProgress = useMemo(() => {
+    const config = settings.data?.[0]?.payload ?? {};
+    const revenueTarget = Number(config.target ?? 0);
+    const jobTarget = Number(config.monthly_jobs_target ?? 0);
+    const customerTarget = Number(config.monthly_customers_target ?? 0);
+    const currentMonth = monthKey(todayISO());
+    const completedJobs = (jobs.data ?? []).filter((row) => row.payload.status === "Tamamlandı" && String(row.payload.completed_at ?? row.payload.date ?? "").startsWith(currentMonth)).length;
+    const newCustomers = (customers.data ?? []).filter((row) => String(row.created_at ?? "").startsWith(currentMonth)).length;
+    return [
+      ...(revenueTarget > 0 ? [{ label: "Tahsilat", current: (txs.data ?? []).filter((row) => row.kind === "payment" && monthKey(row.occurred_on) === currentMonth).reduce((sum, row) => sum + Number(row.amount), 0), target: revenueTarget, money: true }] : []),
+      ...(jobTarget > 0 ? [{ label: "Tamamlanan iş", current: completedJobs, target: jobTarget, money: false }] : []),
+      ...(customerTarget > 0 ? [{ label: "Yeni müşteri", current: newCustomers, target: customerTarget, money: false }] : []),
+    ];
+  }, [settings.data, jobs.data, customers.data, txs.data]);
   const [nearby, setNearby] = useState<{ customer: CustomerRow; meters: number } | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const [kpiLive, setKpiLive] = useState(false);
   const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
   useEffect(() => {
     try { setFocusMode(localStorage.getItem("saha.panel.focus.v1") === "1"); }
@@ -131,6 +156,22 @@ function Panel() {
     return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
   }, []);
   useEffect(() => { if (rates.data) { try { localStorage.setItem("saha.market-rates.v1", JSON.stringify({ value: rates.data, savedAt: Date.now() })); } catch { /* optional public market-rate cache */ } } }, [rates.data]);
+  useEffect(() => {
+    const ownerId = me.data?.id;
+    if (!ownerId) { setKpiLive(false); return; }
+    let active = true;
+    const refreshKpis = () => {
+      void queryClient.invalidateQueries({ queryKey: ["work"] });
+      void queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      void queryClient.invalidateQueries({ queryKey: ["expenses"] });
+    };
+    const channel = supabase.channel(`kpi_live:${ownerId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "work_records", filter: `owner_id=eq.${ownerId}` }, refreshKpis)
+      .on("postgres_changes", { event: "*", schema: "public", table: "transactions" }, refreshKpis)
+      .on("postgres_changes", { event: "*", schema: "public", table: "expenses" }, refreshKpis)
+      .subscribe((status) => { if (active) setKpiLive(status === "SUBSCRIBED"); });
+    return () => { active = false; setKpiLive(false); void supabase.removeChannel(channel); };
+  }, [me.data?.id, queryClient]);
 
   const data = useMemo(() => {
     const t = txs.data ?? [];
@@ -218,38 +259,9 @@ function Panel() {
 
   return (
     <div className={`dashboard-enter mx-auto max-w-7xl space-y-4 pb-6 sm:space-y-6 sm:pb-8 ${focusMode ? "dashboard-focus" : ""}`}>
-      <section aria-label="Günlük iş özeti" className="dashboard-welcome relative isolate overflow-hidden rounded-[1.8rem] border border-white/10 px-5 py-5 text-white shadow-[0_25px_70px_-44px_rgba(20,220,190,.6)] sm:px-8 sm:py-7">
-        <div className="dashboard-welcome-art" aria-hidden="true">
-          <span className="welcome-orbit welcome-orbit-one" />
-          <span className="welcome-orbit welcome-orbit-two" />
-          <span className="welcome-sun" />
-          <span className="welcome-star welcome-star-one">✦</span>
-          <span className="welcome-star welcome-star-two">✧</span>
-          <span className="welcome-star welcome-star-three">·</span>
-          <svg className="welcome-landscape" viewBox="0 0 640 220" fill="none" preserveAspectRatio="xMidYMax slice">
-            <path d="M0 169c86-14 114-68 203-60 69 6 93 51 172 44 103-10 141-89 265-66v133H0V169Z" fill="url(#welcome-back-hill)" />
-            <path d="M0 185c96-22 160-4 237-18 101-18 164-38 243-22 71 15 103 9 160-6v98H0v-52Z" fill="url(#welcome-front-hill)" />
-            <path d="M456 126V65l46-34 46 34v72" stroke="rgba(210,255,247,.72)" strokeWidth="3" strokeLinejoin="round" />
-            <path d="M482 137v-38h39v38M465 65h74" stroke="rgba(210,255,247,.5)" strokeWidth="2" strokeLinejoin="round" />
-            <defs>
-              <linearGradient id="welcome-back-hill" x1="320" y1="80" x2="320" y2="220" gradientUnits="userSpaceOnUse"><stop stopColor="#1c8478" stopOpacity=".58"/><stop offset="1" stopColor="#103f45" stopOpacity=".3"/></linearGradient>
-              <linearGradient id="welcome-front-hill" x1="320" y1="143" x2="320" y2="220" gradientUnits="userSpaceOnUse"><stop stopColor="#23b6a2" stopOpacity=".55"/><stop offset="1" stopColor="#0b393a" stopOpacity=".84"/></linearGradient>
-            </defs>
-          </svg>
-        </div>
-        <div className="relative z-10 max-w-xl">
-          <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.22em] text-emerald-200"><Sparkles className="size-4"/>İş ve finans merkezi</p>
-          <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">Güne hazır mısın?</h2>
-          <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-200">{businessProfile.activeProfile?.name ?? "Ekibin"} için bugünün planı hazır. Günlük iş akışını tek dokunuşla aç.</p>
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <Link to="/isler" className="welcome-cta inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-bold text-slate-950 shadow-lg shadow-black/20 transition">Bugünün işlerine git<ArrowRight className="size-4"/></Link>
-            <span className="flex items-center gap-2 text-xs font-medium text-white/80"><CalendarDays className="size-4 text-emerald-200"/>{data.todayJobCount ? `${data.todayJobCount} iş bugün planlı` : "Bugün için planlı iş yok"}</span>
-          </div>
-        </div>
-      </section>
       <section aria-labelledby="panel-finance-summary" className="overflow-hidden rounded-[1.65rem] border border-primary/20 bg-gradient-to-br from-card via-card to-primary/[0.08] p-3.5 shadow-[0_18px_55px_-42px_color-mix(in_oklch,var(--primary)_55%,transparent)] sm:rounded-3xl sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Finans özeti</p><h1 id="panel-finance-summary" className="mt-1 text-xl font-bold sm:text-2xl">Döneminin finans görünümü</h1><p className="mt-1 text-xs text-muted-foreground">{financeBounds.from === financeBounds.to ? financeBounds.from : `${financeBounds.from} – ${financeBounds.to}`} · kayıtlı operasyon verileri</p></div>
+          <div><p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Finans özeti {kpiLive && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-1 tracking-normal text-emerald-700 dark:text-emerald-300"><span className="size-1.5 animate-pulse rounded-full bg-emerald-500"/>Canlı</span>}</p><h1 id="panel-finance-summary" className="mt-1 text-xl font-bold sm:text-2xl">Döneminin finans görünümü</h1><p className="mt-1 text-xs text-muted-foreground">{financeBounds.from === financeBounds.to ? financeBounds.from : `${financeBounds.from} – ${financeBounds.to}`} · kayıtlı operasyon verileri</p></div>
           <div className="flex items-center gap-2">
             <Button type="button" variant="secondary" className="min-h-11 rounded-xl" aria-pressed={focusMode} onClick={toggleFocusMode}>
               {focusMode ? <Eye className="size-4"/> : <EyeOff className="size-4"/>}
@@ -285,6 +297,8 @@ function Panel() {
         </>}
       </section>
       {nearby && <section className="rounded-2xl border-2 border-emerald-500/50 bg-emerald-500/10 p-4"><div className="flex items-start gap-3"><MapPin className="mt-0.5 size-5 shrink-0 text-emerald-700 dark:text-emerald-300"/><div className="min-w-0 flex-1"><p className="font-semibold">Şu an {nearby.customer.name} konumuna yakınsınız</p><p className="text-xs text-muted-foreground">Yaklaşık {Math.round(nearby.meters)} metre · konum yalnızca cihazda karşılaştırılır</p><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" disabled={saveJob.isPending} onClick={() => startNearbyJob(nearby.customer)}><HardHat/>Hızlı iş başlat</Button><Button asChild size="sm" variant="secondary"><Link to="/cari/$id" params={{ id: nearby.customer.id }}><Wallet/>Tahsilat al</Link></Button></div></div></div></section>}
+      {!focusMode && <section className="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-card to-card p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">Gelir tahmini · 30 gün</p><h2 className="mt-1 text-2xl font-bold">{revenueForecast.data ? formatTL(revenueForecast.data.amount) : "Hesaplanıyor…"}</h2><p className="mt-1 text-xs text-muted-foreground">Yaklaşık %85 geçmiş hata bandı: {revenueForecast.data ? `${formatTL(revenueForecast.data.low)} – ${formatTL(revenueForecast.data.high)}` : "—"}</p></div><span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] text-amber-800 dark:text-amber-200">{revenueForecast.data?.sampleJobs ?? 0} tamamlanmış iş verisi</span></div><div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">{revenueForecast.data?.weeks.map((week) => <div key={week.label} className="rounded-xl border border-amber-500/15 bg-background/60 p-2.5"><p className="text-[10px] text-muted-foreground">{week.label} · {week.from.slice(5)}</p><p className="num mt-1 text-sm font-semibold">{formatTL(week.amount)}</p></div>)}</div><p className="mt-2 text-[10px] text-muted-foreground">Son 90 gündeki tamamlanmış işlerin müşteri başına sıklığı ve ortalama tutarı kullanılır. Mevsim etkisi yalnızca yeterli geçmiş varsa uygulanır. Bu istatistiksel gösterge garantili gelir veya kesin %85 güven aralığı değildir.</p></section>}
+      {!focusMode && monthlyGoalProgress.length > 0 && <section className="rounded-2xl border bg-card p-4"><div className="mb-3 flex items-center justify-between gap-2"><div><h2 className="font-semibold">Bu ay hedeflerin</h2><p className="text-xs text-muted-foreground">Hedefleri Ayarlar’dan düzenleyebilirsin.</p></div><Link to="/ayarlar" className="text-xs font-semibold text-primary">Hedefleri düzenle</Link></div><div className="grid gap-3 sm:grid-cols-3">{monthlyGoalProgress.map((goal) => { const percent = Math.min(100, goal.target > 0 ? goal.current / goal.target * 100 : 0); const tone = percent >= 80 ? "bg-emerald-500" : percent >= 50 ? "bg-amber-500" : "bg-rose-500"; const labelTone = percent >= 80 ? "text-emerald-700 dark:text-emerald-300" : percent >= 50 ? "text-amber-700 dark:text-amber-300" : "text-rose-700 dark:text-rose-300"; const display = (value: number) => goal.money ? formatTL(value) : new Intl.NumberFormat("tr-TR").format(value); return <div key={goal.label} className="rounded-xl border bg-background/50 p-3"><div className="flex justify-between gap-2 text-sm"><span className="font-medium">{goal.label}</span><span className={`num font-semibold ${labelTone}`}>{Math.round(percent)}%</span></div><div role="progressbar" aria-label={`${goal.label} hedefi`} aria-valuenow={Math.round(percent)} aria-valuemin={0} aria-valuemax={100} className="mt-2 h-2 overflow-hidden rounded-full bg-secondary"><div className={`h-full ${tone} transition-[width] duration-700`} style={{ width: `${percent}%` }}/></div><p className="num mt-2 text-xs text-muted-foreground">{display(goal.current)} / {display(goal.target)}</p></div>; })}</div></section>}
       <MaintenanceAlerts />
       <section className="dashboard-reveal overflow-hidden rounded-3xl border bg-card p-4 shadow-sm sm:p-5">
         <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">İş akışı</p><h2 className="mt-1 text-lg font-bold">Bugünün işleri</h2><p className="text-xs text-muted-foreground">{todayISO()} · seçili usta profili</p></div><Link to="/isler" className="inline-flex min-h-10 items-center gap-1 rounded-xl px-3 text-xs font-semibold text-primary hover:bg-primary/10">Tüm işler <ArrowUpRight className="size-4"/></Link></div>

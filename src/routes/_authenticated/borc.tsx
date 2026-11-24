@@ -173,6 +173,18 @@ function DebtPremium() {
     });
     return { ...bucket, amount: items.reduce((sum, item) => sum + leftAmount(item), 0), count: items.length };
   }) : [];
+  const pastDueReceivables = dueRows.filter((item) => item.due_on <= today && rows.find((debt) => debt.id === item.debt_id)?.direction === "receivable");
+  const receivableScheduledTotal = pastDueReceivables.reduce((sum, item) => sum + Number(item.amount), 0);
+  const onTimeCollected = pastDueReceivables.reduce((sum, item) => sum + (payments.data ?? []).filter((payment) => payment.installment_id === item.id && payment.paid_on <= item.due_on).reduce((amount, payment) => amount + Number(payment.amount), 0), 0);
+  const openOverdueAmount = pastDueReceivables.filter((item) => item.due_on < today).reduce((sum, item) => sum + leftAmount(item), 0);
+  const weightedDelayDays = pastDueReceivables.reduce((sum, item) => {
+    const paid = (payments.data ?? []).filter((payment) => payment.installment_id === item.id && payment.paid_on > item.due_on).reduce((amount, payment) => amount + Number(payment.amount) * Math.max(0, ageInDays(payment.paid_on) - ageInDays(item.due_on)), 0);
+    return sum + paid + (item.due_on < today ? leftAmount(item) * ageInDays(item.due_on) : 0);
+  }, 0);
+  const averageDelayDays = receivableScheduledTotal > 0 ? weightedDelayDays / receivableScheduledTotal : 0;
+  const collectionScore = receivableScheduledTotal > 0 ? Math.round(Math.max(0, Math.min(100,
+    onTimeCollected / receivableScheduledTotal * 60 + Math.max(0, 1 - averageDelayDays / 30) * 30 + (1 - Math.min(1, openOverdueAmount / receivableScheduledTotal)) * 10,
+  ))) : null;
   const titleById = new Map(rows.map((d) => [d.id, d]));
 
   return <div className="space-y-4 pb-8">
@@ -186,6 +198,8 @@ function DebtPremium() {
       <div className="rounded-2xl border bg-card p-4"><div className="flex items-center gap-2 text-sm text-muted-foreground"><ArrowDownLeft className="size-4 text-emerald-600"/>Tahsil edeceğim</div><p className="mt-2 text-xl font-bold">{formatTL(collectTotal)}</p></div>
       <div className="rounded-2xl border bg-card p-4"><div className="flex items-center gap-2 text-sm text-muted-foreground"><ArrowUpRight className="size-4 text-rose-600"/>Ödeyeceğim</div><p className="mt-2 text-xl font-bold">{formatTL(payTotal)}</p></div>
     </div>
+
+    {direction === "receivable" && <section className="rounded-2xl border bg-card p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-semibold">Tahsilat performans skoru</h2><p className="mt-1 text-xs text-muted-foreground">Vadesi gelmiş kayıtlı taksitlerden yaklaşık puan · zamanında tahsilat %60, ortalama gecikme %30, açık gecikme %10.</p></div><div className={`flex size-16 items-center justify-center rounded-full border-4 text-xl font-bold ${collectionScore == null ? "border-muted text-muted-foreground" : collectionScore >= 80 ? "border-emerald-500 text-emerald-700 dark:text-emerald-300" : collectionScore >= 50 ? "border-amber-500 text-amber-700 dark:text-amber-300" : "border-rose-500 text-rose-700 dark:text-rose-300"}`}>{collectionScore ?? "—"}</div></div>{collectionScore == null ? <p className="mt-3 text-xs text-muted-foreground">Skor için vadesi gelmiş taksit kaydı bulunmuyor.</p> : <div className="mt-3 grid gap-2 sm:grid-cols-3"><p className="rounded-xl bg-secondary/50 p-3 text-xs">Zamanında tahsilat<br/><strong className="mt-1 inline-block text-sm">{formatTL(onTimeCollected)} / {formatTL(receivableScheduledTotal)}</strong></p><p className="rounded-xl bg-secondary/50 p-3 text-xs">Ağırlıklı gecikme<br/><strong className="mt-1 inline-block text-sm">{averageDelayDays.toFixed(1)} gün</strong></p><p className="rounded-xl bg-secondary/50 p-3 text-xs">Açık gecikmiş bakiye<br/><strong className="mt-1 inline-block text-sm">{formatTL(openOverdueAmount)}</strong></p></div>}<ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-muted-foreground"><li>Vadesi yaklaşan müşterilere önceden ödeme hatırlatması gönderin.</li><li>Ödeme sözü bulunan taksitleri haftalık kontrol edin.</li><li>90+ gün geciken alacaklarda ödeme planı oluşturun.</li></ul><p className="mt-2 text-[10px] text-muted-foreground">Gösterge, uygulamadaki taksit ve ödeme kayıtlarından hesaplanır; banka tahsilatını otomatik doğrulamaz.</p></section>}
 
     <section className="rounded-2xl border bg-card p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">

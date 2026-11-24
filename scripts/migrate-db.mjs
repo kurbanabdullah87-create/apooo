@@ -249,6 +249,20 @@ try {
     } else {
       console.log("[db:migrate] Account access and premium entitlement schema are already secured.");
     }
+
+    const [{ profileTriggerNeedsRepair }] = await tx`
+      SELECT NOT EXISTS (
+        SELECT 1 FROM pg_proc
+        WHERE oid=to_regprocedure('public.assign_and_validate_business_profile()')
+          AND prosrc LIKE '%IF TG_TABLE_NAME = ''transactions'' THEN%'
+          AND prosrc NOT LIKE '%TG_TABLE_NAME = ''transactions'' AND NEW.job_record_id%'
+      ) AS "profileTriggerNeedsRepair"
+    `;
+    if (profileTriggerNeedsRepair) {
+      await applyMigration(tx, "0024_fix_profile_trigger_job_record_id.sql", "0024_fix_profile_trigger_job_record_id");
+    } else {
+      console.log("[db:migrate] Business-profile trigger safely branches by table.");
+    }
   });
 
   const requiredTables = ["debt_records", "debt_installments", "debt_payments", "debt_payment_promises", "credit_card_records", "business_profiles", "business_profile_audit", "authorized_emails", "plan_entitlements"];
@@ -257,6 +271,15 @@ try {
     if (!(await tableExists(client, name))) missing.push(name);
   }
   if (missing.length) throw new Error(`Migration verification failed; missing tables: ${missing.join(", ")}`);
+  const [{ profileTriggerReady }] = await client`
+    SELECT EXISTS (
+      SELECT 1 FROM pg_proc
+      WHERE oid=to_regprocedure('public.assign_and_validate_business_profile()')
+        AND prosrc LIKE '%IF TG_TABLE_NAME = ''transactions'' THEN%'
+        AND prosrc NOT LIKE '%TG_TABLE_NAME = ''transactions'' AND NEW.job_record_id%'
+    ) AS "profileTriggerReady"
+  `;
+  if (!profileTriggerReady) throw new Error("Business-profile trigger verification failed; work-record inserts may still reference transaction-only fields.");
   const unassigned = await client`
     SELECT
       (SELECT count(*)::int FROM public.work_records WHERE kind <> 'settings' AND profile_id IS NULL) AS work_records,

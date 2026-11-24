@@ -12,6 +12,12 @@
   "lang": "tr",
   "categories": ["business", "finance", "productivity"],
   "display_override": ["standalone", "minimal-ui"],
+  "shortcuts": [
+    {"name":"Yeni İş Ekle","short_name":"Yeni İş","description":"Yeni iş kaydı oluştur","url":"/isler?action=new","icons":[{"src":"/icon-192.png","sizes":"192x192","type":"image/png"}]},
+    {"name":"Yeni Müşteri Ekle","short_name":"Yeni Müşteri","description":"Cari hesabına müşteri ekle","url":"/cari?action=new","icons":[{"src":"/icon-192.png","sizes":"192x192","type":"image/png"}]},
+    {"name":"Bugünün İşleri","short_name":"Bugün","description":"Bugünkü işleri filtrele","url":"/isler?view=today","icons":[{"src":"/icon-192.png","sizes":"192x192","type":"image/png"}]},
+    {"name":"Aylık Rapor","short_name":"Rapor","description":"Aylık finans raporunu aç","url":"/rapor","icons":[{"src":"/icon-192.png","sizes":"192x192","type":"image/png"}]}
+  ],
   "icons": [
     {"src": "/brand-mark.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"},
     {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},

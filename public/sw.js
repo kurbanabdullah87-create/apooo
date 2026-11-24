@@ -1,8 +1,13 @@
-const CACHE_NAME = "saha-static-v1";
+const CACHE_NAME = "saha-static-v2";
 const ASSET_PATH = /^\/assets\/.*-[\w-]+\.(?:js|css|png|svg|woff2?)$/;
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(self.skipWaiting());
+  // Keep an update in the waiting state until the user accepts the in-app prompt.
+  event.waitUntil(caches.open(CACHE_NAME));
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener("activate", (event) => {

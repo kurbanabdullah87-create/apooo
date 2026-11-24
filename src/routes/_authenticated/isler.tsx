@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Plus, Play, Pause, Check, Copy, ChevronDown, Clock, Download, Search, X, CalendarCheck, Activity, Phone, MessageCircle, Share2, FileText, ClipboardCheck, Mail, LayoutGrid, LayoutList, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -123,6 +124,18 @@ function Jobs() {
   useEffect(() => {
     try {
       if (jobs.isLoading) return;
+      const url = new URL(window.location.href);
+      if (url.searchParams.get("view") === "today") {
+        url.searchParams.delete("view");
+        window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+        setQuickRange("today");
+      }
+      if (url.searchParams.get("action") === "new") {
+        url.searchParams.delete("action");
+        window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+        edit();
+        return;
+      }
       const requested = sessionStorage.getItem("saha.openJobForm");
       if (!requested) return;
       sessionStorage.removeItem("saha.openJobForm");
@@ -429,6 +442,19 @@ function Jobs() {
           const plannedSeconds = Math.max(0, Number(p.planned_hours ?? 0)) * 3600;
           const promiseDate = String(p.promised_date ?? "");
           const promiseDaysLeft = promiseDate ? Math.ceil((Date.parse(`${promiseDate}T12:00:00`) - Date.parse(`${todayISO()}T12:00:00`)) / 86400000) : null;
+          const jobRevenue = Number(p.price ?? 0) || hourlyCharge(seconds, Number(p.hourly_rate ?? 0));
+          const netJobRevenue = Number(p.vat_rate ?? 0) > 0 ? jobRevenue / (1 + Number(p.vat_rate) / 100) : jobRevenue;
+          const directExpense = (expenses.data ?? []).filter((expense) => expense.job_record_id === j.id).reduce((sum, expense) => sum + Number(expense.amount ?? 0), 0);
+          const jobHours = seconds / 3600;
+          const assignedPayroll = (payrollRows.data ?? []).filter((entry) => entry.owner_id === j.owner_id);
+          const assignedHours = assignedPayroll.reduce((sum, entry) => sum + Number(entry.payload.days ?? 0) * Number(entry.payload.standard_hours ?? 8) + Number(entry.payload.overtime_hours ?? 0), 0);
+          const hourlyLaborCost = assignedHours > 0 ? assignedPayroll.reduce((sum, entry) => sum + payrollEntryAmount(entry.payload), 0) / assignedHours : 0;
+          const laborCost = Number(p.estimated_labor_cost ?? 0) || hourlyLaborCost * jobHours;
+          const overheadShare = (expenses.data ?? []).filter((expense) => !expense.job_record_id).reduce((sum, expense) => sum + Number(expense.amount ?? 0), 0) / Math.max(1, (jobs.data ?? []).length);
+          const materialCost = Number(p.material_cost ?? 0);
+          const totalJobCost = materialCost + directExpense + laborCost + overheadShare;
+          const jobProfit = netJobRevenue - totalJobCost;
+          const jobMargin = netJobRevenue > 0 ? jobProfit / netJobRevenue * 100 : null;
           return (
             <SwipeRow key={j.id} {...(me.data?.isUsta && p.status !== "Tamamlandı" ? { onComplete: () => void complete(j, seconds) } : {})}>
             <article className="space-y-3 rounded-lg border bg-card p-4">
@@ -548,6 +574,7 @@ function Jobs() {
               {expanded === j.id && (
                 <div className="space-y-3 border-t pt-3">
                   <p className="text-sm break-words">{p.notes}</p>
+                  <section className="space-y-3 rounded-xl border bg-background p-3"><div><h3 className="text-sm font-semibold">İş kârlılık analizi</h3><p className="text-[11px] text-muted-foreground">KDV hariç gelir − kayıtlı malzeme − bu işe bağlı gider − atanmış çalışanın ortalama kayıtlı saat maliyeti − ortalama gider payı.</p></div><div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">{[["Gelir",netJobRevenue], ["Malzeme",materialCost], ["İşe bağlı gider",directExpense], ["İşçilik",laborCost], ["Gider payı",overheadShare], ["Net katkı",jobProfit]].map(([label,value])=><div key={String(label)} className="rounded-lg bg-secondary/50 p-2"><p className="text-muted-foreground">{label}</p><p className={`num mt-1 font-semibold ${String(label)==="Net katkı" ? Number(value)<0 ? "text-destructive" : "text-emerald-700 dark:text-emerald-300" : ""}`}>{formatTL(Number(value))}</p></div>)}</div><div className="flex items-center justify-between gap-2">{jobMargin == null ? <p className="text-xs text-muted-foreground">Kârlılık için iş fiyatı girilmelidir.</p> : <p className={`text-sm font-bold ${jobMargin<20?"text-destructive":"text-emerald-700 dark:text-emerald-300"}`}>Kâr marjı %{jobMargin.toFixed(1)}{jobMargin<20?" · Bu iş zarar riski taşıyor":""}</p>}</div><div className="h-40"><ResponsiveContainer width="100%" height="100%"><BarChart data={[{name:"Tutar", Gelir:netJobRevenue, Maliyet:totalJobCost, Net:Math.max(0,jobProfit)}]}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="name"/><YAxis width={45} tickFormatter={(value:number)=>value>=1000?`${Math.round(value/1000)}b`:String(value)}/><Tooltip formatter={(value:number)=>formatTL(value)}/><Bar dataKey="Gelir" fill="#10b981" radius={[5,5,0,0]}/><Bar dataKey="Maliyet" fill="#f43f5e" radius={[5,5,0,0]}/></BarChart></ResponsiveContainer></div>{!hourlyLaborCost && !Number(p.estimated_labor_cost ?? 0) && <p className="text-[10px] text-amber-700 dark:text-amber-300">Bu çalışan için yevmiye maliyeti kaydı bulunamadı; işçilik maliyeti sıfır tahmin edildi. Eksik veride kâr olduğundan yüksek görünebilir.</p>}</section>
                   {checklistFor(p).length > 0 && <section className="space-y-2 rounded-xl border bg-background p-3"><h3 className="flex items-center gap-2 text-sm font-semibold"><ClipboardCheck className="size-4 text-primary"/>İş kontrol listesi</h3>{checklistFor(p).map((item, itemIndex) => <label key={`${j.id}-${itemIndex}`} className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" checked={item.done} disabled={!me.data?.isUsta || Boolean(p.billed)} onChange={(event) => { const updated = checklistFor(p).map((task, index) => index === itemIndex ? { ...task, done: event.target.checked } : task); void change(j, { ...p, checklist_json: JSON.stringify(updated) }); }}/><span className={item.done ? "text-muted-foreground line-through" : ""}>{item.label}</span></label>)}{p.checklist_required === true && checklistFor(p).some((item) => !item.done) && <p className="text-xs text-amber-700 dark:text-amber-300">Bütün adımlar işaretlenmeden iş kapatılamaz.</p>}</section>}
                   {me.data?.isUsta && (
                     <>

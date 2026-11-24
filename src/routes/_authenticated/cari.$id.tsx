@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Pencil,
   Plus,
@@ -39,6 +39,21 @@ function CustomerDetail() {
   const balance = customerBalance(rows);
   const credit = customerRestriction(c ?? {}, rows);
   const lastJob = (jobs.data ?? []).filter((job) => job.payload.customer_id === id).sort((a, b) => String(b.payload.date ?? b.created_at).localeCompare(String(a.payload.date ?? a.created_at)))[0];
+  const customerValue = useMemo(() => {
+    const customerJobs = (jobs.data ?? []).filter((job) => job.payload.customer_id === id && job.payload.status !== "İptal");
+    const ticketValues = customerJobs.map((job) => Number(job.payload.price ?? 0) || Number(job.payload.hourly_rate ?? 0) * Number(job.payload.planned_hours ?? 0)).filter((value) => value > 0);
+    const lifetimeYears = Math.max(1, (customers.data ?? []).length ? (customers.data ?? []).reduce((sum, customer) => sum + Math.max(1, (Date.now() - new Date(customer.created_at).getTime()) / (365.25 * 86_400_000)), 0) / (customers.data ?? []).length : 1);
+    const avgTicket = ticketValues.length ? ticketValues.reduce((sum, value) => sum + value, 0) / ticketValues.length : 0;
+    const annualFrequency = customerJobs.length / lifetimeYears;
+    const lifetimeValues = (customers.data ?? []).map((customer) => {
+      const related = (jobs.data ?? []).filter((job) => job.payload.customer_id === customer.id && job.payload.status !== "İptal");
+      const amounts = related.map((job) => Number(job.payload.price ?? 0) || Number(job.payload.hourly_rate ?? 0) * Number(job.payload.planned_hours ?? 0)).filter((value) => value > 0);
+      const years = Math.max(1, (Date.now() - new Date(customer.created_at).getTime()) / (365.25 * 86_400_000));
+      return amounts.length ? amounts.reduce((sum, value) => sum + value, 0) / amounts.length * (related.length / years) * lifetimeYears : 0;
+    }).filter((value) => value > 0);
+    const averageLifetimeValue = lifetimeValues.length ? lifetimeValues.reduce((sum, value) => sum + value, 0) / lifetimeValues.length : 0;
+    return { estimate: avgTicket * annualFrequency * lifetimeYears, averageLifetimeValue, jobs: customerJobs.length };
+  }, [customers.data, jobs.data, id, c?.created_at]);
   const [edit, setEdit] = useState(false);
   const [kind, setKind] = useState<"debt" | "payment">("debt");
   const [open, setOpen] = useState(false);
@@ -107,6 +122,13 @@ function CustomerDetail() {
           <Pencil />
         </Button>
       </div>
+      <section aria-label="Tahmini müşteri yaşam boyu değeri" className="rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/10 to-card p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Müşteri değeri · tahmini</p>
+        <p className="num mt-1 text-2xl font-bold text-emerald-700 dark:text-emerald-300">{formatTL(customerValue.estimate)}</p>
+        <p className="mt-1 text-xs text-muted-foreground">Tüm müşterilerin ortalama tahmini değeri: {formatTL(customerValue.averageLifetimeValue)} · {customerValue.jobs} kayıtlı iş</p>
+        {customerValue.averageLifetimeValue > 0 && customerValue.estimate >= customerValue.averageLifetimeValue * 2 && <span className="mt-2 inline-flex rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300">⭐ Yüksek değerli müşteri</span>}
+        <p className="mt-2 text-[10px] text-muted-foreground">Kayıtlı iş fiyatı ve müşteri hesabı açılış süresinden türetilen yaklaşık göstergedir; gelecek gelir garantisi değildir.</p>
+      </section>
       <p className="break-words text-sm text-muted-foreground">{c.address}</p>
       <p className="text-sm">{c.notes}</p>
       <div className="flex flex-wrap gap-2">

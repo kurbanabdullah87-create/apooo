@@ -56,43 +56,43 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-/* A calm graphite base with a restrained sage accent keeps dense work screens readable. */
+/* Saha'nın ilk sade AMOLED arayüzü: siyah zemin, koyu kartlar ve turkuaz vurgu. */
 :root {
-  --radius: 0.9rem;
-  --background: oklch(0.13 0.012 155);
-  --foreground: oklch(0.94 0.012 90);
-  --card: oklch(0.175 0.014 155);
-  --card-foreground: oklch(0.94 0.012 90);
-  --popover: oklch(0.205 0.016 155);
-  --popover-foreground: oklch(0.94 0.012 90);
-  --primary: oklch(0.76 0.105 151);
-  --primary-foreground: oklch(0.17 0.025 155);
-  --secondary: oklch(0.225 0.014 155);
-  --secondary-foreground: oklch(0.92 0.012 90);
-  --muted: oklch(0.215 0.014 155);
-  --muted-foreground: oklch(0.69 0.018 105);
-  --accent: oklch(0.26 0.03 150);
-  --accent-foreground: oklch(0.95 0.012 90);
+  --radius: 0.875rem;
+  --background: oklch(0 0 0);
+  --foreground: oklch(0.94 0.005 180);
+  --card: oklch(0.155 0.008 200);
+  --card-foreground: oklch(0.94 0.005 180);
+  --popover: oklch(0.17 0.008 200);
+  --popover-foreground: oklch(0.94 0.005 180);
+  --primary: oklch(0.78 0.12 175);
+  --primary-foreground: oklch(0.14 0.02 180);
+  --secondary: oklch(0.22 0.01 200);
+  --secondary-foreground: oklch(0.92 0.005 180);
+  --muted: oklch(0.2 0.008 200);
+  --muted-foreground: oklch(0.65 0.015 200);
+  --accent: oklch(0.25 0.03 180);
+  --accent-foreground: oklch(0.94 0.005 180);
   --destructive: oklch(0.65 0.2 25);
   --destructive-foreground: oklch(0.98 0 0);
   --success: oklch(0.78 0.14 150);
   --warning: oklch(0.82 0.14 80);
-  --border: oklch(0.29 0.018 155);
-  --input: oklch(0.31 0.018 155);
-  --ring: oklch(0.76 0.105 151);
-  --chart-1: oklch(0.76 0.105 151);
-  --chart-2: oklch(0.82 0.13 78);
+  --border: oklch(0.26 0.01 200);
+  --input: oklch(0.28 0.01 200);
+  --ring: oklch(0.78 0.12 175);
+  --chart-1: oklch(0.78 0.12 175);
+  --chart-2: oklch(0.82 0.14 80);
   --chart-3: oklch(0.7 0.13 250);
   --chart-4: oklch(0.65 0.2 25);
   --chart-5: oklch(0.75 0.1 320);
-  --sidebar: oklch(0.115 0.014 155);
-  --sidebar-foreground: oklch(0.94 0.012 90);
-  --sidebar-primary: oklch(0.76 0.105 151);
-  --sidebar-primary-foreground: oklch(0.17 0.025 155);
-  --sidebar-accent: oklch(0.225 0.018 155);
-  --sidebar-accent-foreground: oklch(0.94 0.012 90);
-  --sidebar-border: oklch(0.29 0.018 155);
-  --sidebar-ring: oklch(0.76 0.105 151);
+  --sidebar: oklch(0.1 0 0);
+  --sidebar-foreground: oklch(0.94 0.005 180);
+  --sidebar-primary: oklch(0.78 0.12 175);
+  --sidebar-primary-foreground: oklch(0.14 0.02 180);
+  --sidebar-accent: oklch(0.22 0.01 200);
+  --sidebar-accent-foreground: oklch(0.94 0.005 180);
+  --sidebar-border: oklch(0.26 0.01 200);
+  --sidebar-ring: oklch(0.78 0.12 175);
   --theme-ocean: oklch(0.76 0.13 205);
   --theme-forest: oklch(0.76 0.16 150);
   --theme-sunset: oklch(0.76 0.16 45);
@@ -104,7 +104,7 @@
 }
 
 /* Theme presets share the same surfaces and change only the accent harmony. */
-:root[data-theme="ocean"] { --primary: oklch(0.76 0.13 205); --primary-foreground: oklch(0.13 0.02 220); --ring: oklch(0.76 0.13 205); --chart-1: oklch(0.76 0.13 205); --chart-2: oklch(0.72 0.14 175); --sidebar-primary: oklch(0.76 0.13 205); --sidebar-ring: oklch(0.76 0.13 205); }
+:root[data-theme="ocean"] { --primary: oklch(0.78 0.12 175); --primary-foreground: oklch(0.14 0.02 180); --ring: oklch(0.78 0.12 175); --chart-1: oklch(0.78 0.12 175); --chart-2: oklch(0.72 0.14 175); --sidebar-primary: oklch(0.78 0.12 175); --sidebar-ring: oklch(0.78 0.12 175); }
 :root[data-theme="forest"] { --primary: oklch(0.76 0.16 150); --primary-foreground: oklch(0.13 0.02 150); --ring: oklch(0.76 0.16 150); --chart-1: oklch(0.76 0.16 150); --chart-2: oklch(0.76 0.13 185); --sidebar-primary: oklch(0.76 0.16 150); --sidebar-ring: oklch(0.76 0.16 150); }
 :root[data-theme="sunset"] { --primary: oklch(0.76 0.16 45); --primary-foreground: oklch(0.16 0.03 45); --ring: oklch(0.76 0.16 45); --chart-1: oklch(0.76 0.16 45); --chart-2: oklch(0.72 0.16 15); --sidebar-primary: oklch(0.76 0.16 45); --sidebar-ring: oklch(0.76 0.16 45); }
 :root[data-theme="lilac"] { --primary: oklch(0.74 0.15 300); --primary-foreground: oklch(0.14 0.02 300); --ring: oklch(0.74 0.15 300); --chart-1: oklch(0.74 0.15 300); --chart-2: oklch(0.74 0.13 255); --sidebar-primary: oklch(0.74 0.15 300); --sidebar-ring: oklch(0.74 0.15 300); }
@@ -150,13 +150,22 @@
   --sidebar-ring: #065f46;
 }
 
+:root[data-text-scale="tiny"] { font-size: 12px; }
 :root[data-text-scale="small"] { font-size: 14px; }
 :root[data-text-scale="normal"] { font-size: 16px; }
 :root[data-text-scale="large"] { font-size: 18px; }
 :root[data-text-scale="xlarge"] { font-size: 20px; }
-:root[data-colorblind="true"] .text-success { text-decoration: underline; text-decoration-style: wavy; text-underline-offset: 3px; }
-:root[data-colorblind="true"] .text-warning { text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
-:root[data-colorblind="true"] .text-destructive { text-decoration: underline; text-decoration-style: dashed; text-underline-offset: 3px; }
+:root[data-text-scale="accessible"] { font-size: 22px; }
+:root[data-text-scale="lowvision"] { font-size: 26px; }
+:root[data-color-vision="deuteranopia"] { --success: oklch(0.72 0.12 235); --warning: oklch(0.76 0.17 65); --destructive: oklch(0.58 0.19 275); --chart-1: oklch(0.72 0.12 235); --chart-2: oklch(0.76 0.17 65); }
+:root[data-color-vision="protanopia"] { --success: oklch(0.72 0.12 220); --warning: oklch(0.77 0.17 78); --destructive: oklch(0.58 0.2 285); --chart-1: oklch(0.72 0.12 220); --chart-2: oklch(0.77 0.17 78); }
+:root[data-color-vision="tritanopia"] { --success: oklch(0.72 0.14 145); --warning: oklch(0.66 0.18 25); --destructive: oklch(0.6 0.2 350); --chart-1: oklch(0.72 0.14 145); --chart-2: oklch(0.66 0.18 25); }
+:root[data-color-vision]:not([data-color-vision="standard"]) .text-success { text-decoration: underline; text-decoration-style: wavy; text-underline-offset: 3px; }
+:root[data-color-vision]:not([data-color-vision="standard"]) .text-warning { text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
+:root[data-color-vision]:not([data-color-vision="standard"]) .text-destructive { text-decoration: underline; text-decoration-style: dashed; text-underline-offset: 3px; }
+:root[data-high-contrast="true"] { --foreground: oklch(0.99 0 0); --card-foreground: oklch(0.99 0 0); --muted-foreground: oklch(0.83 0 0); --border: oklch(0.58 0 0); --input: oklch(0.62 0 0); --ring: oklch(0.9 0.15 190); }
+:root[data-high-contrast="true"] :focus-visible { outline: 3px solid var(--ring); outline-offset: 3px; }
+:root[data-high-contrast="true"] button:disabled { opacity: .78; }
 
 @layer base {
   * {
@@ -363,6 +372,22 @@ body[data-route] main {
   main { max-width: none !important; padding: 0 !important; }
   main .border.bg-card { break-inside: avoid; border: 1px solid #bbb !important; background: white !important; box-shadow: none !important; color: black !important; }
 }
+
+/* Compatibility skin: restore the original flat mobile-first app instead of the later glass/gradient treatment. */
+:root { --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif; --font-display: "Space Grotesk", "Manrope", ui-sans-serif, sans-serif; }
+body { background-image: none !important; }
+main .border.bg-card { border-color: var(--border) !important; background: var(--card) !important; box-shadow: none !important; }
+main [class*="bg-gradient-to-"] { background-image: none !important; background-color: var(--card) !important; }
+main [class*="shadow-"] { box-shadow: none !important; }
+main [class*="rounded-["] { border-radius: var(--radius-2xl) !important; }
+main .dashboard-welcome { border-color: var(--border) !important; background: var(--card) !important; color: var(--card-foreground) !important; box-shadow: none !important; }
+main .dashboard-welcome::after, main .dashboard-welcome-art { display: none !important; }
+main .dashboard-welcome .text-white { color: var(--card-foreground) !important; }
+.dashboard-enter, .dashboard-reveal, .app-page-enter, .animate-slide-up-fade { animation: none !important; }
+.welcome-cta:hover, .welcome-cta:active { transform: none !important; box-shadow: none !important; }
+.auth-shell { background: var(--background) !important; }
+.auth-orbit, .auth-orbit-secondary { display: none !important; }
+.auth-feature-card, .auth-card { border-color: var(--border) !important; background: var(--card) !important; box-shadow: none !important; backdrop-filter: none !important; }
 
 @utility num {
   font-variant-numeric: tabular-nums;
