@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useMemo, useRef } from "react";
-import { AlertTriangle, MapPin, MessageCircle, Wallet, HardHat, WalletCards, TrendingUp, TrendingDown, UserPlus, Camera, QrCode, RefreshCw, ArrowUpRight, Clock3, FileText, Info, CalendarDays, Eye, EyeOff } from "lucide-react";
+import { AlertTriangle, MapPin, MessageCircle, Wallet, HardHat, WalletCards, TrendingUp, TrendingDown, UserPlus, Camera, QrCode, RefreshCw, ArrowUpRight, Clock3, FileText, Info, CalendarDays, Eye, EyeOff, Sparkles, ArrowRight } from "lucide-react";
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -89,19 +89,20 @@ function Panel() {
       const profile = businessProfile.activeProfile;
       if (!auth.session || auth.session.user.id !== me.data?.id) throw new Error("Kur geçmişi için oturumu yenileyin.");
       if (!profile || profile.is_archived) throw new Error("Etkin usta profili yüklenemedi.");
-      const { error } = await supabase.from("work_records").insert({
-        team_id: profile.team_id,
-        profile_id: profile.id,
-        owner_id: auth.session.user.id,
-        kind: "exchange_rate",
-        payload,
-      } as never);
+      const { error } = await supabase.rpc("save_exchange_rate_snapshot", {
+        _profile_id: profile.id,
+        _usd: Number(payload.usd),
+        _eur: Number(payload.eur),
+        _gbp: Number(payload.gbp),
+        _provider_updated_at: String(payload.provider_updated_at),
+      });
       if (error) throw error;
     },
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["exchange-rate-history", me.data?.id] }); },
     onError: (error) => {
       console.error("Kur geçmişi kaydedilemedi:", error);
-      toast.error("Kur geçmişi kaydedilemedi", { description: error instanceof Error ? error.message : "Canlı kur bilgileri gösterilmeye devam ediyor." });
+      const detail = error instanceof Error ? error.message : typeof error === "object" && error !== null && "message" in error ? String(error.message) : "Kur geçmişi yazma isteği tamamlanamadı.";
+      toast.error("Kur geçmişi kaydedilemedi", { description: detail });
     },
   });
   useEffect(() => {
@@ -114,7 +115,7 @@ function Panel() {
     const tryPerUsd = Number(rates.data.rates.TRY);
     if (!Number.isFinite(tryPerUsd) || tryPerUsd <= 0) return;
     const payload = {
-      base: "TRY", source: "mid-market", provider_updated_at: providerStamp, snapshot_at: new Date().toISOString(),
+      base: "TRY", source: "mid-market", provider_updated_at: providerStamp,
       usd: 1 / tryPerUsd,
       eur: Number(rates.data.rates.EUR) / tryPerUsd,
       gbp: Number(rates.data.rates.GBP) / tryPerUsd,
@@ -170,12 +171,13 @@ function Panel() {
         status: String(row.payload.status ?? "Planlandı"),
         time: String(row.payload.start_time ?? "").slice(0, 5),
       }));
+    const todayJobCount = jobRows.filter((row) => String(row.payload.date ?? "").slice(0, 10) === todayISO() && row.payload.status !== "İptal").length;
     const activity = [
       ...jobRows.map((row) => ({ id: row.id, kind: "job", date: row.created_at, title: String(row.payload.title ?? "İş kaydı"), amount: Number(row.payload.price ?? 0) })),
       ...t.map((row) => ({ id: row.id, kind: row.kind === "payment" ? "payment" : "debt", date: row.occurred_on, title: row.description || (row.kind === "payment" ? "Tahsilat" : "İş / alacak"), amount: Number(row.amount) })),
       ...e.map((row) => ({ id: row.id, kind: "expense", date: row.occurred_on, title: row.description || "Gider", amount: Number(row.amount) })),
     ].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
-    return { byCat, bars, overdue, todayJobs, weekly, weekCount: weekJobs.length, activity };
+    return { byCat, bars, overdue, todayJobs, todayJobCount, weekly, weekCount: weekJobs.length, activity };
   }, [txs.data, exps.data, customers.data, month, jobs.data]);
 
   const financeBounds = periodDateBounds(financePeriod, customFrom, customTo);
@@ -216,6 +218,35 @@ function Panel() {
 
   return (
     <div className={`dashboard-enter mx-auto max-w-7xl space-y-4 pb-6 sm:space-y-6 sm:pb-8 ${focusMode ? "dashboard-focus" : ""}`}>
+      <section aria-label="Saha karşılama" className="dashboard-welcome relative isolate overflow-hidden rounded-[1.8rem] border border-white/10 px-5 py-5 text-white shadow-[0_25px_70px_-44px_rgba(20,220,190,.6)] sm:px-8 sm:py-7">
+        <div className="dashboard-welcome-art" aria-hidden="true">
+          <span className="welcome-orbit welcome-orbit-one" />
+          <span className="welcome-orbit welcome-orbit-two" />
+          <span className="welcome-sun" />
+          <span className="welcome-star welcome-star-one">✦</span>
+          <span className="welcome-star welcome-star-two">✧</span>
+          <span className="welcome-star welcome-star-three">·</span>
+          <svg className="welcome-landscape" viewBox="0 0 640 220" fill="none" preserveAspectRatio="xMidYMax slice">
+            <path d="M0 169c86-14 114-68 203-60 69 6 93 51 172 44 103-10 141-89 265-66v133H0V169Z" fill="url(#welcome-back-hill)" />
+            <path d="M0 185c96-22 160-4 237-18 101-18 164-38 243-22 71 15 103 9 160-6v98H0v-52Z" fill="url(#welcome-front-hill)" />
+            <path d="M456 126V65l46-34 46 34v72" stroke="rgba(210,255,247,.72)" strokeWidth="3" strokeLinejoin="round" />
+            <path d="M482 137v-38h39v38M465 65h74" stroke="rgba(210,255,247,.5)" strokeWidth="2" strokeLinejoin="round" />
+            <defs>
+              <linearGradient id="welcome-back-hill" x1="320" y1="80" x2="320" y2="220" gradientUnits="userSpaceOnUse"><stop stopColor="#1c8478" stopOpacity=".58"/><stop offset="1" stopColor="#103f45" stopOpacity=".3"/></linearGradient>
+              <linearGradient id="welcome-front-hill" x1="320" y1="143" x2="320" y2="220" gradientUnits="userSpaceOnUse"><stop stopColor="#23b6a2" stopOpacity=".55"/><stop offset="1" stopColor="#0b393a" stopOpacity=".84"/></linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div className="relative z-10 max-w-xl">
+          <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.22em] text-emerald-200"><Sparkles className="size-4"/>Saha kontrol merkezi</p>
+          <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">Güne hazır mısın?</h2>
+          <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-200">{businessProfile.activeProfile?.name ?? "Ekibin"} için bugünün planı hazır. Saha akışını tek dokunuşla aç.</p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Link to="/isler" className="welcome-cta inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-bold text-slate-950 shadow-lg shadow-black/20 transition">Bugünün işlerine git<ArrowRight className="size-4"/></Link>
+            <span className="flex items-center gap-2 text-xs font-medium text-white/80"><CalendarDays className="size-4 text-emerald-200"/>{data.todayJobCount ? `${data.todayJobCount} iş bugün planlı` : "Bugün için planlı iş yok"}</span>
+          </div>
+        </div>
+      </section>
       <section aria-labelledby="panel-finance-summary" className="overflow-hidden rounded-[1.65rem] border border-primary/20 bg-gradient-to-br from-card via-card to-primary/[0.08] p-3.5 shadow-[0_18px_55px_-42px_color-mix(in_oklch,var(--primary)_55%,transparent)] sm:rounded-3xl sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Finans özeti</p><h1 id="panel-finance-summary" className="mt-1 text-xl font-bold sm:text-2xl">Döneminin finans görünümü</h1><p className="mt-1 text-xs text-muted-foreground">{financeBounds.from === financeBounds.to ? financeBounds.from : `${financeBounds.from} – ${financeBounds.to}`} · kayıtlı operasyon verileri</p></div>

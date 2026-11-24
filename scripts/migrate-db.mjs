@@ -182,6 +182,31 @@ try {
       }
       await applyMigration(tx, "0020_debt_payment_receipts.sql", "0020_debt_payment_receipts");
     }
+
+    const [{ rateSnapshotFunctionExists }] = await tx`
+      SELECT to_regprocedure('public.save_exchange_rate_snapshot(uuid,numeric,numeric,numeric,text)') IS NOT NULL AS "rateSnapshotFunctionExists"
+    `;
+    let appliedRateSnapshotMigration = false;
+    if (!rateSnapshotFunctionExists) {
+      await applyMigration(tx, "0021_secure_exchange_rate_snapshots.sql", "0021_secure_exchange_rate_snapshots");
+      appliedRateSnapshotMigration = true;
+    }
+    const [{ rateSnapshotFunctionReady }] = await tx`
+      SELECT EXISTS (
+        SELECT 1 FROM pg_proc
+        WHERE oid=to_regprocedure('public.save_exchange_rate_snapshot(uuid,numeric,numeric,numeric,text)')
+          AND prosecdef
+          AND proconfig @> ARRAY['search_path=""']::text[]
+      )
+      AND has_function_privilege('authenticated', 'public.save_exchange_rate_snapshot(uuid,numeric,numeric,numeric,text)', 'EXECUTE')
+      AND NOT has_function_privilege('anon', 'public.save_exchange_rate_snapshot(uuid,numeric,numeric,numeric,text)', 'EXECUTE')
+      AS "rateSnapshotFunctionReady"
+    `;
+    if (!rateSnapshotFunctionReady) {
+      if (appliedRateSnapshotMigration) throw new Error("Exchange-rate snapshot RPC verification failed after apply.");
+      throw new Error("Exchange-rate snapshot RPC exists but its security settings are incomplete; refusing automatic repair.");
+    }
+    console.log("[db:migrate] Exchange-rate snapshot RPC is secured.");
   });
 
   const requiredTables = ["debt_records", "debt_installments", "debt_payments", "debt_payment_promises", "credit_card_records", "business_profiles", "business_profile_audit"];

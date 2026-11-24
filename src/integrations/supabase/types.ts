@@ -523,6 +523,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      save_exchange_rate_snapshot: { Args: { _profile_id: string; _usd: number; _eur: number; _gbp: number; _provider_updated_at: string }; Returns: string }
       record_debt_payment: { Args: { _debt_id: string; _installment_id: string; _amount: number; _paid_on: string; _note?: string }; Returns: string }
       record_debt_payment_with_receipt: { Args: { _debt_id: string; _installment_id: string; _amount: number; _paid_on: string; _note?: string; _receipt_no?: string }; Returns: string }
       create_debt_payment_promise: { Args: { _debt_id: string; _installment_id: string; _amount: number; _promised_on: string; _note?: string }; Returns: string }
