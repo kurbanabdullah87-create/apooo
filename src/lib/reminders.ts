@@ -122,6 +122,14 @@ export function useDebtReminders(enabled: boolean, onOpen: () => void) {
       return data ?? [];
     },
   });
+  const paymentPromises = useQuery({
+    queryKey: ["debt-payment-promises"], enabled,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("debt_payment_promises").select("id,debt_id,amount,paid_amount,promised_on,note,status").eq("status", "open");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
   useEffect(() => {
     if (!enabled) return;
     const tick = () => {
@@ -135,6 +143,29 @@ export function useDebtReminders(enabled: boolean, onOpen: () => void) {
         const debt = names.get(installment.debt_id);
         const detail = `${debt?.name ?? "Borç / alacak"} · ${debt?.direction === "payable" ? "ödenecek" : "tahsil edilecek"} · ${installment.installment_no}. taksit · kalan ${formatTL(Number(installment.amount) - Number(installment.paid_amount))}`;
         const title = "🔔 Taksit vadesi bugün";
+        void (async () => {
+          if (notifySupported() && Notification.permission === "granted") {
+            try {
+              const options: NotificationOptions = { body: detail, tag: key, icon: "/icon-192.png", data: { url: "/borc" }, requireInteraction: true };
+              const registration = await navigator.serviceWorker?.getRegistration();
+              if (registration) await registration.showNotification(title, options);
+              else new Notification(title, options).onclick = () => { window.focus(); location.assign("/borc"); };
+            } catch { /* bildirim izni veya platform desteği olmayabilir */ }
+          }
+        })();
+        toast(title, { description: detail, duration: 20_000, action: { label: "Aç", onClick: onOpen } });
+      }
+      for (const promise of paymentPromises.data ?? []) {
+        if (promise.promised_on > today) continue;
+        const remaining = Math.max(0, Number(promise.amount) - Number(promise.paid_amount));
+        if (remaining <= 0) continue;
+        const key = `debt-promise-due:${promise.id}:${promise.promised_on}`;
+        if (seen(key)) continue;
+        mark(key);
+        const debt = names.get(promise.debt_id);
+        const late = promise.promised_on < today;
+        const title = late ? "⏰ Ödeme sözü tarihi geçti" : "🔔 Ödeme sözü bugün";
+        const detail = `${debt?.name ?? "Borç / alacak"} · ${debt?.direction === "payable" ? "ödenecek" : "tahsil edilecek"} · kalan ${formatTL(remaining)}${promise.note ? ` · ${promise.note}` : ""}`;
         void (async () => {
           if (notifySupported() && Notification.permission === "granted") {
             try {
@@ -175,5 +206,5 @@ export function useDebtReminders(enabled: boolean, onOpen: () => void) {
     const timer = setInterval(tick, 30_000);
     document.addEventListener("visibilitychange", tick);
     return () => { clearInterval(timer); document.removeEventListener("visibilitychange", tick); };
-  }, [cardPlans.data, debts.data, enabled, installments.data, onOpen]);
+  }, [cardPlans.data, debts.data, enabled, installments.data, onOpen, paymentPromises.data]);
 }

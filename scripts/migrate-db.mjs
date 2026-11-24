@@ -109,9 +109,56 @@ try {
     if (!profileLifecycleReady) {
       await applyMigration(tx, "0018_manage_default_business_profiles.sql", "0018_manage_default_business_profiles");
     }
+
+    const [{ promiseTableExists, debtPromiseReady }] = await tx`
+      SELECT
+        to_regclass('public.debt_payment_promises') IS NOT NULL AS "promiseTableExists",
+        to_regclass('public.debt_payment_promises') IS NOT NULL
+        AND to_regprocedure('public.create_debt_payment_promise(uuid,uuid,numeric,date,text)') IS NOT NULL
+        AND to_regprocedure('public.cancel_debt_payment_promise(uuid)') IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM pg_class
+          WHERE oid='public.debt_payment_promises'::regclass
+            AND relrowsecurity AND relforcerowsecurity
+        )
+        AND EXISTS (
+          SELECT 1 FROM pg_policies
+          WHERE schemaname='public' AND tablename='debt_payment_promises'
+            AND policyname='usta reads own payment promises' AND cmd='SELECT'
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM pg_policies
+          WHERE schemaname='public' AND tablename='debt_payment_promises'
+            AND cmd IN ('INSERT','UPDATE','DELETE','ALL')
+        )
+        AND has_table_privilege('authenticated', 'public.debt_payment_promises', 'SELECT')
+        AND NOT has_table_privilege('authenticated', 'public.debt_payment_promises', 'INSERT')
+        AND NOT has_table_privilege('authenticated', 'public.debt_payment_promises', 'UPDATE')
+        AND NOT has_table_privilege('authenticated', 'public.debt_payment_promises', 'DELETE')
+        AND EXISTS (
+          SELECT 1 FROM pg_proc
+          WHERE oid='public.create_debt_payment_promise(uuid,uuid,numeric,date,text)'::regprocedure AND prosecdef
+        )
+        AND EXISTS (
+          SELECT 1 FROM pg_proc
+          WHERE oid='public.cancel_debt_payment_promise(uuid)'::regprocedure AND prosecdef
+        )
+        AND EXISTS (
+          SELECT 1 FROM pg_trigger
+          WHERE tgrelid='public.debt_payments'::regclass
+            AND tgname='track_debt_payment_promise_after_insert'
+            AND NOT tgisinternal
+        ) AS "debtPromiseReady"
+    `;
+    if (!debtPromiseReady) {
+      if (promiseTableExists) throw new Error("Debt payment-promise migration is partially present; refusing an automatic production repair.");
+      await applyMigration(tx, "0019_debt_payment_promises.sql", "0019_debt_payment_promises");
+    } else {
+      console.log("[db:migrate] Debt payment promises are already secured.");
+    }
   });
 
-  const requiredTables = ["debt_records", "debt_installments", "debt_payments", "credit_card_records", "business_profiles", "business_profile_audit"];
+  const requiredTables = ["debt_records", "debt_installments", "debt_payments", "debt_payment_promises", "credit_card_records", "business_profiles", "business_profile_audit"];
   const missing = [];
   for (const name of requiredTables) {
     if (!(await tableExists(client, name))) missing.push(name);

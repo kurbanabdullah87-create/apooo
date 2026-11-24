@@ -30,6 +30,11 @@ export function NotificationCenter() {
     if (error) throw error;
     return data ?? [];
   }});
+  const debtPromises = useQuery({ queryKey: ["debt-payment-promises"], enabled: me.data?.isUsta === true, queryFn: async () => {
+    const { data, error } = await supabase.from("debt_payment_promises").select("id,debt_id,amount,paid_amount,promised_on,note,status").eq("status", "open");
+    if (error) throw error;
+    return data ?? [];
+  }});
   const creditPlans = useQuery({ queryKey: ["credit-card-records"], enabled: me.data?.isUsta === true, queryFn: async () => {
     const { data, error } = await supabase.from("credit_card_records").select("id,name,payload").eq("record_kind", "purchase");
     if (error) throw error;
@@ -81,6 +86,20 @@ export function NotificationCenter() {
       const late = installment.due_on < today;
       result.push({ id: `debt:${installment.id}`, kind: "debt", title: `${late ? "Geciken taksit" : installment.due_on === today ? "Bugün taksit vadesi" : "Yaklaşan taksit"} · ${debt.name}`, detail: `${debt.direction === "payable" ? "Ödenecek" : "Tahsil edilecek"} · ${installment.installment_no}. taksit · ${formatTL(remaining)} · vade ${new Date(`${installment.due_on}T12:00:00`).toLocaleDateString("tr-TR")}`, open: () => { setOpen(false); void navigate({ to: "/borc" }); } });
     }
+    for (const promise of debtPromises.data ?? []) {
+      if (promise.promised_on > weekDate) continue;
+      const debt = debtNames.get(promise.debt_id);
+      const remaining = Math.max(0, Number(promise.amount) - Number(promise.paid_amount));
+      if (!debt || remaining <= 0) continue;
+      const late = promise.promised_on < today;
+      result.push({
+        id: `debt-promise:${promise.id}:${promise.promised_on}`,
+        kind: "debt",
+        title: `${late ? "Geciken ödeme sözü" : promise.promised_on === today ? "Bugün ödeme sözü" : "Yaklaşan ödeme sözü"} · ${debt.name}`,
+        detail: `${debt.direction === "payable" ? "Ödenecek" : "Tahsil edilecek"} · kalan ${formatTL(remaining)} · söz tarihi ${new Date(`${promise.promised_on}T12:00:00`).toLocaleDateString("tr-TR")}${promise.note ? ` · ${promise.note}` : ""}`,
+        open: () => { setOpen(false); void navigate({ to: "/borc" }); },
+      });
+    }
     const weekAheadForCards = new Date(`${today}T12:00:00`);
     weekAheadForCards.setDate(weekAheadForCards.getDate() + 7);
     const weekCardDate = `${weekAheadForCards.getFullYear()}-${String(weekAheadForCards.getMonth() + 1).padStart(2, "0")}-${String(weekAheadForCards.getDate()).padStart(2, "0")}`;
@@ -100,7 +119,7 @@ export function NotificationCenter() {
       });
     }
     return result.sort((a, b) => a.title.localeCompare(b.title, "tr-TR"));
-  }, [appointments.data, creditPlans.data, customers.data, debtInstallments.data, debtRows.data, equipment.data, jobs.data, navigate, transactions.data]);
+  }, [appointments.data, creditPlans.data, customers.data, debtInstallments.data, debtPromises.data, debtRows.data, equipment.data, jobs.data, navigate, transactions.data]);
 
   const unread = notices.filter((item) => !dismissed.includes(item.id));
   const markAllRead = () => {

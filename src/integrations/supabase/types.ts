@@ -38,6 +38,12 @@ export type Database = {
         Update: { id?: string; team_id?: string; owner_id?: string; debt_id?: string; installment_id?: string | null; amount?: number; paid_on?: string; note?: string; created_at?: string }
         Relationships: [{ foreignKeyName: "debt_payments_debt_id_fkey"; columns: ["debt_id"]; isOneToOne: false; referencedRelation: "debt_records"; referencedColumns: ["id"] }, { foreignKeyName: "debt_payments_installment_id_fkey"; columns: ["installment_id"]; isOneToOne: false; referencedRelation: "debt_installments"; referencedColumns: ["id"] }]
       }
+      debt_payment_promises: {
+        Row: { id: string; team_id: string; owner_id: string; debt_id: string; installment_id: string; amount: number; paid_amount: number; promised_on: string; note: string; status: string; fulfilled_payment_id: string | null; fulfilled_at: string | null; cancelled_at: string | null; created_at: string; updated_at: string }
+        Insert: { id?: string; team_id?: string; owner_id?: string; debt_id: string; installment_id: string; amount: number; paid_amount?: number; promised_on: string; note?: string; status?: string; fulfilled_payment_id?: string | null; fulfilled_at?: string | null; cancelled_at?: string | null; created_at?: string; updated_at?: string }
+        Update: { id?: string; team_id?: string; owner_id?: string; debt_id?: string; installment_id?: string; amount?: number; paid_amount?: number; promised_on?: string; note?: string; status?: string; fulfilled_payment_id?: string | null; fulfilled_at?: string | null; cancelled_at?: string | null; created_at?: string; updated_at?: string }
+        Relationships: [{ foreignKeyName: "debt_payment_promises_debt_id_fkey"; columns: ["debt_id"]; isOneToOne: false; referencedRelation: "debt_records"; referencedColumns: ["id"] }, { foreignKeyName: "debt_payment_promises_installment_id_fkey"; columns: ["installment_id"]; isOneToOne: false; referencedRelation: "debt_installments"; referencedColumns: ["id"] }, { foreignKeyName: "debt_payment_promises_fulfilled_payment_id_fkey"; columns: ["fulfilled_payment_id"]; isOneToOne: false; referencedRelation: "debt_payments"; referencedColumns: ["id"] }]
+      }
       bank_accounts: {
         Row: {
           created_at: string
@@ -518,6 +524,8 @@ export type Database = {
     }
     Functions: {
       record_debt_payment: { Args: { _debt_id: string; _installment_id: string; _amount: number; _paid_on: string; _note?: string }; Returns: string }
+      create_debt_payment_promise: { Args: { _debt_id: string; _installment_id: string; _amount: number; _promised_on: string; _note?: string }; Returns: string }
+      cancel_debt_payment_promise: { Args: { _promise_id: string }; Returns: string }
       bill_job: { Args: { _job_id: string }; Returns: string }
       complete_appointment: { Args: { _appointment_id: string }; Returns: string }
       customer_credit_status: { Args: { _customer_id: string }; Returns: Json }
