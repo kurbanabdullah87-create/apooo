@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { AlertTriangle, MapPin, MessageCircle, Wallet, HardHat, WalletCards, TrendingUp, TrendingDown, UserPlus, Camera, QrCode, RefreshCw, ArrowUpRight, Clock3, FileText, Info, CalendarDays } from "lucide-react";
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -17,8 +17,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getLiveCurrencyRates } from "@/lib/currency.functions";
 import { useRecords } from "@/lib/work";
 import { CodeScanner } from "@/components/app/CodeScanner";
-import { persistWrite } from "@/lib/offline";
 import { calculatePeriodFinance, periodDateBounds, type FinancePeriod } from "@/lib/finance-period";
+import { useBusinessProfile } from "@/lib/work-profile-context";
 
 export const Route = createFileRoute("/_authenticated/panel")({
   head: () => pageHead("Panel", "Aylık gelir, gider ve kâr özeti."),
@@ -51,11 +51,13 @@ function Panel() {
   const customerRows = customers.data;
   const saveJob = useSaveRecord("job");
   const me = useMe();
+  const businessProfile = useBusinessProfile();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [nearby, setNearby] = useState<{ customer: CustomerRow; meters: number } | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
+  const lastRateSnapshotAttempt = useRef<string | null>(null);
   const cachedRates = readCachedRates();
   const rates = useQuery({ queryKey: ["live-currency-rates"], queryFn: () => getLiveCurrencyRates(), ...(cachedRates ? { initialData: cachedRates.value, initialDataUpdatedAt: cachedRates.savedAt } : {}), staleTime: 5 * 60_000, gcTime: 24 * 60 * 60_000, refetchInterval: (query) => Math.max(60, query.state.data?.updateIntervalSeconds ?? 86_400) * 1000, refetchOnWindowFocus: true, retry: 1 });
   const rateHistory = useQuery({
@@ -68,16 +70,34 @@ function Panel() {
     },
   });
   const saveRateSnapshot = useMutation({
-    mutationFn: (payload: Record<string, unknown>) => persistWrite("work_records", "insert", { owner_id: me.data?.id, kind: "exchange_rate", payload }),
+    mutationFn: async (payload: Record<string, unknown>) => {
+      if (!online) throw new Error("Çevrimdışısınız; canlı kur geçmişi bağlantı gelince yeniden denenir.");
+      const { data: auth } = await supabase.auth.getSession();
+      const profile = businessProfile.activeProfile;
+      if (!auth.session || auth.session.user.id !== me.data?.id) throw new Error("Kur geçmişi için oturumu yenileyin.");
+      if (!profile || profile.is_archived) throw new Error("Etkin usta profili yüklenemedi.");
+      const { error } = await supabase.from("work_records").insert({
+        team_id: profile.team_id,
+        profile_id: profile.id,
+        owner_id: auth.session.user.id,
+        kind: "exchange_rate",
+        payload,
+      } as never);
+      if (error) throw error;
+    },
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["exchange-rate-history", me.data?.id] }); },
-    onError: () => toast.error("Kur geçmişi güvenli biçimde kaydedilemedi."),
+    onError: (error) => {
+      console.error("Kur geçmişi kaydedilemedi:", error);
+      toast.error("Kur geçmişi kaydedilemedi", { description: error instanceof Error ? error.message : "Canlı kur bilgileri gösterilmeye devam ediyor." });
+    },
   });
   useEffect(() => {
-    if (!rates.data || !me.data?.id || !me.data.isUsta || saveRateSnapshot.isPending) return;
+    if (!rates.data || !me.data?.id || !me.data.isUsta || businessProfile.loading || !businessProfile.activeProfileId || !online || saveRateSnapshot.isPending) return;
     const previous = rateHistory.data;
     const previousAt = Date.parse(String(previous?.payload.snapshot_at ?? previous?.created_at ?? ""));
     const providerStamp = rates.data.lastUpdatedAt;
     if (previous?.payload.provider_updated_at === providerStamp && Date.now() - previousAt < 9 * 60_000) return;
+    if (lastRateSnapshotAttempt.current === providerStamp) return;
     const tryPerUsd = Number(rates.data.rates.TRY);
     if (!Number.isFinite(tryPerUsd) || tryPerUsd <= 0) return;
     const payload = {
@@ -86,8 +106,11 @@ function Panel() {
       eur: Number(rates.data.rates.EUR) / tryPerUsd,
       gbp: Number(rates.data.rates.GBP) / tryPerUsd,
     };
-    if ([payload.usd, payload.eur, payload.gbp].every((value) => Number.isFinite(value) && value > 0)) saveRateSnapshot.mutate(payload);
-  }, [rates.data, me.data?.id, me.data?.isUsta, rateHistory.data, saveRateSnapshot]);
+    if ([payload.usd, payload.eur, payload.gbp].every((value) => Number.isFinite(value) && value > 0)) {
+      lastRateSnapshotAttempt.current = providerStamp;
+      saveRateSnapshot.mutate(payload);
+    }
+  }, [rates.data, me.data?.id, me.data?.isUsta, businessProfile.loading, businessProfile.activeProfileId, businessProfile.activeProfile, online, rateHistory.data, saveRateSnapshot]);
   useEffect(() => {
     const on = () => setOnline(true); const off = () => setOnline(false);
     window.addEventListener("online", on); window.addEventListener("offline", off);
@@ -179,18 +202,18 @@ function Panel() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5 pb-8 sm:space-y-6">
-      <section aria-labelledby="panel-finance-summary" className="overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-card via-card to-primary/[0.08] p-4 shadow-sm sm:p-6">
+    <div className="mx-auto max-w-7xl space-y-4 pb-6 sm:space-y-6 sm:pb-8">
+      <section aria-labelledby="panel-finance-summary" className="overflow-hidden rounded-[1.65rem] border border-primary/20 bg-gradient-to-br from-card via-card to-primary/[0.08] p-3.5 shadow-[0_18px_55px_-42px_color-mix(in_oklch,var(--primary)_55%,transparent)] sm:rounded-3xl sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Finans özeti</p><h1 id="panel-finance-summary" className="mt-1 text-xl font-bold sm:text-2xl">Döneminin finans görünümü</h1><p className="mt-1 text-xs text-muted-foreground">{financeBounds.from === financeBounds.to ? financeBounds.from : `${financeBounds.from} – ${financeBounds.to}`} · kayıtlı operasyon verileri</p></div>
           <Link to="/rapor" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background/80 px-3 text-sm font-semibold text-primary hover:bg-primary/5"><FileText className="size-4"/>Aylık rapor</Link>
         </div>
-        <div role="group" aria-label="Finans özeti dönemi" className="mt-4 flex flex-wrap gap-2">
-          {([ ["today", "Bugün"], ["week", "Bu hafta"], ["month", "Bu ay"], ["year", "Bu yıl"], ["custom", "Özel"] ] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={financePeriod === value} onClick={() => setFinancePeriod(value)} className={`min-h-10 rounded-xl border px-3 text-sm font-medium transition-colors ${financePeriod === value ? "border-primary bg-primary text-primary-foreground" : "bg-background/70 text-muted-foreground hover:text-foreground"}`}>{label}</button>)}
+        <div role="group" aria-label="Finans özeti dönemi" className="scrollbar-soft -mx-3.5 mt-4 flex flex-nowrap gap-2 overflow-x-auto px-3.5 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
+          {([ ["today", "Bugün"], ["week", "Bu hafta"], ["month", "Bu ay"], ["year", "Bu yıl"], ["custom", "Özel"] ] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={financePeriod === value} onClick={() => setFinancePeriod(value)} className={`min-h-10 shrink-0 rounded-xl border px-3.5 text-[13px] font-semibold transition duration-200 active:scale-[.97] ${financePeriod === value ? "border-primary bg-primary text-primary-foreground shadow-md shadow-primary/20" : "bg-background/70 text-muted-foreground hover:text-foreground"}`}>{label}</button>)}
           {financePeriod === "custom" && <div className="flex flex-wrap items-center gap-2"><label className="sr-only" htmlFor="finance-period-from">Başlangıç tarihi</label><input id="finance-period-from" type="date" value={customFrom} max={customTo || undefined} onChange={(event) => setCustomFrom(event.target.value)} className="min-h-10 rounded-xl border bg-background px-2 text-sm"/><span aria-hidden="true" className="text-muted-foreground">–</span><label className="sr-only" htmlFor="finance-period-to">Bitiş tarihi</label><input id="finance-period-to" type="date" value={customTo} min={customFrom || undefined} max={todayISO()} onChange={(event) => setCustomTo(event.target.value)} className="min-h-10 rounded-xl border bg-background px-2 text-sm"/></div>}
         </div>
         {financeBounds.from > financeBounds.to ? <p role="alert" className="mt-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm">Başlangıç tarihi bitiş tarihinden sonra olamaz.</p> : txs.isLoading || exps.isLoading || payrollEntries.isLoading || payrollPayments.isLoading || payrollAdvances.isLoading ? <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Finans özeti yükleniyor" aria-busy="true">{[0,1,2,3].map((index) => <Skeleton key={index} className="h-24 rounded-2xl"/>)}<Skeleton className="h-36 rounded-2xl sm:col-span-2 lg:col-span-4"/></div> : !periodFinance.hasData ? <div className="mt-4 rounded-2xl border border-dashed bg-background/50 p-5 text-center"><p className="font-medium">Bu dönemde kayıtlı finans hareketi yok</p><p className="mt-1 text-sm text-muted-foreground">Özet yalnızca kaydedilmiş tahsilat, gider ve yevmiye kayıtlarını gösterir; banka bakiyesi tahmin etmez.</p></div> : <>
-          <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="mt-3 grid grid-cols-2 gap-2.5 sm:mt-4 sm:gap-3 lg:grid-cols-4">
             <SummaryCard label="Brüt iş / alacak" value={periodFinance.grossAccrued} helper="Dönem içinde kaydedilmiş borç işlemlerinin KDV dâhil toplamı; tahsil edildiği anlamına gelmez." tone="text-sky-700 dark:text-sky-300"/>
             <SummaryCard label="Tahsil edilen" value={periodFinance.collected} helper="Dönem içinde kaydedilmiş cari tahsilatları. Banka hareketleri bu toplama dahil değildir." tone="text-emerald-700 dark:text-emerald-300"/>
             <SummaryCard label="Gider" value={periodFinance.expenses} helper="Giderler sayfasındaki dönem kayıtları." tone="text-rose-700 dark:text-rose-300"/>
