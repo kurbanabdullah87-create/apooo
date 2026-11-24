@@ -77,6 +77,7 @@ function Settings() {
         <p className="text-sm text-muted-foreground">{me.data?.isUsta ? "Usta" : "Çırak"}</p>
       </div>
       {me.data?.isAdmin && <AuthorizedAccounts />}
+      {me.data?.isAdmin && <PlanCampaignAdmin />}
       <section className="rounded-2xl border bg-card p-4"><h2 className="font-semibold">Plan ve erişim</h2><p className="mt-1 text-sm text-muted-foreground">{me.data?.hasFullAccess ? "Premium özelliklere erişiminiz açık." : "Ücretsiz planda Yevmiye kullanılabilir; finans özellikleri örnek modundadır."}</p><Button asChild variant="outline" className="mt-3"><a href="/premium">Planı görüntüle</a></Button></section>
       <InstallButton />
       {me.data?.isUsta && (
@@ -339,7 +340,54 @@ function AuthorizedAccounts() {
     const { error } = await supabase.rpc("set_authorized_email", { _email: target, _enabled: enabled });
     if (error) throw error;
   }, onSuccess: async () => { setEmail(""); toast.success("Yetkili hesap listesi güncellendi."); await qc.invalidateQueries({ queryKey: ["authorized-emails"] }); }, onError: (error: Error) => toast.error(error.message) });
-  return <section className="space-y-3 rounded-2xl border border-primary/20 bg-primary/[.035] p-4"><div><h2 className="font-semibold">Yönetici · yetkili hesaplar</h2><p className="mt-1 text-xs text-muted-foreground">Tam erişim yalnızca burada listelenen, e-postası doğrulanmış kayıtlı hesaplara verilir. Şifre girmeyin veya paylaşmayın.</p></div><form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); if (email.trim()) change.mutate({ email: email.trim(), enabled: true }); }}><Input type="email" autoComplete="off" required maxLength={254} placeholder="kullanici@example.com" value={email} onChange={(event) => setEmail(event.target.value)} /><Button disabled={change.isPending}>Yetkili ekle</Button></form><div className="space-y-2">{list.data?.map((item) => <div key={item.email} className="flex items-center justify-between gap-3 rounded-xl border bg-background p-3 text-sm"><span className="truncate">{item.email}</span><Button variant="outline" size="sm" disabled={change.isPending || item.email === "abdullahkurban670@gmail.com"} onClick={() => change.mutate({ email: item.email, enabled: false })}>Erişimi kaldır</Button></div>)}</div></section>;
+  return <section className="space-y-3 rounded-2xl border border-primary/20 bg-primary/[.035] p-4"><div><h2 className="font-semibold">Yönetici · yetkili hesaplar</h2><p className="mt-1 text-xs text-muted-foreground">Tam erişim yalnızca burada listelenen, e-postası doğrulanmış kayıtlı hesaplara verilir. Şifre girmeyin veya paylaşmayın.</p></div>{list.error && <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">Yönetici listesi yüklenemedi. Oturum e-postasının doğrulandığını ve yönetici yetkisinin tanımlandığını kontrol edin.</p>}<form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); if (email.trim()) change.mutate({ email: email.trim(), enabled: true }); }}><Input type="email" autoComplete="off" required maxLength={254} placeholder="kullanici@example.com" value={email} onChange={(event) => setEmail(event.target.value)} /><Button disabled={change.isPending}>Yetkili ekle</Button></form><div className="space-y-2">{list.data?.map((item) => <div key={item.email} className="flex items-center justify-between gap-3 rounded-xl border bg-background p-3 text-sm"><span className="truncate">{item.email}</span><Button variant="outline" size="sm" disabled={change.isPending || item.email === "abdullahkurban670@gmail.com"} onClick={() => change.mutate({ email: item.email, enabled: false })}>Erişimi kaldır</Button></div>)}</div></section>;
+}
+
+function localDateTime(value: Date) {
+  return new Date(value.getTime() - value.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
+function PlanCampaignAdmin() {
+  const qc = useQueryClient();
+  const pricing = useQuery({ queryKey: ["plan-catalog"], queryFn: async () => {
+    const { data, error } = await supabase.rpc("get_plan_catalog");
+    if (error) throw error;
+    return data ?? [];
+  }});
+  const campaigns = useQuery({ queryKey: ["plan-campaigns"], queryFn: async () => {
+    const { data, error } = await supabase.rpc("list_plan_campaigns");
+    if (error) throw error;
+    return data ?? [];
+  }});
+  const [prices, setPrices] = useState<Record<string, string>>({});
+  const [form, setForm] = useState(() => ({ id: null as string | null, title: "", description: "", discount: "10", appliesTo: "all", startsAt: localDateTime(new Date()), endsAt: localDateTime(new Date(Date.now() + 7 * 86400_000)), enabled: false }));
+  useEffect(() => {
+    if (pricing.data) setPrices(Object.fromEntries(pricing.data.filter((plan) => plan.plan_code !== "free").map((plan) => [plan.plan_code, String(plan.amount)])));
+  }, [pricing.data]);
+  const savePrice = useMutation({ mutationFn: async (planCode: string) => {
+    const { error } = await supabase.rpc("set_plan_price", { _plan_code: planCode, _amount: Number(prices[planCode]) });
+    if (error) throw error;
+  }, onSuccess: async () => { toast.success("Plan fiyatı güncellendi."); await qc.invalidateQueries({ queryKey: ["plan-catalog"] }); }, onError: () => toast.error("Fiyat güncellenemedi.") });
+  const saveCampaign = useMutation({ mutationFn: async () => {
+    const { error } = await supabase.rpc("save_plan_campaign", { _id: form.id, _title: form.title, _description: form.description, _discount_percent: Number(form.discount), _applies_to: form.appliesTo, _starts_at: new Date(form.startsAt).toISOString(), _ends_at: new Date(form.endsAt).toISOString(), _enabled: form.enabled });
+    if (error) throw error;
+  }, onSuccess: async () => { toast.success("Kampanya kaydedildi."); setForm((current) => ({ ...current, id: null, title: "", description: "", enabled: false })); await qc.invalidateQueries({ queryKey: ["plan-campaigns"] }); }, onError: () => toast.error("Kampanya kaydedilemedi. Tarihleri ve alanları kontrol edin.") });
+  const updateCampaign = useMutation({ mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
+    const current = campaigns.data?.find((campaign) => campaign.id === id);
+    if (!current) throw new Error("Kampanya bulunamadı.");
+    const { error } = await supabase.rpc("save_plan_campaign", { _id: id, _title: current.title, _description: current.description, _discount_percent: current.discount_percent, _applies_to: current.applies_to, _starts_at: current.starts_at, _ends_at: current.ends_at, _enabled: enabled });
+    if (error) throw error;
+  }, onSuccess: async () => { await qc.invalidateQueries({ queryKey: ["plan-campaigns"] }); }, onError: () => toast.error("Kampanya güncellenemedi.") });
+  const removeCampaign = useMutation({ mutationFn: async (id: string) => {
+    const { error } = await supabase.rpc("delete_plan_campaign", { _id: id });
+    if (error) throw error;
+  }, onSuccess: async () => { toast.success("Kampanya silindi."); await qc.invalidateQueries({ queryKey: ["plan-campaigns"] }); }, onError: () => toast.error("Kampanya silinemedi.") });
+  return <section className="space-y-4 rounded-2xl border bg-card p-4"><div><h2 className="font-semibold">Plan fiyatları ve kampanyalar</h2><p className="mt-1 text-xs text-muted-foreground">Fiyat ve kampanyaları yalnızca yönetici değiştirebilir. Kampanya, belirtilen tarih aralığında plan ekranında görünür; ödeme sağlayıcısı bağlanmadan indirim tahsilatı veya Premium erişimi başlatmaz.</p></div>
+    <div className="grid gap-3 sm:grid-cols-2">{pricing.data?.filter((plan) => plan.plan_code !== "free").map((plan) => <form key={plan.plan_code} className="flex items-end gap-2 rounded-xl border p-3" onSubmit={(event) => { event.preventDefault(); savePrice.mutate(plan.plan_code); }}><div className="min-w-0 flex-1"><Label htmlFor={`plan-price-${plan.plan_code}`}>{plan.plan_code === "premium_monthly" ? "Premium · aylık" : "Premium · yıllık"}</Label><Input id={`plan-price-${plan.plan_code}`} type="number" min="1" max="100000" step="0.01" value={prices[plan.plan_code] ?? String(plan.amount)} onChange={(event) => setPrices((current) => ({ ...current, [plan.plan_code]: event.target.value }))}/></div><Button size="sm" disabled={savePrice.isPending}>Fiyatı kaydet</Button></form>)}</div>
+    <form className="space-y-3 rounded-xl border p-3" onSubmit={(event) => { event.preventDefault(); saveCampaign.mutate(); }}><h3 className="font-medium">{form.id ? "Kampanyayı düzenle" : "Yeni kampanya oluştur"}</h3><div className="grid gap-3 sm:grid-cols-2"><div className="space-y-1"><Label htmlFor="campaign-title">Kampanya adı</Label><Input id="campaign-title" required minLength={3} maxLength={80} placeholder="Örn. İlk yıl fırsatı" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })}/></div><div className="space-y-1"><Label htmlFor="campaign-discount">İndirim (%)</Label><Input id="campaign-discount" type="number" required min="1" max="80" value={form.discount} onChange={(event) => setForm({ ...form, discount: event.target.value })}/></div><div className="space-y-1"><Label htmlFor="campaign-applies">Uygulanacak plan</Label><select id="campaign-applies" className="h-10 w-full rounded-xl border bg-background px-3 text-sm" value={form.appliesTo} onChange={(event) => setForm({ ...form, appliesTo: event.target.value })}><option value="all">Aylık ve yıllık</option><option value="premium_monthly">Yalnızca aylık</option><option value="premium_annual">Yalnızca yıllık</option></select></div><div className="space-y-1"><Label htmlFor="campaign-description">Açıklama</Label><Input id="campaign-description" maxLength={240} placeholder="Kısa kampanya açıklaması" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })}/></div><div className="space-y-1"><Label htmlFor="campaign-start">Başlangıç</Label><Input id="campaign-start" type="datetime-local" required value={form.startsAt} onChange={(event) => setForm({ ...form, startsAt: event.target.value })}/></div><div className="space-y-1"><Label htmlFor="campaign-end">Bitiş</Label><Input id="campaign-end" type="datetime-local" required value={form.endsAt} onChange={(event) => setForm({ ...form, endsAt: event.target.value })}/></div></div><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.enabled} onChange={(event) => setForm({ ...form, enabled: event.target.checked })}/>Kaydeder kaydetmez etkinleştir</label><div className="flex gap-2"><Button disabled={saveCampaign.isPending}>{form.id ? "Değişiklikleri kaydet" : "Kampanyayı kaydet"}</Button>{form.id && <Button type="button" variant="outline" onClick={() => setForm((current) => ({ ...current, id: null, title: "", description: "", enabled: false }))}>Düzenlemeyi iptal et</Button>}</div></form>
+    {campaigns.error && <p role="alert" className="text-sm text-destructive">Kampanyalar yüklenemedi. Veritabanı güncellemesi tamamlandıktan sonra yenileyin.</p>}
+    <div className="space-y-2">{campaigns.data?.map((campaign) => <article key={campaign.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"><div className="min-w-0"><p className="font-medium">{campaign.title} · %{campaign.discount_percent}</p><p className="text-xs text-muted-foreground">{campaign.description || "Açıklama yok"} · {new Date(campaign.starts_at).toLocaleString("tr-TR")} – {new Date(campaign.ends_at).toLocaleString("tr-TR")}</p></div><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => setForm({ id: campaign.id, title: campaign.title, description: campaign.description, discount: String(campaign.discount_percent), appliesTo: campaign.applies_to, startsAt: localDateTime(new Date(campaign.starts_at)), endsAt: localDateTime(new Date(campaign.ends_at)), enabled: campaign.enabled })}>Düzenle</Button><Button variant="outline" size="sm" disabled={updateCampaign.isPending} onClick={() => updateCampaign.mutate({ id: campaign.id, enabled: !campaign.enabled })}>{campaign.enabled ? "Durdur" : "Etkinleştir"}</Button><Button variant="destructive" size="sm" disabled={removeCampaign.isPending} onClick={() => { if (confirm("Bu kampanya silinsin mi?")) removeCampaign.mutate(campaign.id); }}>Sil</Button></div></article>)}</div>
+  </section>;
 }
 function useCreateServerFn() {
   return useServerFn(createApprentice);

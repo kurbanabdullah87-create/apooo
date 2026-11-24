@@ -126,8 +126,21 @@ function AuthPage() {
         if (error) throw error;
         await navigate({ to: "/panel", replace: true });
       }
-    } catch {
-      toast.error(mode === "login" ? "Giriş yapılamadı. Bilgilerini kontrol edip tekrar dene." : "Hesap oluşturulamadı. E-posta adresini ve bilgilerini kontrol et.");
+    } catch (error) {
+      if (mode === "login") {
+        const message = error instanceof Error ? error.message.toLocaleLowerCase("en-US") : "";
+        setPassword("");
+        setShowPassword(false);
+        if (/invalid login credentials|invalid_grant|email not confirmed/.test(message)) {
+          toast.error("Giriş doğrulanamadı. E-posta/şifreyi kontrol et; hesabını Google ile açtıysan Google ile devam et veya ‘Şifremi unuttum’ seçeneğini kullan.");
+        } else {
+          toast.error("Giriş yapılamadı. Bağlantını kontrol edip tekrar dene.");
+        }
+      } else {
+        setPassword("");
+        setShowPassword(false);
+        toast.error("Hesap oluşturulamadı. E-posta adresini ve bilgilerini kontrol et.");
+      }
     } finally {
       setBusy(false);
     }

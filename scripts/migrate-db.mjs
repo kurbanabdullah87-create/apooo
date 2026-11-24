@@ -263,9 +263,23 @@ try {
     } else {
       console.log("[db:migrate] Business-profile trigger safely branches by table.");
     }
+
+    const [{ planSchemaReady }] = await tx`
+      SELECT to_regclass('public.plan_pricing') IS NOT NULL
+        AND to_regclass('public.plan_campaigns') IS NOT NULL
+        AND to_regprocedure('public.get_plan_catalog()') IS NOT NULL
+        AND to_regprocedure('public.list_plan_campaigns()') IS NOT NULL
+        AND to_regprocedure('public.save_plan_campaign(uuid,text,text,integer,text,timestamptz,timestamptz,boolean)') IS NOT NULL
+        AS "planSchemaReady"
+    `;
+    if (!planSchemaReady) {
+      await applyMigration(tx, "0025_plan_pricing_and_campaigns.sql", "0025_plan_pricing_and_campaigns");
+    } else {
+      console.log("[db:migrate] Plan pricing and admin campaigns are already secured.");
+    }
   });
 
-  const requiredTables = ["debt_records", "debt_installments", "debt_payments", "debt_payment_promises", "credit_card_records", "business_profiles", "business_profile_audit", "authorized_emails", "plan_entitlements"];
+  const requiredTables = ["debt_records", "debt_installments", "debt_payments", "debt_payment_promises", "credit_card_records", "business_profiles", "business_profile_audit", "authorized_emails", "plan_entitlements", "plan_pricing", "plan_campaigns"];
   const missing = [];
   for (const name of requiredTables) {
     if (!(await tableExists(client, name))) missing.push(name);

@@ -523,6 +523,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_plan_catalog: { Args: never; Returns: { plan_code: string; amount: number; currency: string; interval_months: number; features: string[] }[] }
+      list_plan_campaigns: { Args: never; Returns: { id: string; title: string; description: string; discount_percent: number; applies_to: string; starts_at: string; ends_at: string; enabled: boolean }[] }
+      save_plan_campaign: { Args: { _id: string | null; _title: string; _description: string; _discount_percent: number; _applies_to: string; _starts_at: string; _ends_at: string; _enabled: boolean }; Returns: string }
+      delete_plan_campaign: { Args: { _id: string }; Returns: undefined }
+      set_plan_price: { Args: { _plan_code: string; _amount: number }; Returns: undefined }
       get_current_access: { Args: never; Returns: { is_admin: boolean; is_premium: boolean; expires_at: string | null }[] }
       list_authorized_emails: { Args: never; Returns: { email: string; created_at: string }[] }
       set_authorized_email: { Args: { _email: string; _enabled: boolean }; Returns: undefined }
