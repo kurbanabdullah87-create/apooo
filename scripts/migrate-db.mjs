@@ -238,7 +238,7 @@ try {
         AND to_regclass('public.plan_entitlements') IS NOT NULL
         AND to_regprocedure('public.get_current_access()') IS NOT NULL
         AND to_regprocedure('public.set_authorized_email(text,boolean)') IS NOT NULL
-        AND EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='work_records' AND policyname='access scoped work record writes')
+        AND EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='work_records' AND policyname IN ('access scoped work record writes','owner operational work record writes'))
         AND EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='bank_accounts' AND policyname='premium owner manages bank accounts')
         AND has_function_privilege('authenticated', 'public.get_current_access()', 'EXECUTE')
         AND NOT has_function_privilege('anon', 'public.get_current_access()', 'EXECUTE')
@@ -288,6 +288,49 @@ try {
       await applyMigration(tx, "0026_admin_usage_analytics.sql", "0026_admin_usage_analytics");
     } else {
       console.log("[db:migrate] Admin usage analytics are already secured.");
+    }
+    const [{ freeCoreAccessReady }] = await tx`
+      SELECT
+        coalesce(pg_get_functiondef(to_regprocedure('public.is_team_usta()')), '') ILIKE '%current_team() = auth.uid()%'
+        AND EXISTS (
+          SELECT 1 FROM pg_policies
+          WHERE schemaname='public' AND tablename='work_records'
+            AND policyname='owner operational work record writes'
+        )
+        AND EXISTS (
+          SELECT 1 FROM pg_policies
+          WHERE schemaname='public' AND tablename='debt_records'
+            AND policyname='premium owner manages debt records'
+            AND coalesce(qual,'') ILIKE '%has_full_access%'
+        )
+        AND EXISTS (
+          SELECT 1 FROM pg_policies
+          WHERE schemaname='public' AND tablename='credit_card_records'
+            AND policyname='premium owner manages credit card records'
+            AND coalesce(qual,'') ILIKE '%has_full_access%'
+        )
+        AND (
+          SELECT count(*) = 9
+          FROM pg_trigger
+          WHERE NOT tgisinternal
+            AND tgname='require_premium_financial_module'
+            AND tgrelid IN (
+              'public.bank_accounts'::regclass,
+              'public.bank_transactions'::regclass,
+              'public.bank_connections'::regclass,
+              'public.bank_documents'::regclass,
+              'public.debt_records'::regclass,
+              'public.debt_installments'::regclass,
+              'public.debt_payments'::regclass,
+              'public.debt_payment_promises'::regclass,
+              'public.credit_card_records'::regclass
+            )
+        ) AS "freeCoreAccessReady"
+    `;
+    if (!freeCoreAccessReady) {
+      await applyMigration(tx, "0027_free_core_modules_premium_finance.sql", "0027_free_core_modules_premium_finance");
+    } else {
+      console.log("[db:migrate] Free operational modules and premium financial gates are already secured.");
     }
   });
 

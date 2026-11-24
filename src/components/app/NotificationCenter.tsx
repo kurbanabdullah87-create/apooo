@@ -20,22 +20,22 @@ export function NotificationCenter() {
   const equipment = useRecords("equipment");
   const jobs = useRecords("job");
   const appointments = useRecords("appointment");
-  const debtRows = useQuery({ queryKey: ["debt-records"], enabled: me.data?.isUsta === true, queryFn: async () => {
+  const debtRows = useQuery({ queryKey: ["debt-records"], enabled: me.data?.hasFullAccess === true, queryFn: async () => {
     const { data, error } = await supabase.from("debt_records").select("id,name,direction");
     if (error) throw error;
     return data ?? [];
   }});
-  const debtInstallments = useQuery({ queryKey: ["debt-installments"], enabled: me.data?.isUsta === true, queryFn: async () => {
+  const debtInstallments = useQuery({ queryKey: ["debt-installments"], enabled: me.data?.hasFullAccess === true, queryFn: async () => {
     const { data, error } = await supabase.from("debt_installments").select("id,debt_id,installment_no,amount,paid_amount,due_on");
     if (error) throw error;
     return data ?? [];
   }});
-  const debtPromises = useQuery({ queryKey: ["debt-payment-promises"], enabled: me.data?.isUsta === true, queryFn: async () => {
+  const debtPromises = useQuery({ queryKey: ["debt-payment-promises"], enabled: me.data?.hasFullAccess === true, queryFn: async () => {
     const { data, error } = await supabase.from("debt_payment_promises").select("id,debt_id,amount,paid_amount,promised_on,note,status").eq("status", "open");
     if (error) throw error;
     return data ?? [];
   }});
-  const creditPlans = useQuery({ queryKey: ["credit-card-records"], enabled: me.data?.isUsta === true, queryFn: async () => {
+  const creditPlans = useQuery({ queryKey: ["credit-card-records"], enabled: me.data?.hasFullAccess === true, queryFn: async () => {
     const { data, error } = await supabase.from("credit_card_records").select("id,name,payload").eq("record_kind", "purchase");
     if (error) throw error;
     return data ?? [];

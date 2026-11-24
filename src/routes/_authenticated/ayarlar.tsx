@@ -79,7 +79,7 @@ function Settings() {
       {me.data?.isAdmin && <AuthorizedAccounts />}
       {me.data?.isAdmin && <AdminUsageDashboard />}
       {me.data?.isAdmin && <PlanCampaignAdmin />}
-      <section className="rounded-2xl border bg-card p-4"><h2 className="font-semibold">Plan ve erişim</h2><p className="mt-1 text-sm text-muted-foreground">{me.data?.hasFullAccess ? "Premium özelliklere erişiminiz açık." : "Ücretsiz planda Yevmiye kullanılabilir; finans özellikleri örnek modundadır."}</p><Button asChild variant="outline" className="mt-3"><a href="/premium">Planı görüntüle</a></Button></section>
+      <section className="rounded-2xl border bg-card p-4"><h2 className="font-semibold">Plan ve erişim</h2><p className="mt-1 text-sm text-muted-foreground">{me.data?.hasFullAccess ? "Premium erişiminiz açık; banka ve taksit bölümleri kullanılabilir." : "Ücretsiz planda yevmiye, işler, cari, randevu, ekipman, stok, gider ve raporlar kullanılabilir. Yalnızca banka ve taksit bölümleri Premium erişim ister."}</p><Button asChild variant="outline" className="mt-3"><a href="/premium">Planı görüntüle</a></Button></section>
       <InstallButton />
       {me.data?.isUsta && (
         <>
@@ -416,6 +416,7 @@ function PlanCampaignAdmin() {
     <div className="space-y-2">{campaigns.data?.map((campaign) => <article key={campaign.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"><div className="min-w-0"><p className="font-medium">{campaign.title} · %{campaign.discount_percent}</p><p className="text-xs text-muted-foreground">{campaign.description || "Açıklama yok"} · {new Date(campaign.starts_at).toLocaleString("tr-TR")} – {new Date(campaign.ends_at).toLocaleString("tr-TR")}</p></div><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => setForm({ id: campaign.id, title: campaign.title, description: campaign.description, discount: String(campaign.discount_percent), appliesTo: campaign.applies_to, startsAt: localDateTime(new Date(campaign.starts_at)), endsAt: localDateTime(new Date(campaign.ends_at)), enabled: campaign.enabled })}>Düzenle</Button><Button variant="outline" size="sm" disabled={updateCampaign.isPending} onClick={() => updateCampaign.mutate({ id: campaign.id, enabled: !campaign.enabled })}>{campaign.enabled ? "Durdur" : "Etkinleştir"}</Button><Button variant="destructive" size="sm" disabled={removeCampaign.isPending} onClick={() => { if (confirm("Bu kampanya silinsin mi?")) removeCampaign.mutate(campaign.id); }}>Sil</Button></div></article>)}</div>
   </section>;
 }
+
 function useCreateServerFn() {
   return useServerFn(createApprentice);
 }

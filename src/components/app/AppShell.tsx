@@ -73,8 +73,9 @@ export function AppShell() {
   }, [activeJobId, activeJobStartedAt]);
 
   const isUsta = me.data?.isUsta ?? false;
+  const hasFullAccess = me.data?.hasFullAccess === true;
   useAppointmentReminders(isUsta, () => void navigate({ to: "/randevu" }));
-  useDebtReminders(isUsta, () => void navigate({ to: "/borc" }));
+  useDebtReminders(isUsta && hasFullAccess, () => void navigate({ to: "/borc" }));
   useEffect(() => {
     const sync = () => void flushQueue();
     const refresh = () => void qc.invalidateQueries();
@@ -216,11 +217,11 @@ export function AppShell() {
           <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/75">Araçlar</p>
           {[
             { to: "/premium", label: "Premium plan", icon: Award },
-            { to: "/borc", label: isUsta ? "Taksitler" : "Taksitler · Demo", icon: HandCoins },
+            { to: "/borc", label: hasFullAccess ? "Taksitler" : "Taksitler · Premium", icon: HandCoins },
             { to: "/randevu", label: "Randevular", icon: CalendarClock },
             { to: "/rapor", label: "Aylık rapor", icon: LayoutDashboard },
             { to: "/hesaplayici", label: "Maliyet hesaplayıcı", icon: Coins },
-            { to: "/banka", label: isUsta ? "Hesap hareketleri" : "Banka · Demo", icon: Landmark },
+            { to: "/banka", label: hasFullAccess ? "Hesap hareketleri" : "Banka · Premium", icon: Landmark },
             { to: "/giderler", label: "Giderler", icon: Receipt },
             { to: "/hava", label: "Hava durumu", icon: Cloud },
             { to: "/ayarlar", label: "Ayarlar", icon: Settings },
@@ -288,11 +289,18 @@ export function AppShell() {
           <div className="flex justify-center py-20">
             <Loader2 className="size-6 animate-spin text-muted-foreground" />
           </div>
-        ) : !isUsta && !["/ayarlar", "/yevmiye", "/banka", "/borc", "/premium"].includes(path) ? (
+        ) : !isUsta && !["/ayarlar", "/yevmiye", "/premium"].includes(path) ? (
           <div className="rounded-2xl border bg-card p-6 text-center">
-            <h2 className="text-lg font-semibold">Bu bölüm Premium planda</h2>
-            <p className="mt-2 text-sm text-muted-foreground">Ücretsiz hesaplarda yalnızca Yevmiye kullanılabilir. Özellik erişimi sunucu tarafında da denetlenir.</p>
+            <h2 className="text-lg font-semibold">Bu bölüm çalışma alanı sahibine açık</h2>
+            <p className="mt-2 text-sm text-muted-foreground">Ekip hesabınızın izin verdiği bölümleri kullanabilirsiniz.</p>
             <Button asChild className="mt-4"><Link to="/premium">Premium planı incele</Link></Button>
+          </div>
+        ) : !hasFullAccess && (path === "/banka" || path === "/borc") ? (
+          <div className="mx-auto max-w-md rounded-2xl border bg-card p-6 text-center">
+            <Landmark className="mx-auto size-8 text-primary" />
+            <h2 className="mt-3 text-lg font-semibold">Banka ve taksit bölümleri Premium</h2>
+            <p className="mt-2 text-sm text-muted-foreground">Ücretsiz hesapta Panel, işler, cari, yevmiye, randevu, ekipman, stok, raporlar ve diğer çalışma araçları kullanılabilir. Banka hareketleri ve taksit kayıtları Premium erişim gerektirir.</p>
+            <Button asChild className="mt-4"><Link to="/premium">Planları görüntüle</Link></Button>
           </div>
         ) : (
           <div key={path} className="min-w-0">
