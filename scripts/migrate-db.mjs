@@ -110,15 +110,22 @@ try {
       await applyMigration(tx, "0018_manage_default_business_profiles.sql", "0018_manage_default_business_profiles");
     }
 
-    const [{ promiseTableExists, debtPromiseReady }] = await tx`
+    const [{ promiseTableExists }] = await tx`
+      SELECT to_regclass('public.debt_payment_promises') IS NOT NULL AS "promiseTableExists"
+    `;
+    let appliedDebtPromiseMigration = false;
+    if (!promiseTableExists) {
+      await applyMigration(tx, "0019_debt_payment_promises.sql", "0019_debt_payment_promises");
+      appliedDebtPromiseMigration = true;
+    }
+
+    const [{ debtPromiseReady }] = await tx`
       SELECT
-        to_regclass('public.debt_payment_promises') IS NOT NULL AS "promiseTableExists",
-        to_regclass('public.debt_payment_promises') IS NOT NULL
-        AND to_regprocedure('public.create_debt_payment_promise(uuid,uuid,numeric,date,text)') IS NOT NULL
+        to_regprocedure('public.create_debt_payment_promise(uuid,uuid,numeric,date,text)') IS NOT NULL
         AND to_regprocedure('public.cancel_debt_payment_promise(uuid)') IS NOT NULL
         AND EXISTS (
           SELECT 1 FROM pg_class
-          WHERE oid='public.debt_payment_promises'::regclass
+          WHERE oid=to_regclass('public.debt_payment_promises')
             AND relrowsecurity AND relforcerowsecurity
         )
         AND EXISTS (
@@ -137,11 +144,11 @@ try {
         AND NOT has_table_privilege('authenticated', 'public.debt_payment_promises', 'DELETE')
         AND EXISTS (
           SELECT 1 FROM pg_proc
-          WHERE oid='public.create_debt_payment_promise(uuid,uuid,numeric,date,text)'::regprocedure AND prosecdef
+          WHERE oid=to_regprocedure('public.create_debt_payment_promise(uuid,uuid,numeric,date,text)') AND prosecdef
         )
         AND EXISTS (
           SELECT 1 FROM pg_proc
-          WHERE oid='public.cancel_debt_payment_promise(uuid)'::regprocedure AND prosecdef
+          WHERE oid=to_regprocedure('public.cancel_debt_payment_promise(uuid)') AND prosecdef
         )
         AND EXISTS (
           SELECT 1 FROM pg_trigger
@@ -151,8 +158,8 @@ try {
         ) AS "debtPromiseReady"
     `;
     if (!debtPromiseReady) {
-      if (promiseTableExists) throw new Error("Debt payment-promise migration is partially present; refusing an automatic production repair.");
-      await applyMigration(tx, "0019_debt_payment_promises.sql", "0019_debt_payment_promises");
+      if (appliedDebtPromiseMigration) throw new Error("Debt payment-promise migration verification failed after apply.");
+      throw new Error("Debt payment-promise schema is partially present or its access controls are incomplete; refusing an automatic production repair.");
     } else {
       console.log("[db:migrate] Debt payment promises are already secured.");
     }
