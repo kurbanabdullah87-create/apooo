@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Save, UserPlus, LogOut, Fingerprint, LockKeyhole, Award, Link2, Loader2, Plus, X, ShieldCheck, CheckCircle2, ArchiveRestore, Star, Trash2 } from "lucide-react";
+import { Save, UserPlus, LogOut, Fingerprint, LockKeyhole, Award, Link2, Loader2, Plus, X, ShieldCheck, CheckCircle2, ArchiveRestore, Star, Trash2, Activity, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,6 +77,7 @@ function Settings() {
         <p className="text-sm text-muted-foreground">{me.data?.isUsta ? "Usta" : "Çırak"}</p>
       </div>
       {me.data?.isAdmin && <AuthorizedAccounts />}
+      {me.data?.isAdmin && <AdminUsageDashboard />}
       {me.data?.isAdmin && <PlanCampaignAdmin />}
       <section className="rounded-2xl border bg-card p-4"><h2 className="font-semibold">Plan ve erişim</h2><p className="mt-1 text-sm text-muted-foreground">{me.data?.hasFullAccess ? "Premium özelliklere erişiminiz açık." : "Ücretsiz planda Yevmiye kullanılabilir; finans özellikleri örnek modundadır."}</p><Button asChild variant="outline" className="mt-3"><a href="/premium">Planı görüntüle</a></Button></section>
       <InstallButton />
@@ -345,6 +346,32 @@ function AuthorizedAccounts() {
 
 function localDateTime(value: Date) {
   return new Date(value.getTime() - value.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
+type AdminUsageSummary = {
+  day: { users: number; sessions: number; views: number };
+  month: { users: number; sessions: number; views: number };
+  all_time: { users: number; sessions: number; views: number };
+  modules: { module: string; views: number }[];
+  users: { id: string; email: string; last_seen: string; sessions: number; views: number }[];
+};
+const usageModuleNames: Record<string, string> = { app: "Uygulama oturumu", panel: "Ana sayfa", isler: "İşler", cari: "Cari", yevmiye: "Yevmiye", ekipman: "Ekipman", doviz: "Döviz", banka: "Banka", randevu: "Randevu", rapor: "Raporlar", ayarlar: "Ayarlar", premium: "Planlar", giderler: "Giderler", alim: "Alımlar", borc: "Borçlar", puantaj: "Puantaj", hava: "Hava", hesaplayici: "Hesaplayıcı", other: "Diğer" };
+function AdminUsageDashboard() {
+  const usage = useQuery({ queryKey: ["admin-usage-summary"], queryFn: async () => {
+    const { data, error } = await supabase.rpc("admin_usage_summary");
+    if (error) throw error;
+    return data as unknown as AdminUsageSummary;
+  }, staleTime: 60_000 });
+  const periods = [{ label: "Bugün", values: usage.data?.day }, { label: "Bu ay", values: usage.data?.month }, { label: "Tüm zamanlar", values: usage.data?.all_time }];
+  return <section className="space-y-4 rounded-2xl border bg-card p-4">
+    <div className="flex items-start justify-between gap-3"><div className="flex items-center gap-2"><Activity className="size-5 text-primary"/><div><h2 className="font-semibold">Uygulama kullanımı</h2><p className="text-xs text-muted-foreground">Gizliliği koruyan, bölüm düzeyinde ziyaret ve oturum özeti</p></div></div><Button variant="outline" size="sm" onClick={() => void usage.refetch()} disabled={usage.isFetching}><RefreshCw className={`mr-2 size-4 ${usage.isFetching ? "animate-spin" : ""}`}/>Yenile</Button></div>
+    {usage.error ? <p className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">Kullanım raporu alınamadı. Veritabanı güncellemesi henüz tamamlanmamış olabilir.</p> : <>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">{periods.map(({ label, values }) => <article key={label} className="rounded-xl border bg-background/40 p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-xl font-bold">{values?.users ?? 0} <span className="text-xs font-normal text-muted-foreground">kişi</span></p><p className="text-xs text-muted-foreground">{values?.sessions ?? 0} oturum · {values?.views ?? 0} sayfa ziyareti</p></article>)}</div>
+      <div className="grid gap-4 md:grid-cols-2"><div><h3 className="mb-2 text-sm font-semibold">En çok ziyaret edilen bölümler</h3><div className="space-y-1">{(usage.data?.modules ?? []).slice(0, 8).map((item) => <div key={item.module} className="flex justify-between rounded-lg bg-background/40 px-3 py-2 text-sm"><span>{usageModuleNames[item.module] ?? item.module}</span><span className="num text-muted-foreground">{item.views}</span></div>)}{!usage.data?.modules?.length && <p className="text-xs text-muted-foreground">Henüz ziyaret kaydı yok.</p>}</div></div>
+        <div><h3 className="mb-2 text-sm font-semibold">Son aktif hesaplar</h3><div className="max-h-64 space-y-1 overflow-auto">{(usage.data?.users ?? []).map((user) => <div key={user.id} className="rounded-lg bg-background/40 px-3 py-2"><div className="truncate text-sm">{user.email}</div><div className="flex justify-between gap-2 text-[11px] text-muted-foreground"><span>{user.sessions} oturum · {user.views} ziyaret</span><time>{new Date(user.last_seen).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" })}</time></div></div>)}{!usage.data?.users?.length && <p className="text-xs text-muted-foreground">Henüz kullanım kaydı yok.</p>}</div></div></div>
+      <p className="text-[11px] leading-relaxed text-muted-foreground">Yalnızca oturum, bölüm ziyareti ve zaman bilgisi kaydedilir. Banka hareketleri, e-posta içeriği, formlara yazılanlar ve işlem ayrıntıları izlenmez. Rapor yalnızca yönetici hesabına açıktır.</p>
+    </>}
+  </section>;
 }
 
 function PlanCampaignAdmin() {

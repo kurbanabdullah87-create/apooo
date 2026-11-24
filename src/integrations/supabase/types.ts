@@ -523,6 +523,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      record_app_usage: { Args: { _event_type: string; _module: string }; Returns: undefined }
+      admin_usage_summary: { Args: never; Returns: Json }
       get_plan_catalog: { Args: never; Returns: { plan_code: string; amount: number; currency: string; interval_months: number; features: string[] }[] }
       list_plan_campaigns: { Args: never; Returns: { id: string; title: string; description: string; discount_percent: number; applies_to: string; starts_at: string; ends_at: string; enabled: boolean }[] }
       save_plan_campaign: { Args: { _id: string | null; _title: string; _description: string; _discount_percent: number; _applies_to: string; _starts_at: string; _ends_at: string; _enabled: boolean }; Returns: string }

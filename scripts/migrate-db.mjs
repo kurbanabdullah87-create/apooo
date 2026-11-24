@@ -277,9 +277,21 @@ try {
     } else {
       console.log("[db:migrate] Plan pricing and admin campaigns are already secured.");
     }
+
+    const [{ usageSchemaReady }] = await tx`
+      SELECT to_regclass('public.app_usage_events') IS NOT NULL
+        AND to_regprocedure('public.record_app_usage(text,text)') IS NOT NULL
+        AND to_regprocedure('public.admin_usage_summary()') IS NOT NULL
+        AS "usageSchemaReady"
+    `;
+    if (!usageSchemaReady) {
+      await applyMigration(tx, "0026_admin_usage_analytics.sql", "0026_admin_usage_analytics");
+    } else {
+      console.log("[db:migrate] Admin usage analytics are already secured.");
+    }
   });
 
-  const requiredTables = ["debt_records", "debt_installments", "debt_payments", "debt_payment_promises", "credit_card_records", "business_profiles", "business_profile_audit", "authorized_emails", "plan_entitlements", "plan_pricing", "plan_campaigns"];
+  const requiredTables = ["debt_records", "debt_installments", "debt_payments", "debt_payment_promises", "credit_card_records", "business_profiles", "business_profile_audit", "authorized_emails", "plan_entitlements", "plan_pricing", "plan_campaigns", "app_usage_events"];
   const missing = [];
   for (const name of requiredTables) {
     if (!(await tableExists(client, name))) missing.push(name);

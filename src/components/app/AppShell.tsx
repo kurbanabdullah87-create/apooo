@@ -307,7 +307,8 @@ export function AppShell() {
         <div className="mx-auto grid max-w-xl grid-cols-6">
           {NAV.filter(n => isUsta || n.to === "/yevmiye").map((n) => {
             const active = path.startsWith(n.to);
-              <Link
+            return <Link
+                key={n.to}
                 to={n.to}
                 onClick={() => haptic(8)}
                 aria-current={active ? "page" : undefined}
@@ -316,7 +317,7 @@ export function AppShell() {
                 <n.icon className="size-5" />
                 {n.label}
                 {n.to === "/isler" && openToday.length > 0 && <span className="absolute right-1/4 top-1 min-w-4 rounded-full bg-primary px-1 text-center text-[9px] leading-4 text-primary-foreground" aria-label={`${openToday.length} açık iş`}>{openToday.length}</span>}
-              </Link>
+              </Link>;
 
           })}
         </div>
