@@ -1,8 +1,9 @@
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
-import { LayoutDashboard, Users, Receipt, Settings, Plus, Search, Loader2, ArrowDown, HardHat, CalendarDays, Wrench, CalendarClock, Cloud, CloudUpload, Landmark, Coins, HandCoins, Building2, Award } from "lucide-react";
+import { LayoutDashboard, Users, Receipt, Settings, Plus, Search, Loader2, ArrowDown, HardHat, CalendarDays, Wrench, CalendarClock, Cloud, CloudUpload, Landmark, Coins, HandCoins, Building2, Award, MoreHorizontal, Calculator, ShoppingCart, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DeviceLock } from "./DeviceLock";
 import { useEffect } from "react";
 import { flushQueue, pendingCount } from "@/lib/offline";
@@ -124,7 +125,7 @@ export function AppShell() {
 
   useEffect(() => {
     const pageName: Record<string, string> = { "/panel": "Panel", "/isler": "İşler", "/cari": "Cari", "/yevmiye": "Yevmiye", "/ekipman": "Ekipman", "/doviz": "Döviz", "/randevu": "Randevular", "/banka": "Banka" };
-    const base = `${pageName[path] ?? "Yevmiye & Finans"} — Yevmiye & Finans`;
+    const base = `${pageName[path] ?? "Saha"} — Saha`;
     if (!activeJob) { document.title = base; return; }
     const tick = () => {
       const seconds = Math.max(0, Math.floor((Date.now() - Date.parse(String(activeJob.payload.started_at))) / 1000));
@@ -194,11 +195,11 @@ export function AppShell() {
   }
 
   return (
-    <div className="relative min-h-dvh w-full min-w-0 overflow-x-clip lg:pl-72">
-      <aside className="glass-sidebar fixed inset-y-4 left-4 z-40 hidden w-60 flex-col rounded-[1.8rem] p-3 lg:flex" aria-label="Ana gezinme">
+    <div className="relative mx-auto flex min-h-dvh w-full max-w-xl flex-col overflow-x-clip">
+      <aside className="hidden" aria-label="Ana gezinme">
         <Link to="/panel" className="flex items-center gap-3 rounded-2xl px-3 py-3 transition hover:bg-white/[0.06]">
           <img src="/brand-mark.svg" alt="" className="size-10 rounded-2xl shadow-lg shadow-primary/20" />
-          <span className="min-w-0"><span className="block text-sm font-bold leading-tight tracking-tight">Yevmiye & Finans</span><span className="block text-[11px] text-muted-foreground">İş · ekip · hesap yönetimi</span></span>
+          <span className="min-w-0"><span className="block text-sm font-bold leading-tight tracking-tight">Saha</span><span className="block text-[11px] text-muted-foreground">Operasyon &amp; Finans</span></span>
         </Link>
         <div className="mx-3 my-3 h-px bg-white/10" />
         <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/75">Çalışma alanı</p>
@@ -235,20 +236,27 @@ export function AppShell() {
         </div>
       </aside>
 
-      <header className="glass-topbar sticky top-0 z-30 px-4 pb-3 pt-[max(env(safe-area-inset-top),0.75rem)] lg:mx-auto lg:max-w-[1600px] lg:px-10 lg:pt-6">
-        <div className={cn("flex flex-wrap items-center gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.035] p-1.5 backdrop-blur-xl transition-colors duration-500 lg:flex-nowrap lg:gap-2 lg:rounded-[1.4rem] lg:bg-white/[0.045] lg:p-2", !isOnline && "border-destructive/30 bg-destructive/10", activeJob && "border-primary/25 bg-primary/[0.06]")}><Link to="/panel" className="mr-1 flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary/15 lg:hidden" aria-label="Panele dön"><img src="/brand-mark.svg" alt="" className="size-full"/></Link><Button variant="ghost"
+      <header className="sticky top-0 z-30 border-b bg-background/95 px-4 pb-3 pt-[max(env(safe-area-inset-top),0.75rem)] backdrop-blur">
+        <div className={cn("flex flex-wrap items-center gap-1.5", !isOnline && "text-destructive", activeJob && "text-primary")}><Link to="/panel" className="mr-1 flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary/15" aria-label="Panele dön"><img src="/brand-mark.svg" alt="" className="size-full"/></Link><Button variant="ghost"
           onClick={() => setSearchOpen(true)}
           className="flex h-10 min-w-0 basis-36 flex-1 justify-start gap-3 rounded-xl px-3 text-sm text-muted-foreground hover:bg-white/[0.06] lg:basis-auto"
         >
           <Search className="size-4" /><span className="truncate">Ara: müşteri, iş, tutar…</span><kbd className="ml-auto hidden rounded-md border border-white/10 bg-black/10 px-1.5 py-0.5 text-[10px] font-medium lg:inline-block">Ctrl K</kbd>
-        </Button>{activeJob && <span className="hidden items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary sm:inline-flex" role="status"><span className="size-1.5 animate-pulse rounded-full bg-primary"/> {(() => { const seconds = Math.max(0, Math.floor((clockNow - Date.parse(String(activeJob.payload.started_at))) / 1000)); return `${String(Math.floor(seconds / 3600)).padStart(2, "0")}:${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`; })()}</span>}{isUsta&&<VoiceCommandButton onSearch={(query) => { setSearchSeed(query); setSearchOpen(true); }}/>}{isUsta&&<NotificationCenter/>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Randevular" className="rounded-xl hover:bg-white/[0.07]"><Link to="/randevu"><CalendarClock/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Hava Durumu" className="rounded-xl hover:bg-white/[0.07]"><Link to="/hava"><Cloud/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Borç ve alacak" className="rounded-xl hover:bg-white/[0.07]"><Link to="/borc"><HandCoins/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Hesap hareketleri"><Link to="/banka"><Landmark/></Link></Button><Button asChild variant="ghost" size="icon" title="Taksitler"><Link to="/borc"><HandCoins/></Link></Button>{!isUsta && <Button asChild variant="ghost" size="icon" title="Premium plan"><Link to="/premium"><Award/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Giderler" className="rounded-xl hover:bg-white/[0.07]"><Link to="/giderler"><Receipt/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Ayarlar" className="rounded-xl hover:bg-white/[0.07]"><Link to="/ayarlar"><Settings/></Link></Button></div>
+        </Button>{activeJob && <span className="hidden items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary sm:inline-flex" role="status"><span className="size-1.5 animate-pulse rounded-full bg-primary"/> {(() => { const seconds = Math.max(0, Math.floor((clockNow - Date.parse(String(activeJob.payload.started_at))) / 1000)); return `${String(Math.floor(seconds / 3600)).padStart(2, "0")}:${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`; })()}</span>}{isUsta&&<VoiceCommandButton onSearch={(query) => { setSearchSeed(query); setSearchOpen(true); }}/>}{isUsta&&<NotificationCenter/>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Randevular" className="rounded-xl hover:bg-white/[0.07]"><Link to="/randevu"><CalendarClock/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Hava Durumu" className="rounded-xl hover:bg-white/[0.07]"><Link to="/hava"><Cloud/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Borç ve alacak" className="rounded-xl hover:bg-white/[0.07]"><Link to="/borc"><HandCoins/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Hesap hareketleri"><Link to="/banka"><Landmark/></Link></Button><Button asChild variant="ghost" size="icon" title="Taksitler"><Link to="/borc"><HandCoins/></Link></Button>{!isUsta && <Button asChild variant="ghost" size="icon" title="Premium plan"><Link to="/premium"><Award/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Giderler" className="rounded-xl hover:bg-white/[0.07]"><Link to="/giderler"><Receipt/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Ayarlar" className="rounded-xl hover:bg-white/[0.07]"><Link to="/ayarlar"><Settings/></Link></Button><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" title="Diğer bölümler" aria-label="Diğer bölümler"><MoreHorizontal/></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="max-h-[70dvh] overflow-y-auto">{[
+          ...(isUsta ? [
+            { to: "/alim", label: "Alım ve stok", icon: ShoppingCart },
+            { to: "/rapor", label: "Raporlar", icon: ClipboardList },
+            { to: "/hesaplayici", label: "Maliyet hesaplayıcı", icon: Calculator },
+            { to: "/premium", label: "Premium plan", icon: Award },
+          ] : [{ to: "/premium", label: "Premium plan", icon: Award }]),
+        ].map((item) => <DropdownMenuItem key={item.to} asChild><Link to={item.to} className="flex items-center gap-2"><item.icon className="size-4"/>{item.label}</Link></DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu></div>
         {isUsta && businessProfile.profileError && <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100" role="status"><Building2 className="size-4 shrink-0"/><span className="min-w-0 flex-1">{businessProfile.profileError}</span>{businessProfile.profiles.length === 0 && <Button asChild size="sm" variant="secondary"><Link to="/ayarlar">Ayarları aç</Link></Button>}<Button type="button" size="sm" variant="ghost" onClick={() => void businessProfile.refreshProfiles()}>Yenile</Button></div>}
         {isUsta && businessProfile.isUsta && businessProfile.activeProfile && <div className="mt-2 flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/[0.045] px-3 py-2"><Building2 className="size-4 shrink-0 text-primary"/><label htmlFor="active-business-profile" className="sr-only">Etkin usta profili</label><select id="active-business-profile" value={businessProfile.activeProfileId ?? ""} onChange={(event) => businessProfile.switchProfile(event.target.value)} className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-foreground outline-none" aria-label="Etkin usta profili">{businessProfile.profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}{profile.is_default ? " · Varsayılan" : ""}{profile.is_archived ? " · Arşivli (yalnızca geçmiş)" : ""}</option>)}</select><span className="hidden text-[10px] text-muted-foreground sm:inline">Kayıt ve rapor kapsamı</span></div>}
         {(!isOnline || queuedWrites > 0) && <div className={cn("mt-2 flex items-center gap-1.5 text-xs font-semibold", isOnline ? "text-warning" : "text-destructive")} role="status"><span className={cn("size-2 rounded-full", isOnline ? "bg-warning" : "animate-pulse bg-destructive")}/>{!isOnline ? "Çevrimdışı" : "Senkronizasyon bekliyor"}{queuedWrites > 0 && <> · <CloudUpload className="size-3.5"/>{queuedWrites} kayıt</>}</div>}
       </header>
 
       <main
-        className="mx-auto w-full min-w-0 max-w-2xl px-4 pb-32 pt-4 sm:max-w-4xl lg:max-w-[1600px] lg:px-10 lg:pb-12 lg:pt-5"
+        className="w-full min-w-0 flex-1 px-4 pb-32 pt-4"
         onTouchStart={(e) => {
           startY.current = window.scrollY <= 0 ? e.touches[0]?.clientY ?? null : null;
           const x = e.touches[0]?.clientX;
@@ -287,29 +295,29 @@ export function AppShell() {
             <Button asChild className="mt-4"><Link to="/premium">Premium planı incele</Link></Button>
           </div>
         ) : (
-          <div key={path} className="app-page-enter min-w-0">
+          <div key={path} className="min-w-0">
             <Outlet />
           </div>
         )}
       </main>
 
-      <nav className="glass-dock safe-bottom fixed inset-x-3 bottom-3 z-30 rounded-[1.4rem] p-1.5 lg:hidden">
-        <div className={`mx-auto grid max-w-md ${isUsta ? "grid-cols-13" : "grid-cols-1"}`}>
-          {NAV.filter(n => isUsta || n.to === "/yevmiye").map((n, index) => {
+      {isUsta && <Button aria-label="Hızlı ekle" onClick={() => { haptic(); setAddOpen(true); }} className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-[max(1.25rem,calc(50%-18rem+1.25rem))] z-40 flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg active:scale-95"><Plus className="size-6" /></Button>}
+
+      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 backdrop-blur">
+        <div className="mx-auto grid max-w-xl grid-cols-6">
+          {NAV.filter(n => isUsta || n.to === "/yevmiye").map((n) => {
             const active = path.startsWith(n.to);
-            return <div key={n.to} className="contents">
-              {isUsta && index === 3 && <button type="button" aria-label="Hızlı işlem ekle" onClick={() => { haptic(); setAddOpen(true); }} className="-mt-4 flex flex-col items-center justify-start gap-1 py-1 text-[10px] font-semibold text-primary"><span className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition active:scale-95"><Plus className="size-6"/></span>Ekle</button>}
               <Link
                 to={n.to}
                 onClick={() => haptic(8)}
                 aria-current={active ? "page" : undefined}
-                className={cn("glass-dock-item relative flex min-w-0 flex-col items-center gap-1 rounded-xl py-2.5 text-[10px] font-medium transition duration-200 sm:text-[11px]", isUsta && "col-span-2", active ? "is-active text-primary" : "text-muted-foreground hover:bg-white/[0.06]")}
+                className={cn("relative flex min-w-0 flex-col items-center gap-1 py-3 text-[11px] font-medium", active ? "text-primary" : "text-muted-foreground")}
               >
                 <n.icon className="size-5" />
                 {n.label}
                 {n.to === "/isler" && openToday.length > 0 && <span className="absolute right-1/4 top-1 min-w-4 rounded-full bg-primary px-1 text-center text-[9px] leading-4 text-primary-foreground" aria-label={`${openToday.length} açık iş`}>{openToday.length}</span>}
               </Link>
-            </div>;
+
           })}
         </div>
       </nav>

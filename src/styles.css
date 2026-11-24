@@ -373,11 +373,11 @@ body[data-route] main {
   main .border.bg-card { break-inside: avoid; border: 1px solid #bbb !important; background: white !important; box-shadow: none !important; color: black !important; }
 }
 
-/* Compatibility skin: restore the original flat mobile-first app instead of the later glass/gradient treatment. */
-:root { --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif; --font-display: "Space Grotesk", "Manrope", ui-sans-serif, sans-serif; }
+/* Saha's original direct, dark interface: flat surfaces, clear spacing and one mint accent. */
+:root { --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif; --font-display: "Manrope", ui-sans-serif, system-ui, sans-serif; }
 body { background-image: none !important; }
 main .border.bg-card { border-color: var(--border) !important; background: var(--card) !important; box-shadow: none !important; }
-main [class*="bg-gradient-to-"] { background-image: none !important; background-color: var(--card) !important; }
+main .border[class*="bg-gradient-to-"], main section[class*="bg-gradient-to-"], main header[class*="bg-gradient-to-"], main div[class*="rounded-3xl"][class*="bg-gradient-to-"] { background-image: none !important; background-color: var(--card) !important; }
 main [class*="shadow-"] { box-shadow: none !important; }
 main [class*="rounded-["] { border-radius: var(--radius-2xl) !important; }
 main .dashboard-welcome { border-color: var(--border) !important; background: var(--card) !important; color: var(--card-foreground) !important; box-shadow: none !important; }
@@ -385,9 +385,19 @@ main .dashboard-welcome::after, main .dashboard-welcome-art { display: none !imp
 main .dashboard-welcome .text-white { color: var(--card-foreground) !important; }
 .dashboard-enter, .dashboard-reveal, .app-page-enter, .animate-slide-up-fade { animation: none !important; }
 .welcome-cta:hover, .welcome-cta:active { transform: none !important; box-shadow: none !important; }
-.auth-shell { background: var(--background) !important; }
+.auth-shell { background: #000 !important; }
 .auth-orbit, .auth-orbit-secondary { display: none !important; }
-.auth-feature-card, .auth-card { border-color: var(--border) !important; background: var(--card) !important; box-shadow: none !important; backdrop-filter: none !important; }
+.auth-shell aside { display: none !important; }
+.auth-shell > div.relative { max-width: 430px !important; }
+.auth-shell > div.relative > div { width: 100%; padding: 3rem 1.5rem; }
+.auth-feature-card { display: none !important; }
+.auth-card { border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; backdrop-filter: none !important; }
+.auth-card > div:first-child { margin-bottom: 2.5rem !important; }
+.auth-card > div:first-child > span { display: none !important; }
+.auth-card input:not([type="checkbox"]) { height: 3rem !important; border-color: #303936 !important; border-radius: .75rem !important; background: #000 !important; }
+.auth-card button[type="submit"] { background: var(--primary) !important; color: var(--primary-foreground) !important; box-shadow: none !important; }
+.auth-card button[type="button"][class*="border-white"] { background: transparent !important; box-shadow: none !important; }
+.auth-card label[class*="rounded-xl"][class*="border"] { border-color: #303936 !important; border-radius: .75rem !important; background: transparent !important; }
 
 @utility num {
   font-variant-numeric: tabular-nums;

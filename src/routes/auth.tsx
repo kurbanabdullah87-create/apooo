@@ -14,11 +14,11 @@ export const Route = createFileRoute("/auth")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Giriş — Yevmiye & Finans" },
-      { name: "description", content: "Yevmiye & Finans hesabınıza güvenli şekilde giriş yapın." },
+      { title: "Giriş — Saha" },
+      { name: "description", content: "Saha hesabınıza güvenli şekilde giriş yapın." },
       { name: "robots", content: "noindex,nofollow" },
-      { property: "og:title", content: "Giriş — Yevmiye & Finans" },
-      { property: "og:description", content: "Yevmiye & Finans hesabınıza güvenli şekilde giriş yapın." },
+      { property: "og:title", content: "Giriş — Saha" },
+      { property: "og:description", content: "Saha hesabınıza güvenli şekilde giriş yapın." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -179,12 +179,12 @@ function AuthPage() {
     <main className="auth-shell relative isolate min-h-dvh overflow-hidden bg-background text-foreground selection:bg-primary/30">
       <div aria-hidden="true" className="auth-orbit pointer-events-none absolute -left-48 -top-56 size-[38rem] rounded-full" />
       <div aria-hidden="true" className="auth-orbit auth-orbit-secondary pointer-events-none absolute -bottom-72 right-[-8rem] size-[42rem] rounded-full" />
-      <div className="relative mx-auto grid min-h-dvh w-full max-w-[1480px] lg:grid-cols-[minmax(0,1.08fr)_minmax(430px,0.92fr)]">
+      <div className="relative mx-auto flex min-h-dvh w-full max-w-[430px] flex-col">
         <aside className="relative hidden flex-col justify-between overflow-hidden px-12 py-10 lg:flex xl:px-20 xl:py-12">
           <div aria-hidden="true" className="absolute inset-8 rounded-[3rem] border border-white/[0.055]" />
           <div className="relative flex items-center gap-3">
-            <img src="/brand-mark.svg" alt="Yevmiye & Finans uygulama logosu" className="size-12 rounded-2xl shadow-lg shadow-primary/20" />
-            <div><p className="text-lg font-bold tracking-tight">Yevmiye & Finans</p><p className="text-xs text-muted-foreground">İş · ekip · hesap yönetimi</p></div>
+            <img src="/brand-mark.svg" alt="Saha uygulama logosu" className="size-12 rounded-full" />
+            <div><p className="text-lg font-bold tracking-tight">Saha</p><p className="text-xs text-muted-foreground">Operasyon &amp; Finans</p></div>
           </div>
           <div className="relative max-w-xl py-12">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/[0.08] px-3.5 py-2 text-xs font-semibold text-primary"><span className="size-1.5 rounded-full bg-primary"/>YEVMİYE & FİNANS · İŞ VE HESAP TAKİBİ</div>
@@ -199,10 +199,10 @@ function AuthPage() {
           <div className="relative flex items-center gap-2 text-xs text-muted-foreground"><ShieldCheck className="size-4 text-emerald-400"/>Güvenli oturum · Kayıtların hesabına özel</div>
         </aside>
 
-        <div className="flex min-h-dvh items-center justify-center px-3 py-5 sm:px-8 sm:py-8 lg:px-10 xl:px-14">
-          <section className="auth-card relative w-full max-w-[470px] overflow-hidden rounded-[1.5rem] border p-4 sm:rounded-[2rem] sm:p-9">
+        <div className="flex min-h-dvh items-start justify-center px-6 py-12 sm:px-8 sm:py-16">
+          <section className="auth-card relative w-full max-w-[380px] overflow-visible border-0 p-0">
             <div className="relative mb-7 flex flex-col items-start gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between lg:hidden">
-            <div className="flex items-center gap-3"><img src="/brand-mark.svg" alt="Yevmiye & Finans uygulama logosu" className="size-11 rounded-2xl"/><div><p className="text-base font-bold tracking-tight">Yevmiye & Finans</p><p className="text-xs text-muted-foreground">İş · ekip · hesap yönetimi</p></div></div>
+            <div className="flex items-center gap-3"><img src="/brand-mark.svg" alt="Saha uygulama logosu" className="size-12 rounded-full"/><div><p className="text-lg font-bold tracking-tight">Saha</p><p className="text-xs text-muted-foreground">Operasyon &amp; Finans</p></div></div>
               <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-2.5 py-1.5 text-[10px] font-medium text-emerald-300"><ShieldCheck className="size-3.5"/>Güvenli oturum</span>
             </div>
             <div className="relative mb-8 hidden items-center justify-end lg:flex"><span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-2.5 py-1.5 text-[10px] font-medium text-emerald-300"><ShieldCheck className="size-3.5"/>Güvenli oturum</span></div>
@@ -216,7 +216,7 @@ function AuthPage() {
               </div>
             ) : (
               <>
-                <div className="relative mb-7"><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">{resetMode ? "HESAP KURTARMA" : mode === "login" ? "HESABINA GÜVENLE ERİŞ" : "YENİ HESAP"}</p><h1 className="mt-2 font-display text-3xl font-bold tracking-tight sm:text-[2.1rem]">{resetMode ? "Şifreni yenile" : mode === "login" ? "Tekrar hoş geldin" : "Hesap oluştur"}</h1><p className="mt-2 text-sm leading-6 text-slate-400">{resetMode ? "Kayıtlı e-posta adresine güvenli bir bağlantı göndereceğiz." : mode === "login" ? "Hesabına giriş yap, işlerine kaldığın yerden devam et." : "Hesabını oluştur, işlerini tek yerden yönet."}</p></div>
+                <div className="relative mb-7"><h1 className="font-display text-3xl font-bold tracking-tight sm:text-[2rem]">{resetMode ? "Şifreni yenile" : mode === "login" ? "Tekrar hoş geldin" : "Hesap oluştur"}</h1><p className="mt-2 text-sm leading-6 text-muted-foreground">{resetMode ? "Kayıtlı e-posta adresine güvenli bir bağlantı göndereceğiz." : mode === "login" ? "Hesabına giriş yap, işlerine kaldığın yerden devam et." : "Hesabını oluştur, işlerini tek yerden yönet."}</p></div>
 
                 {!resetMode && <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                   <Button type="button" variant="outline" className="h-12 w-full min-w-0 rounded-xl border-white/10 bg-white/[0.045] text-[13px] leading-tight transition hover:border-white/20 hover:bg-white/[0.08] sm:text-sm" onClick={() => void continueWith("google")} disabled={busy}><GoogleMark/><span>Google ile devam et</span></Button>
