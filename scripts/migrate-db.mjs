@@ -91,6 +91,16 @@ try {
       if (policies.length < 3 || triggers.length !== 3 || profileTriggers.length !== 3 || !(await tableExists(tx, 'business_profile_audit'))) throw new Error('Business profile schema is present but its access policies, audit table or validation triggers are incomplete. Refusing to continue.');
       console.log('[db:migrate] Business profile schema and ownership safeguards already exist.');
     }
+
+    const [{ unassignedProfiles }] = await tx`
+      SELECT
+        (SELECT count(*) FROM public.work_records WHERE kind <> 'settings' AND profile_id IS NULL) +
+        (SELECT count(*) FROM public.transactions WHERE profile_id IS NULL) +
+        (SELECT count(*) FROM public.expenses WHERE profile_id IS NULL) AS "unassignedProfiles"
+    `;
+    if (Number(unassignedProfiles) > 0) {
+      await applyMigration(tx, "0017_backfill_business_profile_defaults.sql", "0017_backfill_business_profile_defaults");
+    }
   });
 
   const requiredTables = ["debt_records", "debt_installments", "debt_payments", "credit_card_records", "business_profiles", "business_profile_audit"];
