@@ -100,7 +100,11 @@ CREATE TRIGGER touch_business_profile_updated_at BEFORE UPDATE ON public.busines
 INSERT INTO public.business_profiles(team_id, name, is_default, created_by)
 SELECT p.id, coalesce(nullif(btrim(p.display_name), ''), p.username, 'Usta'), true, p.id
 FROM public.profiles p
-WHERE p.id = p.team_id AND public.has_role(p.id, 'usta')
+-- This migration runs without an authenticated JWT, so has_role() deliberately
+-- returns false under the hardened function. Read the role table directly here.
+WHERE p.id = p.team_id AND EXISTS (
+  SELECT 1 FROM public.user_roles ur WHERE ur.user_id = p.id AND ur.role = 'usta'
+)
 ON CONFLICT DO NOTHING;
 
 -- Earlier versions stored additional usta names as newline-separated labels.
