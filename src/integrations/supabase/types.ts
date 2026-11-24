@@ -33,9 +33,9 @@ export type Database = {
         Relationships: [{ foreignKeyName: "debt_installments_debt_id_fkey"; columns: ["debt_id"]; isOneToOne: false; referencedRelation: "debt_records"; referencedColumns: ["id"] }]
       }
       debt_payments: {
-        Row: { id: string; team_id: string; owner_id: string; debt_id: string; installment_id: string | null; amount: number; paid_on: string; note: string; created_at: string }
-        Insert: { id?: string; team_id?: string; owner_id?: string; debt_id: string; installment_id?: string | null; amount: number; paid_on?: string; note?: string; created_at?: string }
-        Update: { id?: string; team_id?: string; owner_id?: string; debt_id?: string; installment_id?: string | null; amount?: number; paid_on?: string; note?: string; created_at?: string }
+        Row: { id: string; team_id: string; owner_id: string; debt_id: string; installment_id: string | null; amount: number; paid_on: string; note: string; receipt_no: string; created_at: string }
+        Insert: { id?: string; team_id?: string; owner_id?: string; debt_id: string; installment_id?: string | null; amount: number; paid_on?: string; note?: string; receipt_no?: string; created_at?: string }
+        Update: { id?: string; team_id?: string; owner_id?: string; debt_id?: string; installment_id?: string | null; amount?: number; paid_on?: string; note?: string; receipt_no?: string; created_at?: string }
         Relationships: [{ foreignKeyName: "debt_payments_debt_id_fkey"; columns: ["debt_id"]; isOneToOne: false; referencedRelation: "debt_records"; referencedColumns: ["id"] }, { foreignKeyName: "debt_payments_installment_id_fkey"; columns: ["installment_id"]; isOneToOne: false; referencedRelation: "debt_installments"; referencedColumns: ["id"] }]
       }
       debt_payment_promises: {
@@ -524,6 +524,7 @@ export type Database = {
     }
     Functions: {
       record_debt_payment: { Args: { _debt_id: string; _installment_id: string; _amount: number; _paid_on: string; _note?: string }; Returns: string }
+      record_debt_payment_with_receipt: { Args: { _debt_id: string; _installment_id: string; _amount: number; _paid_on: string; _note?: string; _receipt_no?: string }; Returns: string }
       create_debt_payment_promise: { Args: { _debt_id: string; _installment_id: string; _amount: number; _promised_on: string; _note?: string }; Returns: string }
       cancel_debt_payment_promise: { Args: { _promise_id: string }; Returns: string }
       bill_job: { Args: { _job_id: string }; Returns: string }

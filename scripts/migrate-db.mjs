@@ -163,6 +163,25 @@ try {
     } else {
       console.log("[db:migrate] Debt payment promises are already secured.");
     }
+
+    const [{ receiptColumnExists, receiptIndexExists, receiptFunctionExists }] = await tx`
+      SELECT
+        EXISTS (
+          SELECT 1 FROM pg_attribute
+          WHERE attrelid='public.debt_payments'::regclass
+            AND attname='receipt_no' AND NOT attisdropped
+        ) AS "receiptColumnExists",
+        to_regclass('public.debt_payments_owner_receipt_no_unique_idx') IS NOT NULL AS "receiptIndexExists",
+        to_regprocedure('public.record_debt_payment_with_receipt(uuid,uuid,numeric,date,text,text)') IS NOT NULL AS "receiptFunctionExists"
+    `;
+    if (receiptColumnExists && receiptIndexExists && receiptFunctionExists) {
+      console.log("[db:migrate] Debt payment receipt references are already secured.");
+    } else {
+      if (receiptColumnExists || receiptIndexExists || receiptFunctionExists) {
+        throw new Error("Debt payment receipt migration is partially present; refusing an automatic production repair.");
+      }
+      await applyMigration(tx, "0020_debt_payment_receipts.sql", "0020_debt_payment_receipts");
+    }
   });
 
   const requiredTables = ["debt_records", "debt_installments", "debt_payments", "debt_payment_promises", "credit_card_records", "business_profiles", "business_profile_audit"];

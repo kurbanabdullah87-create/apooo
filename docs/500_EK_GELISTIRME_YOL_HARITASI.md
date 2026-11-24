@@ -75,7 +75,7 @@
 034. **[Mevcut özellik; yeni sayılmadı] [Profesyonel] Tahsilat planlama:** kısmi tahsilat için kalan bakiye çizelgesi.
 035. **[Kodlandı] [Profesyonel] Tahsilat planlama:** vadesi geçen kayıtlar için yaşlandırma dilimleri.
 036. **[Kodlandı] [Profesyonel] Tahsilat planlama:** seçilen vade dönemindeki açık taksitleri ve bu taksitlerde ödenen tutarı kıyaslama.
-037. **[Profesyonel] Tahsilat planlama:** makbuz numarası ile ödeme eşlemesi.
+037. **[Kodlandı] [Profesyonel] Tahsilat planlama:** benzersiz makbuz / banka işlem numarası ile ödeme eşlemesi.
 038. **[Profesyonel] Tahsilat planlama:** tahsilat için takip görevi oluşturma.
 039. **[Profesyonel] Tahsilat planlama:** ödeme itirazı ve çözüm kaydı.
 040. **[Profesyonel] Tahsilat planlama:** tahsilat planını CSV/PDF dışa aktarma.
