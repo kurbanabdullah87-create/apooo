@@ -8,7 +8,7 @@ export type ProfileContextValue = {
   loading: boolean;
   profileError: string | null;
   isUsta: boolean;
-  switchProfile: (id: string) => boolean;
+  switchProfile: (id: string, confirmBeforeSwitch?: boolean) => boolean;
   refreshProfiles: () => Promise<void>;
 };
 

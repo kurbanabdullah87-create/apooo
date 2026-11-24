@@ -30,7 +30,7 @@ export function BusinessProfileProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("storage", sync);
   }, [storageKey]);
   const profiles = useMemo(() => profilesQuery.data ?? [], [profilesQuery.data]);
-  const activeProfile = profiles.find((profile) => profile.id === savedId)
+  const activeProfile = profiles.find((profile) => profile.id === savedId && !profile.is_archived)
     ?? profiles.find((profile) => profile.is_default && !profile.is_archived)
     ?? profiles.find((profile) => !profile.is_archived) ?? null;
   const activeProfileId = activeProfile?.id ?? null;
@@ -39,10 +39,10 @@ export function BusinessProfileProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem(storageKey, activeProfileId); } catch { /* profile still works for this session */ }
     setSavedId(activeProfileId);
   }, [activeProfileId, savedId, storageKey]);
-  const switchProfile = useCallback((id: string) => {
+  const switchProfile = useCallback((id: string, confirmBeforeSwitch = true) => {
     if (!profiles.some((profile) => profile.id === id)) return false;
     if (activeProfileId === id) return true;
-    if (activeProfileId && typeof window !== "undefined" && !window.confirm("Usta profili değişecek. Açık form taslaklarını yeni profil bağlamında yeniden kontrol edin. Devam edilsin mi?")) return false;
+    if (confirmBeforeSwitch && activeProfileId && typeof window !== "undefined" && !window.confirm("Usta profili değişecek. Açık form taslaklarını yeni profil bağlamında yeniden kontrol edin. Devam edilsin mi?")) return false;
     try { localStorage.setItem(storageKey, id); } catch { /* in-memory selection remains available */ }
     setSavedId(id);
     qc.removeQueries({ queryKey: ["work"] });

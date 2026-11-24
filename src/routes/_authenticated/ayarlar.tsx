@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Save, UserPlus, LogOut, Fingerprint, LockKeyhole, Award, Link2, Loader2, Plus, X, ShieldCheck, CheckCircle2, ArchiveRestore } from "lucide-react";
+import { Save, UserPlus, LogOut, Fingerprint, LockKeyhole, Award, Link2, Loader2, Plus, X, ShieldCheck, CheckCircle2, ArchiveRestore, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -533,9 +533,32 @@ function BusinessProfilesSettings() {
     } catch (error) { toast.error(error instanceof Error ? error.message : "Profil güncellenemedi."); return false; }
     finally { setSaving(false); }
   }
+  async function setDefaultProfile(id: string) {
+    setSaving(true);
+    try {
+      const { data, error } = await supabase.rpc("set_default_business_profile", { _profile_id: id });
+      if (error) throw error;
+      if (data) profileState.switchProfile(data, false);
+      await qc.invalidateQueries({ queryKey: ["business-profiles", me.data?.id] });
+      toast.success("Varsayılan giriş profili değiştirildi.");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Varsayılan profil değiştirilemedi."); }
+    finally { setSaving(false); }
+  }
+  async function removeProfile(profile: typeof profileState.profiles[number]) {
+    if (!window.confirm(`“${profile.name}” profili etkin listeden kaldırılacak. Geçmiş iş, yevmiye ve cari kayıtları korunacak. Devam edilsin mi?`)) return;
+    setSaving(true);
+    try {
+      const { data, error } = await supabase.rpc("archive_business_profile", { _profile_id: profile.id });
+      if (error) throw error;
+      if (profileState.activeProfileId === profile.id && data) profileState.switchProfile(data, false);
+      await qc.invalidateQueries({ queryKey: ["business-profiles", me.data?.id] });
+      toast.success("Profil etkin listeden kaldırıldı; geçmiş kayıtlar korundu.");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Profil kaldırılamadı."); }
+    finally { setSaving(false); }
+  }
   const activeCount = profileState.profiles.filter((profile) => !profile.is_archived).length;
   return <section className="space-y-3 rounded-2xl border bg-card p-4">
-    <div><h2 className="font-semibold">Usta / işletme profilleri</h2><p className="mt-1 text-xs leading-relaxed text-muted-foreground">Her profilin işleri, randevuları, yevmiyesi, gideri ve cari hareketleri ayrı kapsamda tutulur. Müşteri ve hesap erişim yetkileri değişmez. Eski kayıtlar mevcut varsayılan profile bağlı kalır.</p></div>
+    <div><h2 className="font-semibold">Usta / işletme profilleri</h2><p className="mt-1 text-xs leading-relaxed text-muted-foreground">Her profilin işleri, randevuları, yevmiyesi, gideri ve cari hareketleri ayrı kapsamda tutulur. Varsayılan giriş profilini değiştirebilir, profili etkin listeden kaldırabilirsiniz. Kaldırılan profilin geçmiş kayıtları korunur.</p></div>
     {!profileBackendReady && !profileState.loading && <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-100" role="status">Profil tablosu henüz erişilebilir değil. Uygulama eski kayıt görünümünde çalışıyor; 0016 migration uygulanıp erişim sağlandığında profil yönetimi açılacak.</p>}
     <form onSubmit={(event) => void createProfile(event)} className="grid gap-2 sm:grid-cols-2">
       <Input aria-label="Yeni profil adı" value={name} maxLength={100} required placeholder="Örn. Ahmet Usta" onChange={(event) => setName(event.target.value)}/>
@@ -548,9 +571,10 @@ function BusinessProfilesSettings() {
     {profileState.loading ? <p className="text-sm text-muted-foreground">Profiller yükleniyor…</p> : <ul className="space-y-2">{profileState.profiles.map((profile) => { const nextName = renames[profile.id]?.trim() ?? ""; const initial = { phone: profile.phone ?? "", currency: profile.currency, hourlyRate: profile.default_hourly_rate == null ? "" : String(profile.default_hourly_rate) }; const draft = details[profile.id] ?? initial; const detailsChanged = draft.phone !== initial.phone || draft.currency !== initial.currency || draft.hourlyRate !== initial.hourlyRate; return <li key={profile.id} className="grid gap-2 rounded-xl border p-2.5 sm:grid-cols-[minmax(0,1fr)_auto]">
       <div className="flex flex-wrap items-center gap-2">
       <Input aria-label={`${profile.name} profil adı`} className="min-w-40 flex-1" maxLength={100} value={renames[profile.id] ?? profile.name} onChange={(event) => setRenames((current) => ({ ...current, [profile.id]: event.target.value }))}/>
-      <span className="text-[10px] text-muted-foreground">{profile.is_default ? "Varsayılan" : profile.is_archived ? "Arşivli · geçmiş kayıtlar" : `${activeCount} etkin profil`}</span>
+      <span className="text-[10px] text-muted-foreground">{profile.is_default ? "Varsayılan giriş profili" : profile.is_archived ? "Arşivli · geçmiş kayıtlar korunuyor" : "Etkin profil"}</span>
       {renames[profile.id] !== undefined && nextName !== profile.name && <Button type="button" size="sm" variant="secondary" disabled={saving || !nextName} onClick={() => { if (!nextName) return; void updateProfile(profile.id, { name: nextName }).then((saved) => { if (saved) setRenames((current) => { const next = { ...current }; delete next[profile.id]; return next; }); }); }}><Save className="size-4"/>Adı kaydet</Button>}
-      {!profile.is_default && <Button type="button" size="sm" variant="outline" disabled={saving} onClick={() => void updateProfile(profile.id, { is_archived: !profile.is_archived })}><ArchiveRestore className="size-4"/>{profile.is_archived ? "Etkinleştir" : "Arşivle"}</Button>}
+      {!profile.is_archived && !profile.is_default && <Button type="button" size="sm" variant="secondary" disabled={saving} onClick={() => void setDefaultProfile(profile.id)}><Star className="size-4"/>Varsayılan yap</Button>}
+      {profile.is_archived ? <Button type="button" size="sm" variant="outline" disabled={saving} onClick={() => void updateProfile(profile.id, { is_archived: false })}><ArchiveRestore className="size-4"/>Etkinleştir</Button> : <Button type="button" size="sm" variant="outline" disabled={saving || (profile.is_default && activeCount <= 1)} title={profile.is_default && activeCount <= 1 ? "Önce yeni bir profil oluşturun." : ""} onClick={() => void removeProfile(profile)}><Trash2 className="size-4"/>Profili kaldır</Button>}
       </div>
       {!profile.is_archived && <div className="grid gap-2 sm:col-span-2 sm:grid-cols-[1fr_1fr_1fr_auto]"><Input aria-label={`${profile.name} telefon`} maxLength={40} value={draft.phone} placeholder="Telefon" onChange={(event) => setDetails((current) => ({ ...current, [profile.id]: { ...draft, phone: event.target.value } }))}/><select aria-label={`${profile.name} varsayılan para birimi`} value={draft.currency} onChange={(event) => setDetails((current) => ({ ...current, [profile.id]: { ...draft, currency: event.target.value } }))} className="h-11 rounded-xl border bg-background px-3 text-sm"><option value="TRY">TRY</option><option value="USD">USD</option><option value="EUR">EUR</option><option value="GBP">GBP</option></select><Input aria-label={`${profile.name} varsayılan saat ücreti`} type="number" min="0" step="0.01" value={draft.hourlyRate} placeholder="Varsayılan saat ücreti" onChange={(event) => setDetails((current) => ({ ...current, [profile.id]: { ...draft, hourlyRate: event.target.value } }))}/><Button type="button" size="sm" variant="secondary" disabled={saving || !detailsChanged} onClick={() => void updateProfile(profile.id, { phone: draft.phone.trim() || null, currency: draft.currency, default_hourly_rate: draft.hourlyRate ? Number(draft.hourlyRate) : null }).then((saved) => { if (saved) setDetails((current) => { const next = { ...current }; delete next[profile.id]; return next; }); })}><Save className="size-4"/>Detayları kaydet</Button></div>}
     </li>; })}</ul>}

@@ -101,6 +101,14 @@ try {
     if (Number(unassignedProfiles) > 0) {
       await applyMigration(tx, "0017_backfill_business_profile_defaults.sql", "0017_backfill_business_profile_defaults");
     }
+
+    const [{ profileLifecycleReady }] = await tx`
+      SELECT to_regprocedure('public.set_default_business_profile(uuid)') IS NOT NULL
+        AND to_regprocedure('public.archive_business_profile(uuid)') IS NOT NULL AS "profileLifecycleReady"
+    `;
+    if (!profileLifecycleReady) {
+      await applyMigration(tx, "0018_manage_default_business_profiles.sql", "0018_manage_default_business_profiles");
+    }
   });
 
   const requiredTables = ["debt_records", "debt_installments", "debt_payments", "credit_card_records", "business_profiles", "business_profile_audit"];
