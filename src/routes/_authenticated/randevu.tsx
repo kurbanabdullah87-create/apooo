@@ -106,12 +106,12 @@ function Appointments() {
       const endsAt = new Date(startsAt.getTime() + Math.max(15, Number(row.payload.duration_minutes ?? 60)) * 60_000);
       const utc = (date: Date) => date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
       const alarmMinutes = Math.max(0, Math.min(10080, Number(row.payload.remind ?? 30)));
-      return ["BEGIN:VEVENT", `UID:${row.id}@yevmiye-finans.app`, `DTSTAMP:${utc(new Date())}`, `DTSTART:${utc(startsAt)}`, `DTEND:${utc(endsAt)}`, `SUMMARY:${icalEscape(`${String(row.payload.name ?? "Müşteri")} · ${String(row.payload.title ?? "Randevu")}`)}`, `DESCRIPTION:${icalEscape(row.payload.notes)}`, `LOCATION:${icalEscape(row.payload.address)}`, ...(alarmMinutes ? ["BEGIN:VALARM", `TRIGGER:-PT${alarmMinutes}M`, "ACTION:DISPLAY", `DESCRIPTION:${icalEscape("Yevmiye ve Finans randevusu")}`, "END:VALARM"] : []), "END:VEVENT"].join("\r\n");
+      return ["BEGIN:VEVENT", `UID:${row.id}@yevmiye-finans.app`, `DTSTAMP:${utc(new Date())}`, `DTSTART:${utc(startsAt)}`, `DTEND:${utc(endsAt)}`, `SUMMARY:${icalEscape(`${String(row.payload.name ?? "Müşteri")} · ${String(row.payload.title ?? "Randevu")}`)}`, `DESCRIPTION:${icalEscape(row.payload.notes)}`, `LOCATION:${icalEscape(row.payload.address)}`, ...(alarmMinutes ? ["BEGIN:VALARM", `TRIGGER:-PT${alarmMinutes}M`, "ACTION:DISPLAY", `DESCRIPTION:${icalEscape("Yevmiye & Finans randevusu")}`, "END:VALARM"] : []), "END:VEVENT"].join("\r\n");
     }).filter(Boolean);
     if (!events.length) { toast.error("Takvim dosyasına aktarılabilecek tarih ve saatli randevu yok."); return; }
-    const content = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Yevmiye ve Finans//Randevular//TR", "CALSCALE:GREGORIAN", ...events, "END:VCALENDAR"].join("\r\n");
+    const content = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Yevmiye & Finans//Randevular//TR", "CALSCALE:GREGORIAN", ...events, "END:VCALENDAR"].join("\r\n");
     const url = URL.createObjectURL(new Blob([content], { type: "text/calendar;charset=utf-8" }));
-    const link = document.createElement("a"); link.href = url; link.download = `yevmiye-ve-finans-randevular-${todayISO()}.ics`; link.click();
+    const link = document.createElement("a"); link.href = url; link.download = `yevmiye-finans-randevular-${todayISO()}.ics`; link.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast.success(`${events.length} randevu takvim dosyası olarak indirildi. Google veya Apple Takvim'e içe aktarabilirsin.`);
   }

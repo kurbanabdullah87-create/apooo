@@ -241,7 +241,7 @@ function Jobs() {
       if (job.payload["estimated_profit_margin"] != null) field("Tahmini kâr marjı", `%${Number(job.payload["estimated_profit_margin"]).toFixed(1)}`);
       doc.setFont("DejaVu", "normal"); doc.setFontSize(7.5); doc.setTextColor(115, 126, 141);
       doc.text(isQuote ? "Bu belge fiyat teklifidir; iş onayı veya fatura yerine geçmez." : "Bu rapor uygulamadaki iş kaydına dayanır; fatura veya resmi belge yerine geçmez.", margin, 282, { maxWidth: 175 });
-      const filename = `${isQuote ? "yevmiye-ve-finans-fiyat-teklifi" : "yevmiye-ve-finans-is-raporu"}-${String(job.payload.date ?? todayISO())}.pdf`;
+      const filename = `${isQuote ? "yevmiye-finans-fiyat-teklifi" : "yevmiye-finans-is-raporu"}-${String(job.payload.date ?? todayISO())}.pdf`;
       const blob = doc.output("blob");
       if (share && typeof File !== "undefined") {
         const file = new File([blob], filename, { type: "application/pdf" });

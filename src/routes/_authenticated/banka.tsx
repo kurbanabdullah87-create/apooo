@@ -599,7 +599,7 @@ function Bank() {
         doc.setPage(page);
         drawFooter(page, pages);
       }
-      doc.save(`yevmiye-ve-finans-hesap-ozeti-${month === "all" ? "tum-zamanlar" : month}.pdf`);
+      doc.save(`yevmiye-finans-hesap-ozeti-${month === "all" ? "tum-zamanlar" : month}.pdf`);
       toast.success("PDF bu cihazda oluşturuldu ve indirildi; sunucuya kaydedilmedi.");
     } catch {
       toast.error("PDF raporu oluşturulamadı");
@@ -625,7 +625,7 @@ function Bank() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `yevmiye-ve-finans-muhasebe-aktarimi-${month === "all" ? "tum-zamanlar" : month}.csv`;
+    link.download = `yevmiye-finans-muhasebe-aktarimi-${month === "all" ? "tum-zamanlar" : month}.csv`;
     link.click();
     URL.revokeObjectURL(url);
     toast.success(`${rows.length} hareket muhasebe CSV dosyası olarak indirildi.`);
@@ -732,7 +732,7 @@ function Bank() {
       doc.setFontSize(6.5);
       doc.setTextColor(...muted);
       doc.text("Bu belge, bu cihazdaki şifreli kasada bulunan hareket bilgilerini özetler.", margin, 202);
-      const filename = `yevmiye-ve-finans-hareket-${row.date.replace(/[^0-9-]/g, "-")}-${row.id.slice(0, 8)}.pdf`;
+      const filename = `yevmiye-finans-hareket-${row.date.replace(/[^0-9-]/g, "-")}-${row.id.slice(0, 8)}.pdf`;
       doc.save(filename);
       toast.success("YEVMİYE VE FİNANS hareket belgesi bu cihazda oluşturuldu; sunucuya kaydedilmedi.");
     } catch {
@@ -802,7 +802,7 @@ function Bank() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `yevmiye-ve-finans-banka-kasa-yedegi-${todayISO()}.json`;
+      link.download = `yevmiye-finans-banka-kasa-yedegi-${todayISO()}.json`;
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
       toast.success("Şifreli kasa yedeği indirildi. Açma parolası yedek dosyasına eklenmedi.");

@@ -36,7 +36,7 @@ function Settings() {
   const create = useCreateServerFn();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [form, setForm] = useState<Payload>({ business: "Yevmiye ve Finans", target: 0 });
+  const [form, setForm] = useState<Payload>({ business: "Yevmiye & Finans", target: 0 });
   const [pin, setPin] = useState("");
   const [team, setTeam] = useState({ username: "", password: "", name: "" });
   const [busy, setBusy] = useState(false);

@@ -79,7 +79,7 @@ function Attendance() {
       elapsedLabel(shiftDuration(row, now)), row.payload.clock_in_lat ?? "", row.payload.clock_in_lng ?? "", row.payload.clock_out_lat ?? "", row.payload.clock_out_lng ?? "",
     ])].map((line) => line.map(quote).join(",")).join("\r\n");
     const url = URL.createObjectURL(new Blob(["\uFEFF", lines], { type: "text/csv;charset=utf-8" }));
-    const anchor = document.createElement("a"); anchor.href = url; anchor.download = `yevmiye-ve-finans-puantaj-${month}.csv`; anchor.click(); URL.revokeObjectURL(url);
+    const anchor = document.createElement("a"); anchor.href = url; anchor.download = `yevmiye-finans-puantaj-${month}.csv`; anchor.click(); URL.revokeObjectURL(url);
   }
 
   const selectedName = members.find((member) => member.id === ownerId)?.username ?? me.data?.profile?.display_name ?? "Çalışan";

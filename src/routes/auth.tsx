@@ -14,11 +14,11 @@ export const Route = createFileRoute("/auth")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Giriş — Yevmiye ve Finans" },
-      { name: "description", content: "Yevmiye ve Finans hesabınıza güvenli şekilde giriş yapın." },
+      { title: "Giriş — Yevmiye & Finans" },
+      { name: "description", content: "Yevmiye & Finans hesabınıza güvenli şekilde giriş yapın." },
       { name: "robots", content: "noindex,nofollow" },
-      { property: "og:title", content: "Giriş — Yevmiye ve Finans" },
-      { property: "og:description", content: "Yevmiye ve Finans hesabınıza güvenli şekilde giriş yapın." },
+      { property: "og:title", content: "Giriş — Yevmiye & Finans" },
+      { property: "og:description", content: "Yevmiye & Finans hesabınıza güvenli şekilde giriş yapın." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -170,11 +170,11 @@ function AuthPage() {
         <aside className="relative hidden flex-col justify-between overflow-hidden px-12 py-10 lg:flex xl:px-20 xl:py-12">
           <div aria-hidden="true" className="absolute inset-8 rounded-[3rem] border border-white/[0.055]" />
           <div className="relative flex items-center gap-3">
-            <img src="/brand-mark.svg" alt="Yevmiye ve Finans uygulama logosu" className="size-12 rounded-2xl shadow-lg shadow-primary/20" />
-            <div><p className="text-lg font-bold tracking-tight">Yevmiye ve Finans</p><p className="text-xs text-muted-foreground">İş · ekip · hesap yönetimi</p></div>
+            <img src="/brand-mark.svg" alt="Yevmiye & Finans uygulama logosu" className="size-12 rounded-2xl shadow-lg shadow-primary/20" />
+            <div><p className="text-lg font-bold tracking-tight">Yevmiye & Finans</p><p className="text-xs text-muted-foreground">İş · ekip · hesap yönetimi</p></div>
           </div>
           <div className="relative max-w-xl py-12">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/[0.08] px-3.5 py-2 text-xs font-semibold text-primary"><span className="size-1.5 rounded-full bg-primary"/>YEVMIYE VE FİNANS · İŞ VE HESAP TAKİBİ</div>
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/[0.08] px-3.5 py-2 text-xs font-semibold text-primary"><span className="size-1.5 rounded-full bg-primary"/>YEVMİYE & FİNANS · İŞ VE HESAP TAKİBİ</div>
             <h2 className="font-display text-5xl font-semibold leading-[1.08] tracking-[-0.045em] xl:text-[4.25rem]">İşin başından,<br/><span className="text-primary">hesabın sonuna.</span></h2>
             <p className="mt-6 max-w-lg text-base leading-7 text-slate-300">İşlerini, müşterilerini ve günlük finansını tek bir sakin çalışma alanında yönet. Günün yoğunluğunda aradığın bilgi hep elinin altında olsun.</p>
             <div className="mt-9 grid max-w-lg grid-cols-2 gap-3">
@@ -189,7 +189,7 @@ function AuthPage() {
         <div className="flex min-h-dvh items-center justify-center px-3 py-5 sm:px-8 sm:py-8 lg:px-10 xl:px-14">
           <section className="auth-card relative w-full max-w-[470px] overflow-hidden rounded-[1.5rem] border p-4 sm:rounded-[2rem] sm:p-9">
             <div className="relative mb-7 flex flex-col items-start gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between lg:hidden">
-            <div className="flex items-center gap-3"><img src="/brand-mark.svg" alt="Yevmiye ve Finans uygulama logosu" className="size-11 rounded-2xl"/><div><p className="text-base font-bold tracking-tight">Yevmiye ve Finans</p><p className="text-xs text-muted-foreground">İş · ekip · hesap yönetimi</p></div></div>
+            <div className="flex items-center gap-3"><img src="/brand-mark.svg" alt="Yevmiye & Finans uygulama logosu" className="size-11 rounded-2xl"/><div><p className="text-base font-bold tracking-tight">Yevmiye & Finans</p><p className="text-xs text-muted-foreground">İş · ekip · hesap yönetimi</p></div></div>
               <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-2.5 py-1.5 text-[10px] font-medium text-emerald-300"><ShieldCheck className="size-3.5"/>Güvenli oturum</span>
             </div>
             <div className="relative mb-8 hidden items-center justify-end lg:flex"><span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-2.5 py-1.5 text-[10px] font-medium text-emerald-300"><ShieldCheck className="size-3.5"/>Güvenli oturum</span></div>

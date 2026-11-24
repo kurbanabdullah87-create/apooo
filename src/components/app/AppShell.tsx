@@ -124,7 +124,7 @@ export function AppShell() {
 
   useEffect(() => {
     const pageName: Record<string, string> = { "/panel": "Panel", "/isler": "İşler", "/cari": "Cari", "/yevmiye": "Yevmiye", "/ekipman": "Ekipman", "/doviz": "Döviz", "/randevu": "Randevular", "/banka": "Banka" };
-    const base = `${pageName[path] ?? "Yevmiye ve Finans"} — Yevmiye ve Finans`;
+    const base = `${pageName[path] ?? "Yevmiye & Finans"} — Yevmiye & Finans`;
     if (!activeJob) { document.title = base; return; }
     const tick = () => {
       const seconds = Math.max(0, Math.floor((Date.now() - Date.parse(String(activeJob.payload.started_at))) / 1000));
@@ -198,7 +198,7 @@ export function AppShell() {
       <aside className="glass-sidebar fixed inset-y-4 left-4 z-40 hidden w-60 flex-col rounded-[1.8rem] p-3 lg:flex" aria-label="Ana gezinme">
         <Link to="/panel" className="flex items-center gap-3 rounded-2xl px-3 py-3 transition hover:bg-white/[0.06]">
           <img src="/brand-mark.svg" alt="" className="size-10 rounded-2xl shadow-lg shadow-primary/20" />
-          <span className="min-w-0"><span className="block text-sm font-bold leading-tight tracking-tight">Yevmiye ve Finans</span><span className="block text-[11px] text-muted-foreground">İş · ekip · hesap yönetimi</span></span>
+          <span className="min-w-0"><span className="block text-sm font-bold leading-tight tracking-tight">Yevmiye & Finans</span><span className="block text-[11px] text-muted-foreground">İş · ekip · hesap yönetimi</span></span>
         </Link>
         <div className="mx-3 my-3 h-px bg-white/10" />
         <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/75">Çalışma alanı</p>

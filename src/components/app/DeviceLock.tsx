@@ -61,7 +61,7 @@ export function DeviceLock({ user }: { user: string }) {
         }}
       >
         <LockKeyhole className="mx-auto size-10 text-primary" />
-        <h2 className="text-2xl font-bold">Yevmiye ve Finans kilitli</h2>
+        <h2 className="text-2xl font-bold">Yevmiye & Finans kilitli</h2>
         <Input
           aria-label="Kilit PIN kodu"
           type="password"

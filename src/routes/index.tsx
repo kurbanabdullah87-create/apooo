@@ -8,6 +8,6 @@ export const Route = createFileRoute("/")({
     const { data } = await supabase.auth.getUser();
     throw redirect({ to: data.user ? "/panel" : "/auth" });
   },
-  head: () => ({ meta: [{ title: "Yevmiye ve Finans" }] }),
+  head: () => ({ meta: [{ title: "Yevmiye & Finans" }] }),
   component: () => null,
 });

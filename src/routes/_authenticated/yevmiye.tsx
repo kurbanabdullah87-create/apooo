@@ -215,7 +215,7 @@ function Payroll() {
       for (let page = 1; page <= pageCount; page++) { doc.setPage(page); const pageHeight = doc.internal.pageSize.getHeight();
         doc.setDrawColor(222, 228, 236); doc.line(margin, pageHeight - 14, 195, pageHeight - 14); doc.setFont("DejaVu", "normal"); doc.setFontSize(8); doc.setTextColor(115, 126, 141);
         doc.text("Bu rapor uygulamadaki kayıtlara dayanır; resmi bordro belgesi değildir.", margin, pageHeight - 8); doc.text(`${page} / ${pageCount}`, 195, pageHeight - 8, { align: "right" }); }
-      doc.save(`yevmiye-ve-finans-yevmiye-${month}.pdf`); toast.success("Aylık yevmiye PDF'i hazır.");
+      doc.save(`yevmiye-finans-yevmiye-${month}.pdf`); toast.success("Aylık yevmiye PDF'i hazır.");
     } catch (error) { console.error(error); toast.error("PDF oluşturulamadı. Yeniden deneyin."); }
   }
 

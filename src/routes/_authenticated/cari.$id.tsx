@@ -51,7 +51,7 @@ function CustomerDetail() {
     try {
       setFile(
         await buildReceipt({
-          business: String(settings.data?.[0]?.payload.business ?? "Yevmiye ve Finans"),
+          business: String(settings.data?.[0]?.payload.business ?? "Yevmiye & Finans"),
           profile: settings.data?.[0]?.payload,
           customer: c,
           tx,

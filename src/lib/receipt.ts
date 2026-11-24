@@ -56,7 +56,7 @@ export async function buildReceipt(opts: {
 }) {
   const { customer, tx, balance } = opts;
   const prof = opts.profile ?? {};
-  const business = String(prof.business ?? opts.business ?? "Yevmiye ve Finans");
+  const business = String(prof.business ?? opts.business ?? "Yevmiye & Finans");
   const { jsPDF } = await import("jspdf");
   if (!fontCache) {
     const [regular, bold] = await Promise.all([toBase64("/fonts/DejaVuSans.ttf"), toBase64("/fonts/DejaVuSans-Bold.ttf")]);

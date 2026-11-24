@@ -23,8 +23,8 @@ export async function registerBiometric(user: string) {
   const credential = (await navigator.credentials.create({
     publicKey: {
       challenge: crypto.getRandomValues(new Uint8Array(32)),
-      rp: { name: "Yevmiye ve Finans", id: location.hostname },
-      user: { id: encoder.encode(user), name: user, displayName: "Yevmiye ve Finans" },
+      rp: { name: "Yevmiye & Finans", id: location.hostname },
+      user: { id: encoder.encode(user), name: user, displayName: "Yevmiye & Finans" },
       pubKeyCredParams: [
         { type: "public-key", alg: -7 },
         { type: "public-key", alg: -257 },

@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "Yevmiye ve Finans",
-  "short_name": "Yevmiye ve Finans",
+  "name": "Yevmiye & Finans",
+  "short_name": "Yevmiye & Finans",
   "description": "İşleri, ekipleri, yevmiyeleri ve günlük finansı tek uygulamada yönetin.",
   "start_url": "/auth",
   "scope": "/",
