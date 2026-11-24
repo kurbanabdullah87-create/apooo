@@ -214,7 +214,7 @@ function Jobs() {
       const margin = 18;
       let y = 22;
       doc.setFillColor(15, 31, 54); doc.rect(0, 0, 210, 42, "F");
-      doc.setFont("DejaVu", "bold"); doc.setFontSize(19); doc.setTextColor(255, 255, 255); doc.text(isQuote ? "SAHA · FİYAT TEKLİFİ" : "SAHA · İŞ RAPORU", margin, y);
+      doc.setFont("DejaVu", "bold"); doc.setFontSize(19); doc.setTextColor(255, 255, 255); doc.text(isQuote ? "YEVMİYE VE FİNANS · FİYAT TEKLİFİ" : "YEVMİYE VE FİNANS · İŞ RAPORU", margin, y);
       y += 10; doc.setFont("DejaVu", "normal"); doc.setFontSize(9); doc.setTextColor(205, 219, 235); doc.text(`Rapor tarihi: ${new Date().toLocaleString("tr-TR")}`, margin, y);
       y = 56;
       const section = (title: string) => { doc.setFont("DejaVu", "bold"); doc.setFontSize(11); doc.setTextColor(15, 31, 54); doc.text(title, margin, y); y += 3; doc.setDrawColor(220, 227, 236); doc.line(margin, y, 192, y); y += 8; };
@@ -241,12 +241,12 @@ function Jobs() {
       if (job.payload["estimated_profit_margin"] != null) field("Tahmini kâr marjı", `%${Number(job.payload["estimated_profit_margin"]).toFixed(1)}`);
       doc.setFont("DejaVu", "normal"); doc.setFontSize(7.5); doc.setTextColor(115, 126, 141);
       doc.text(isQuote ? "Bu belge fiyat teklifidir; iş onayı veya fatura yerine geçmez." : "Bu rapor uygulamadaki iş kaydına dayanır; fatura veya resmi belge yerine geçmez.", margin, 282, { maxWidth: 175 });
-      const filename = `${isQuote ? "saha-fiyat-teklifi" : "saha-is-raporu"}-${String(job.payload.date ?? todayISO())}.pdf`;
+      const filename = `${isQuote ? "yevmiye-ve-finans-fiyat-teklifi" : "yevmiye-ve-finans-is-raporu"}-${String(job.payload.date ?? todayISO())}.pdf`;
       const blob = doc.output("blob");
       if (share && typeof File !== "undefined") {
         const file = new File([blob], filename, { type: "application/pdf" });
         if (navigator.canShare?.({ files: [file] }) && navigator.share) {
-          await navigator.share({ title: `İş raporu · ${String(job.payload.title ?? "Saha")}`, files: [file] });
+          await navigator.share({ title: `İş raporu · ${String(job.payload.title ?? "İş kaydı")}`, files: [file] });
           toast.success("İş raporu paylaşım ekranında açıldı.");
           return;
         }

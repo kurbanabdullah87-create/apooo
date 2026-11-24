@@ -171,7 +171,7 @@ function Payroll() {
       const margin = 15; let y = 18;
       const header = () => {
         doc.setFillColor(15, 31, 54); doc.rect(0, 0, 210, 45, "F");
-        doc.setTextColor(255, 255, 255); doc.setFont("DejaVu", "bold"); doc.setFontSize(20); doc.text("SAHA · YEVMIYE RAPORU", margin, 20);
+        doc.setTextColor(255, 255, 255); doc.setFont("DejaVu", "bold"); doc.setFontSize(20); doc.text("YEVMİYE VE FİNANS · YEVMIYE RAPORU", margin, 20);
         const employeeName = members.find((m) => m.id === ownerId)?.username ?? "Çalışan";
         doc.setFont("DejaVu", "normal"); doc.setFontSize(8.5); doc.text(`${monthTitle(month)}  ·  Çalışan: ${employeeName}`, margin, 29);
         doc.text(`Usta / işveren: ${selectedMasterName}`, margin, 35);
@@ -215,7 +215,7 @@ function Payroll() {
       for (let page = 1; page <= pageCount; page++) { doc.setPage(page); const pageHeight = doc.internal.pageSize.getHeight();
         doc.setDrawColor(222, 228, 236); doc.line(margin, pageHeight - 14, 195, pageHeight - 14); doc.setFont("DejaVu", "normal"); doc.setFontSize(8); doc.setTextColor(115, 126, 141);
         doc.text("Bu rapor uygulamadaki kayıtlara dayanır; resmi bordro belgesi değildir.", margin, pageHeight - 8); doc.text(`${page} / ${pageCount}`, 195, pageHeight - 8, { align: "right" }); }
-      doc.save(`saha-yevmiye-${month}.pdf`); toast.success("Aylık yevmiye PDF'i hazır.");
+      doc.save(`yevmiye-ve-finans-yevmiye-${month}.pdf`); toast.success("Aylık yevmiye PDF'i hazır.");
     } catch (error) { console.error(error); toast.error("PDF oluşturulamadı. Yeniden deneyin."); }
   }
 
@@ -228,7 +228,7 @@ function Payroll() {
     <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-5 text-white shadow-lg sm:p-7">
       <div className="absolute -right-10 -top-16 size-56 rounded-full bg-emerald-400/10 blur-3xl" />
       <div className="relative flex flex-wrap items-start justify-between gap-4">
-        <div><p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[.2em] text-emerald-300"><TrendingUp className="size-4"/>SAHA · ÇALIŞMA TAKİBİ</p><h1 className="mt-2 text-2xl font-bold sm:text-3xl">Yevmiye ve bordro</h1><p className="mt-1 max-w-lg text-sm text-slate-300">İşyeri ücretlerini, günlük çalışmalarını, mesaileri ve ödemeleri tek yerden yönetin.</p></div>
+        <div><p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[.2em] text-emerald-300"><TrendingUp className="size-4"/>YEVMİYE VE FİNANS · ÇALIŞMA TAKİBİ</p><h1 className="mt-2 text-2xl font-bold sm:text-3xl">Yevmiye ve bordro</h1><p className="mt-1 max-w-lg text-sm text-slate-300">İşyeri ücretlerini, günlük çalışmalarını, mesaileri ve ödemeleri tek yerden yönetin.</p></div>
         <div className="flex flex-wrap gap-2">{me.data?.isUsta && <Button asChild variant="outline" className="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"><Link to="/puantaj"><UserCheck/>Puantaj</Link></Button>}{me.data?.isUsta && <Button className="bg-white text-slate-950 hover:bg-slate-100" onClick={() => openEntry("payroll")}><Plus/>Çalışma ekle</Button>}</div>
       </div>
       {me.data?.isUsta && <div className="relative mt-5 grid max-w-2xl gap-3 sm:grid-cols-2">

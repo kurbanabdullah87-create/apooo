@@ -14,11 +14,11 @@ export const Route = createFileRoute("/auth")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Giriş — İşvera" },
-      { name: "description", content: "İşvera hesabına güvenli şekilde giriş yap." },
+      { title: "Giriş — Yevmiye ve Finans" },
+      { name: "description", content: "Yevmiye ve Finans hesabınıza güvenli şekilde giriş yapın." },
       { name: "robots", content: "noindex,nofollow" },
-      { property: "og:title", content: "Giriş — İşvera" },
-      { property: "og:description", content: "Saha hesabına güvenli şekilde giriş yap." },
+      { property: "og:title", content: "Giriş — Yevmiye ve Finans" },
+      { property: "og:description", content: "Yevmiye ve Finans hesabınıza güvenli şekilde giriş yapın." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -170,18 +170,18 @@ function AuthPage() {
         <aside className="relative hidden flex-col justify-between overflow-hidden px-12 py-10 lg:flex xl:px-20 xl:py-12">
           <div aria-hidden="true" className="absolute inset-8 rounded-[3rem] border border-white/[0.055]" />
           <div className="relative flex items-center gap-3">
-            <img src="/brand-mark.svg" alt="İşvera iş yönetimi logosu" className="size-12 rounded-2xl shadow-lg shadow-primary/20" />
-            <div><p className="text-xl font-bold tracking-tight">İşvera</p><p className="text-xs text-muted-foreground">İş · ekip · finans yönetimi</p></div>
+            <img src="/brand-mark.svg" alt="Yevmiye ve Finans uygulama logosu" className="size-12 rounded-2xl shadow-lg shadow-primary/20" />
+            <div><p className="text-lg font-bold tracking-tight">Yevmiye ve Finans</p><p className="text-xs text-muted-foreground">İş · ekip · hesap yönetimi</p></div>
           </div>
           <div className="relative max-w-xl py-12">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/[0.08] px-3.5 py-2 text-xs font-semibold text-primary"><span className="size-1.5 rounded-full bg-primary"/>SAHA · OPERASYON VE FİNANS</div>
-            <h2 className="font-display text-5xl font-semibold leading-[1.08] tracking-[-0.045em] xl:text-[4.25rem]">İşin sahada.<br/><span className="text-primary">Düzenin yanında.</span></h2>
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/[0.08] px-3.5 py-2 text-xs font-semibold text-primary"><span className="size-1.5 rounded-full bg-primary"/>YEVMIYE VE FİNANS · İŞ VE HESAP TAKİBİ</div>
+            <h2 className="font-display text-5xl font-semibold leading-[1.08] tracking-[-0.045em] xl:text-[4.25rem]">İşin başından,<br/><span className="text-primary">hesabın sonuna.</span></h2>
             <p className="mt-6 max-w-lg text-base leading-7 text-slate-300">İşlerini, müşterilerini ve günlük finansını tek bir sakin çalışma alanında yönet. Günün yoğunluğunda aradığın bilgi hep elinin altında olsun.</p>
             <div className="mt-9 grid max-w-lg grid-cols-2 gap-3">
               <div className="auth-feature-card rounded-2xl border border-white/[0.09] p-4"><div className="flex size-10 items-center justify-center rounded-xl border border-primary/15 bg-primary/10 text-primary"><UsersRound className="size-4.5"/></div><p className="mt-4 text-sm font-semibold">Müşteri ve işler</p><p className="mt-1 text-xs leading-5 text-slate-400">Cari hareketler, iş geçmişi ve saha takibi</p></div>
               <div className="auth-feature-card rounded-2xl border border-white/[0.09] p-4"><div className="flex size-10 items-center justify-center rounded-xl border border-amber-300/15 bg-amber-300/10 text-amber-200"><BarChart3 className="size-4.5"/></div><p className="mt-4 text-sm font-semibold">Finans ve raporlar</p><p className="mt-1 text-xs leading-5 text-slate-400">Tahsilat, gider, yevmiye ve dönem özeti</p></div>
             </div>
-            <div className="mt-5 flex max-w-lg items-center gap-3 rounded-2xl border border-white/[0.08] bg-black/20 px-4 py-3"><div className="flex -space-x-2"><span className="flex size-8 items-center justify-center rounded-full border-2 border-[#101419] bg-primary/15 text-primary"><CalendarDays className="size-3.5"/></span><span className="flex size-8 items-center justify-center rounded-full border-2 border-[#101419] bg-sky-400/15 text-sky-300"><WalletCards className="size-3.5"/></span></div><p className="text-xs leading-5 text-slate-300">Takviminden hesap hareketlerine kadar<br/><strong className="font-semibold text-white">günlük iş akışın tek yerde.</strong></p><span className="ml-auto hidden rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-2.5 py-1 text-[10px] font-medium text-emerald-300 xl:inline-flex">Saha için tasarlandı</span></div>
+            <div className="mt-5 flex max-w-lg items-center gap-3 rounded-2xl border border-white/[0.08] bg-black/20 px-4 py-3"><div className="flex -space-x-2"><span className="flex size-8 items-center justify-center rounded-full border-2 border-[#101419] bg-primary/15 text-primary"><CalendarDays className="size-3.5"/></span><span className="flex size-8 items-center justify-center rounded-full border-2 border-[#101419] bg-sky-400/15 text-sky-300"><WalletCards className="size-3.5"/></span></div><p className="text-xs leading-5 text-slate-300">Takviminden hesap hareketlerine kadar<br/><strong className="font-semibold text-white">günlük iş akışın tek yerde.</strong></p><span className="ml-auto hidden rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-2.5 py-1 text-[10px] font-medium text-emerald-300 xl:inline-flex">İş ve hesap takibi</span></div>
           </div>
           <div className="relative flex items-center gap-2 text-xs text-muted-foreground"><ShieldCheck className="size-4 text-emerald-400"/>Güvenli oturum · Kayıtların hesabına özel</div>
         </aside>
@@ -189,7 +189,7 @@ function AuthPage() {
         <div className="flex min-h-dvh items-center justify-center px-3 py-5 sm:px-8 sm:py-8 lg:px-10 xl:px-14">
           <section className="auth-card relative w-full max-w-[470px] overflow-hidden rounded-[1.5rem] border p-4 sm:rounded-[2rem] sm:p-9">
             <div className="relative mb-7 flex flex-col items-start gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between lg:hidden">
-            <div className="flex items-center gap-3"><img src="/brand-mark.svg" alt="İşvera iş yönetimi logosu" className="size-11 rounded-2xl"/><div><p className="text-lg font-bold tracking-tight">İşvera</p><p className="text-xs text-muted-foreground">İş · ekip · finans yönetimi</p></div></div>
+            <div className="flex items-center gap-3"><img src="/brand-mark.svg" alt="Yevmiye ve Finans uygulama logosu" className="size-11 rounded-2xl"/><div><p className="text-base font-bold tracking-tight">Yevmiye ve Finans</p><p className="text-xs text-muted-foreground">İş · ekip · hesap yönetimi</p></div></div>
               <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-2.5 py-1.5 text-[10px] font-medium text-emerald-300"><ShieldCheck className="size-3.5"/>Güvenli oturum</span>
             </div>
             <div className="relative mb-8 hidden items-center justify-end lg:flex"><span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-2.5 py-1.5 text-[10px] font-medium text-emerald-300"><ShieldCheck className="size-3.5"/>Güvenli oturum</span></div>
@@ -203,7 +203,7 @@ function AuthPage() {
               </div>
             ) : (
               <>
-                <div className="relative mb-7"><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">{resetMode ? "HESAP KURTARMA" : mode === "login" ? "HESABINA GÜVENLE ERİŞ" : "SAHA'YA KATIL"}</p><h1 className="mt-2 font-display text-3xl font-bold tracking-tight sm:text-[2.1rem]">{resetMode ? "Şifreni yenile" : mode === "login" ? "Tekrar hoş geldin" : "Saha'ya katıl"}</h1><p className="mt-2 text-sm leading-6 text-slate-400">{resetMode ? "Kayıtlı e-posta adresine güvenli bir bağlantı göndereceğiz." : mode === "login" ? "Hesabına giriş yap, işlerine kaldığın yerden devam et." : "Hesabını oluştur, işlerini tek yerden yönet."}</p></div>
+                <div className="relative mb-7"><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">{resetMode ? "HESAP KURTARMA" : mode === "login" ? "HESABINA GÜVENLE ERİŞ" : "YENİ HESAP"}</p><h1 className="mt-2 font-display text-3xl font-bold tracking-tight sm:text-[2.1rem]">{resetMode ? "Şifreni yenile" : mode === "login" ? "Tekrar hoş geldin" : "Hesap oluştur"}</h1><p className="mt-2 text-sm leading-6 text-slate-400">{resetMode ? "Kayıtlı e-posta adresine güvenli bir bağlantı göndereceğiz." : mode === "login" ? "Hesabına giriş yap, işlerine kaldığın yerden devam et." : "Hesabını oluştur, işlerini tek yerden yönet."}</p></div>
 
                 {!resetMode && <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                   <Button type="button" variant="outline" className="h-12 w-full min-w-0 rounded-xl border-white/10 bg-white/[0.045] text-[13px] leading-tight transition hover:border-white/20 hover:bg-white/[0.08] sm:text-sm" onClick={() => void continueWith("google")} disabled={busy}><GoogleMark/><span>Google ile devam et</span></Button>

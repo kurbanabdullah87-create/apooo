@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/auth/reset-password")({
   ssr: false,
-  head: () => ({ meta: [{ title: "Şifre yenile — Saha" }] }),
+  head: () => ({ meta: [{ title: "Şifre yenile — Yevmiye ve Finans" }] }),
   component: ResetPassword,
 });
 

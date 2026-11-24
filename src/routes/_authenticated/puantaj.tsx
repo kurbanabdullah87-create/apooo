@@ -79,13 +79,13 @@ function Attendance() {
       elapsedLabel(shiftDuration(row, now)), row.payload.clock_in_lat ?? "", row.payload.clock_in_lng ?? "", row.payload.clock_out_lat ?? "", row.payload.clock_out_lng ?? "",
     ])].map((line) => line.map(quote).join(",")).join("\r\n");
     const url = URL.createObjectURL(new Blob(["\uFEFF", lines], { type: "text/csv;charset=utf-8" }));
-    const anchor = document.createElement("a"); anchor.href = url; anchor.download = `saha-puantaj-${month}.csv`; anchor.click(); URL.revokeObjectURL(url);
+    const anchor = document.createElement("a"); anchor.href = url; anchor.download = `yevmiye-ve-finans-puantaj-${month}.csv`; anchor.click(); URL.revokeObjectURL(url);
   }
 
   const selectedName = members.find((member) => member.id === ownerId)?.username ?? me.data?.profile?.display_name ?? "Çalışan";
   return <div className="mx-auto max-w-4xl space-y-5 pb-8">
     <header className="rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-5 text-white sm:p-7">
-      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[.18em] text-sky-300"><Clock3 className="size-4"/>SAHA · VARDİYA TAKİBİ</p>
+      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[.18em] text-sky-300"><Clock3 className="size-4"/>YEVMİYE VE FİNANS · VARDİYA TAKİBİ</p>
       <h1 className="mt-2 text-2xl font-bold">Puantaj ve çalışma saatleri</h1>
       <p className="mt-1 text-sm text-slate-300">Giriş/çıkış saatlerini ve vardiya süresini kayıt altına alın.</p>
       <div className="mt-5 flex flex-wrap items-center gap-3">

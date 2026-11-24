@@ -166,7 +166,7 @@ function Panel() {
       .slice(0, 6)
       .map((row) => ({
         id: row.id,
-        title: String(row.payload.title ?? "Saha işi"),
+        title: String(row.payload.title ?? "İş kaydı"),
         customer: customers.data?.find((customer) => customer.id === row.payload.customer_id)?.name ?? "Müşteri seçilmemiş",
         status: String(row.payload.status ?? "Planlandı"),
         time: String(row.payload.start_time ?? "").slice(0, 5),
@@ -218,7 +218,7 @@ function Panel() {
 
   return (
     <div className={`dashboard-enter mx-auto max-w-7xl space-y-4 pb-6 sm:space-y-6 sm:pb-8 ${focusMode ? "dashboard-focus" : ""}`}>
-      <section aria-label="Saha karşılama" className="dashboard-welcome relative isolate overflow-hidden rounded-[1.8rem] border border-white/10 px-5 py-5 text-white shadow-[0_25px_70px_-44px_rgba(20,220,190,.6)] sm:px-8 sm:py-7">
+      <section aria-label="Günlük iş özeti" className="dashboard-welcome relative isolate overflow-hidden rounded-[1.8rem] border border-white/10 px-5 py-5 text-white shadow-[0_25px_70px_-44px_rgba(20,220,190,.6)] sm:px-8 sm:py-7">
         <div className="dashboard-welcome-art" aria-hidden="true">
           <span className="welcome-orbit welcome-orbit-one" />
           <span className="welcome-orbit welcome-orbit-two" />
@@ -238,9 +238,9 @@ function Panel() {
           </svg>
         </div>
         <div className="relative z-10 max-w-xl">
-          <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.22em] text-emerald-200"><Sparkles className="size-4"/>Saha kontrol merkezi</p>
+          <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.22em] text-emerald-200"><Sparkles className="size-4"/>İş ve finans merkezi</p>
           <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">Güne hazır mısın?</h2>
-          <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-200">{businessProfile.activeProfile?.name ?? "Ekibin"} için bugünün planı hazır. Saha akışını tek dokunuşla aç.</p>
+          <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-200">{businessProfile.activeProfile?.name ?? "Ekibin"} için bugünün planı hazır. Günlük iş akışını tek dokunuşla aç.</p>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <Link to="/isler" className="welcome-cta inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-bold text-slate-950 shadow-lg shadow-black/20 transition">Bugünün işlerine git<ArrowRight className="size-4"/></Link>
             <span className="flex items-center gap-2 text-xs font-medium text-white/80"><CalendarDays className="size-4 text-emerald-200"/>{data.todayJobCount ? `${data.todayJobCount} iş bugün planlı` : "Bugün için planlı iş yok"}</span>
@@ -287,7 +287,7 @@ function Panel() {
       {nearby && <section className="rounded-2xl border-2 border-emerald-500/50 bg-emerald-500/10 p-4"><div className="flex items-start gap-3"><MapPin className="mt-0.5 size-5 shrink-0 text-emerald-700 dark:text-emerald-300"/><div className="min-w-0 flex-1"><p className="font-semibold">Şu an {nearby.customer.name} konumuna yakınsınız</p><p className="text-xs text-muted-foreground">Yaklaşık {Math.round(nearby.meters)} metre · konum yalnızca cihazda karşılaştırılır</p><div className="mt-3 flex flex-wrap gap-2"><Button size="sm" disabled={saveJob.isPending} onClick={() => startNearbyJob(nearby.customer)}><HardHat/>Hızlı iş başlat</Button><Button asChild size="sm" variant="secondary"><Link to="/cari/$id" params={{ id: nearby.customer.id }}><Wallet/>Tahsilat al</Link></Button></div></div></div></section>}
       <MaintenanceAlerts />
       <section className="dashboard-reveal overflow-hidden rounded-3xl border bg-card p-4 shadow-sm sm:p-5">
-        <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Saha akışı</p><h2 className="mt-1 text-lg font-bold">Bugünün işleri</h2><p className="text-xs text-muted-foreground">{todayISO()} · seçili usta profili</p></div><Link to="/isler" className="inline-flex min-h-10 items-center gap-1 rounded-xl px-3 text-xs font-semibold text-primary hover:bg-primary/10">Tüm işler <ArrowUpRight className="size-4"/></Link></div>
+        <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">İş akışı</p><h2 className="mt-1 text-lg font-bold">Bugünün işleri</h2><p className="text-xs text-muted-foreground">{todayISO()} · seçili usta profili</p></div><Link to="/isler" className="inline-flex min-h-10 items-center gap-1 rounded-xl px-3 text-xs font-semibold text-primary hover:bg-primary/10">Tüm işler <ArrowUpRight className="size-4"/></Link></div>
         {data.todayJobs.length ? <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{data.todayJobs.map((job) => <li key={job.id}><Link to="/isler" className="flex h-full min-h-20 items-center gap-3 rounded-2xl border bg-background/55 p-3 transition-colors hover:border-primary/40 hover:bg-primary/[0.04]"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><HardHat className="size-5"/></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{job.title}</span><span className="mt-1 block truncate text-xs text-muted-foreground">{job.customer}{job.time ? ` · ${job.time}` : ""}</span></span><span className="max-w-24 shrink-0 truncate rounded-full bg-secondary px-2 py-1 text-[10px] font-semibold">{job.status}</span></Link></li>)}</ul> : <div className="flex flex-col items-center rounded-2xl border border-dashed bg-background/35 px-4 py-6 text-center"><span className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground"><CalendarDays className="size-5"/></span><p className="mt-2 text-sm font-semibold">Bugün için planlanmış iş yok</p><p className="mt-1 text-xs text-muted-foreground">Randevu veya iş kaydı eklediğinde günlük planın burada görünür.</p><Button asChild variant="secondary" size="sm" className="mt-3"><Link to="/randevu">Takvimi aç</Link></Button></div>}
       </section>
       {txs.isLoading || exps.isLoading || customers.isLoading || jobs.isLoading || payrollEntries.isLoading || payrollPayments.isLoading || payrollAdvances.isLoading ? <div className="space-y-3" aria-label="Panel verileri yükleniyor" aria-busy="true"><div className="rounded-3xl border bg-card p-4"><Skeleton className="h-5 w-40"/><Skeleton className="mt-4 h-24 w-full"/></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-24 rounded-2xl"/>)}</div><div className="rounded-2xl border bg-card p-4"><Skeleton className="h-5 w-32"/><Skeleton className="mt-4 h-48 w-full"/></div></div> : <>

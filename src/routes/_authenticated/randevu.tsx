@@ -106,12 +106,12 @@ function Appointments() {
       const endsAt = new Date(startsAt.getTime() + Math.max(15, Number(row.payload.duration_minutes ?? 60)) * 60_000);
       const utc = (date: Date) => date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
       const alarmMinutes = Math.max(0, Math.min(10080, Number(row.payload.remind ?? 30)));
-      return ["BEGIN:VEVENT", `UID:${row.id}@saha.app`, `DTSTAMP:${utc(new Date())}`, `DTSTART:${utc(startsAt)}`, `DTEND:${utc(endsAt)}`, `SUMMARY:${icalEscape(`${String(row.payload.name ?? "Müşteri")} · ${String(row.payload.title ?? "Randevu")}`)}`, `DESCRIPTION:${icalEscape(row.payload.notes)}`, `LOCATION:${icalEscape(row.payload.address)}`, ...(alarmMinutes ? ["BEGIN:VALARM", `TRIGGER:-PT${alarmMinutes}M`, "ACTION:DISPLAY", `DESCRIPTION:${icalEscape("Saha randevusu")}`, "END:VALARM"] : []), "END:VEVENT"].join("\r\n");
+      return ["BEGIN:VEVENT", `UID:${row.id}@yevmiye-finans.app`, `DTSTAMP:${utc(new Date())}`, `DTSTART:${utc(startsAt)}`, `DTEND:${utc(endsAt)}`, `SUMMARY:${icalEscape(`${String(row.payload.name ?? "Müşteri")} · ${String(row.payload.title ?? "Randevu")}`)}`, `DESCRIPTION:${icalEscape(row.payload.notes)}`, `LOCATION:${icalEscape(row.payload.address)}`, ...(alarmMinutes ? ["BEGIN:VALARM", `TRIGGER:-PT${alarmMinutes}M`, "ACTION:DISPLAY", `DESCRIPTION:${icalEscape("Yevmiye ve Finans randevusu")}`, "END:VALARM"] : []), "END:VEVENT"].join("\r\n");
     }).filter(Boolean);
     if (!events.length) { toast.error("Takvim dosyasına aktarılabilecek tarih ve saatli randevu yok."); return; }
-    const content = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Saha//Randevular//TR", "CALSCALE:GREGORIAN", ...events, "END:VCALENDAR"].join("\r\n");
+    const content = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Yevmiye ve Finans//Randevular//TR", "CALSCALE:GREGORIAN", ...events, "END:VCALENDAR"].join("\r\n");
     const url = URL.createObjectURL(new Blob([content], { type: "text/calendar;charset=utf-8" }));
-    const link = document.createElement("a"); link.href = url; link.download = `saha-randevular-${todayISO()}.ics`; link.click();
+    const link = document.createElement("a"); link.href = url; link.download = `yevmiye-ve-finans-randevular-${todayISO()}.ics`; link.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast.success(`${events.length} randevu takvim dosyası olarak indirildi. Google veya Apple Takvim'e içe aktarabilirsin.`);
   }
@@ -354,7 +354,7 @@ function Appointments() {
       <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-violet-950 p-5 text-white shadow-lg sm:p-7">
         <div className="absolute -right-12 -top-16 size-56 rounded-full bg-violet-400/10 blur-3xl" />
         <div className="relative flex flex-wrap items-start justify-between gap-4">
-          <div><p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[.2em] text-violet-300"><CalendarDays className="size-4"/>SAHA · PLANLAMA</p><h1 className="mt-2 text-2xl font-bold sm:text-3xl">Randevu takvimi</h1><p className="mt-1 text-sm text-slate-300">Gününü planla, müşteriye hatırlat ve randevudan iş kaydı başlat.</p></div>
+          <div><p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[.2em] text-violet-300"><CalendarDays className="size-4"/>YEVMİYE VE FİNANS · PLANLAMA</p><h1 className="mt-2 text-2xl font-bold sm:text-3xl">Randevu takvimi</h1><p className="mt-1 text-sm text-slate-300">Gününü planla, müşteriye hatırlat ve randevudan iş kaydı başlat.</p></div>
           <div className="flex flex-wrap gap-2"><Button variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/20" onClick={exportCalendarFile}><Download/>Takvime aktar</Button><Button className="bg-white text-slate-950 hover:bg-slate-100" onClick={() => setEdit({ payload: empty() })}><Plus/>Yeni randevu</Button></div>
         </div>
         <div className="relative mt-5 grid grid-cols-3 gap-2 sm:gap-3">

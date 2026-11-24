@@ -102,8 +102,8 @@ async function enableBiometricVault(ownerId: string, passphrase: string) {
   const prfSalt = crypto.getRandomValues(new Uint8Array(32));
   const credential = await navigator.credentials.create({ publicKey: {
     challenge: crypto.getRandomValues(new Uint8Array(32)),
-    rp: { name: "Saha Kasa", id: location.hostname },
-    user: { id: crypto.getRandomValues(new Uint8Array(32)), name: `saha-${ownerId}`, displayName: "Saha kişisel kasa" },
+    rp: { name: "Yevmiye ve Finans", id: location.hostname },
+    user: { id: crypto.getRandomValues(new Uint8Array(32)), name: `yevmiye-finans-${ownerId}`, displayName: "Yevmiye ve Finans kişisel kasa" },
     pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
     authenticatorSelection: { authenticatorAttachment: "platform", residentKey: "preferred", userVerification: "required" },
     attestation: "none",
@@ -182,7 +182,7 @@ function parseEncryptedBankBackup(value: unknown): EncryptedVaultBackup {
   const backup = value as Partial<EncryptedVaultBackup>;
   const vault = backup.vault as Partial<EncryptedVault> | undefined;
   if (backup.format !== "saha-encrypted-bank-vault" || backup.version !== 1 || vault?.version !== 1 || typeof vault.salt !== "string" || typeof vault.iv !== "string" || typeof vault.ciphertext !== "string") {
-    throw new Error("Bu dosya desteklenen Saha şifreli kasa yedeği değil.");
+    throw new Error("Bu dosya desteklenen Yevmiye ve Finans şifreli kasa yedeği değil.");
   }
   if (vault.ciphertext.length > 140_000_000 || vault.salt.length > 256 || vault.iv.length > 256) throw new Error("Yedek dosyası izin verilen boyutu aşıyor.");
   return backup as EncryptedVaultBackup;

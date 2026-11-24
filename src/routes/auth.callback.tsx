@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { Check, HardHat, Loader2, ShieldCheck } from "lucide-react";
+import { Check, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { getRememberMe } from "@/integrations/supabase/rememberedAuthStorage";
 
 export const Route = createFileRoute("/auth/callback")({
   ssr: false,
-  head: () => ({ meta: [{ title: "Giriş tamamlanıyor — Saha" }] }),
+  head: () => ({ meta: [{ title: "Giriş tamamlanıyor — Yevmiye ve Finans" }] }),
   component: AuthCallback,
 });
 
@@ -91,7 +91,7 @@ function AuthCallback() {
   if (checking) return <main className="grid min-h-dvh place-items-center p-6"><div className="flex items-center gap-3 text-muted-foreground"><Loader2 className="size-5 animate-spin"/>Giriş güvenli şekilde doğrulanıyor…</div></main>;
 
   return <main className="flex min-h-dvh items-center justify-center bg-background px-4 py-8"><section className="w-full max-w-md rounded-3xl border bg-card p-6 shadow-xl sm:p-8">
-    <div className="mb-7 flex items-center gap-3"><div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground"><HardHat className="size-6"/></div><div><h1 className="text-xl font-bold">Saha hesabını tamamla</h1><p className="text-sm text-muted-foreground">Bir kez adını ve soyadını ekle.</p></div></div>
+    <div className="mb-7 flex items-center gap-3"><img src="/brand-mark.svg" alt="Yevmiye ve Finans" className="size-12 rounded-2xl"/><div><h1 className="text-xl font-bold">Yevmiye ve Finans hesabını tamamla</h1><p className="text-sm text-muted-foreground">Bir kez adını ve soyadını ekle.</p></div></div>
     <p className="mb-5 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-muted-foreground"><ShieldCheck className="size-4 shrink-0 text-emerald-600"/>Giriş sağlayıcısı doğrulandı. Bu bilgiler profilinde gösterilir.</p>
     <form className="space-y-4" onSubmit={(event) => void completeProfile(event)}>
       <div className="space-y-2"><Label htmlFor="oauth-first-name">Ad</Label><Input id="oauth-first-name" autoComplete="given-name" maxLength={80} required value={firstName} onChange={(e) => setFirstName(e.target.value)} className="h-11 rounded-xl"/></div>

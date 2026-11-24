@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "İşvera · İş, Ekip ve Finans Yönetimi",
-  "short_name": "İşvera",
-  "description": "İşlerinizi, müşterilerinizi, ekibinizi ve günlük finansınızı tek yerde yönetin.",
+  "name": "Yevmiye ve Finans",
+  "short_name": "Yevmiye ve Finans",
+  "description": "İşleri, ekipleri, yevmiyeleri ve günlük finansı tek uygulamada yönetin.",
   "start_url": "/auth",
   "scope": "/",
   "display": "standalone",

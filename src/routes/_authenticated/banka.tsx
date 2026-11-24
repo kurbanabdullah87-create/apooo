@@ -136,11 +136,11 @@ function Bank() {
       doc.addFont("DejaVuSans.ttf", "Saha", "normal");
       doc.addFont("DejaVuSans-Bold.ttf", "Saha", "bold");
       doc.setProperties({
-        title: `SAHA hesap özeti — ${monthLabel}`,
+        title: `YEVMİYE VE FİNANS hesap özeti — ${monthLabel}`,
         subject: "Hesap hareketleri ve aylık finans özeti",
-        author: "SAHA",
-        creator: "SAHA",
-        keywords: "hesap hareketi, aylık özet, SAHA",
+        author: "YEVMİYE VE FİNANS",
+        creator: "YEVMİYE VE FİNANS",
+        keywords: "hesap hareketi, aylık özet, YEVMİYE VE FİNANS",
       });
       const pageWidth = 210;
       const pageHeight = 297;
@@ -155,7 +155,7 @@ function Bank() {
         doc.setFont("Saha", "normal");
         doc.setFontSize(7);
         doc.setTextColor(...muted);
-        doc.text("SAHA  ·  Bu cihazdaki şifreli kasadan oluşturuldu", margin, 290);
+        doc.text("YEVMİYE VE FİNANS  ·  Bu cihazdaki şifreli kasadan oluşturuldu", margin, 290);
         doc.text(`Oluşturulma: ${generatedAt}`, pageWidth / 2, 290, { align: "center" });
         doc.text(`${page} / ${totalPages}`, pageWidth - margin, 290, { align: "right" });
       };
@@ -170,9 +170,9 @@ function Bank() {
       doc.setFont("Saha", "bold");
       doc.setFontSize(10);
       doc.setTextColor(255, 255, 255);
-      doc.text("S", margin + 6.5, 21.5, { align: "center" });
+      doc.text("YF", margin + 6.5, 21.5, { align: "center" });
       doc.setFontSize(9);
-      doc.text("SAHA  /  HESAP RAPORU", margin + 18, 18);
+      doc.text("YEVMİYE VE FİNANS  /  HESAP RAPORU", margin + 18, 18);
       doc.setFont("Saha", "normal");
       doc.setFontSize(8);
       doc.setTextColor(203, 213, 225);
@@ -599,7 +599,7 @@ function Bank() {
         doc.setPage(page);
         drawFooter(page, pages);
       }
-      doc.save(`saha-hesap-ozeti-${month === "all" ? "tum-zamanlar" : month}.pdf`);
+      doc.save(`yevmiye-ve-finans-hesap-ozeti-${month === "all" ? "tum-zamanlar" : month}.pdf`);
       toast.success("PDF bu cihazda oluşturuldu ve indirildi; sunucuya kaydedilmedi.");
     } catch {
       toast.error("PDF raporu oluşturulamadı");
@@ -625,7 +625,7 @@ function Bank() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `saha-muhasebe-aktarimi-${month === "all" ? "tum-zamanlar" : month}.csv`;
+    link.download = `yevmiye-ve-finans-muhasebe-aktarimi-${month === "all" ? "tum-zamanlar" : month}.csv`;
     link.click();
     URL.revokeObjectURL(url);
     toast.success(`${rows.length} hareket muhasebe CSV dosyası olarak indirildi.`);
@@ -648,7 +648,7 @@ function Bank() {
       doc.addFileToVFS("DejaVuSans-Bold.ttf", await fontToBase64("/fonts/DejaVuSans-Bold.ttf"));
       doc.addFont("DejaVuSans.ttf", "Saha", "normal");
       doc.addFont("DejaVuSans-Bold.ttf", "Saha", "bold");
-      doc.setProperties({ title: `SAHA hareket özeti — ${row.date}`, author: "SAHA", creator: "SAHA" });
+      doc.setProperties({ title: `YEVMİYE VE FİNANS hareket özeti — ${row.date}`, author: "YEVMİYE VE FİNANS", creator: "YEVMİYE VE FİNANS" });
       const pageWidth = 148;
       const margin = 15;
       const contentWidth = pageWidth - margin * 2;
@@ -667,10 +667,10 @@ function Bank() {
       doc.setFont("Saha", "bold");
       doc.setFontSize(9);
       doc.setTextColor(15, 23, 42);
-      doc.text("S", margin + 5.5, 19.4, { align: "center" });
+      doc.text("YF", margin + 5.5, 19.4, { align: "center" });
       doc.setFontSize(8);
       doc.setTextColor(203, 213, 225);
-      doc.text("SAHA  /  HESAP HAREKETLERİ", margin + 16, 19);
+      doc.text("YEVMİYE VE FİNANS  /  HESAP HAREKETLERİ", margin + 16, 19);
       doc.setFontSize(17);
       doc.setTextColor(255, 255, 255);
       doc.text("Hareket özeti", margin, 37);
@@ -700,7 +700,7 @@ function Bank() {
           doc.setFont("Saha", "bold");
           doc.setFontSize(8);
           doc.setTextColor(255, 255, 255);
-          doc.text("SAHA  /  HAREKET ÖZETİ · DEVAM", margin, 12);
+          doc.text("YEVMİYE VE FİNANS  /  HAREKET ÖZETİ · DEVAM", margin, 12);
           y = 25;
         }
         doc.setFillColor(248, 250, 252);
@@ -727,14 +727,14 @@ function Bank() {
       doc.setFont("Saha", "bold");
       doc.setFontSize(7);
       doc.setTextColor(185, 28, 28);
-      doc.text("SAHA KAYDI  ·  RESMİ BANKA DEKONTU DEĞİLDİR", margin, 197);
+      doc.text("YEVMİYE VE FİNANS KAYDI  ·  RESMİ BANKA DEKONTU DEĞİLDİR", margin, 197);
       doc.setFont("Saha", "normal");
       doc.setFontSize(6.5);
       doc.setTextColor(...muted);
       doc.text("Bu belge, bu cihazdaki şifreli kasada bulunan hareket bilgilerini özetler.", margin, 202);
-      const filename = `saha-hareket-${row.date.replace(/[^0-9-]/g, "-")}-${row.id.slice(0, 8)}.pdf`;
+      const filename = `yevmiye-ve-finans-hareket-${row.date.replace(/[^0-9-]/g, "-")}-${row.id.slice(0, 8)}.pdf`;
       doc.save(filename);
-      toast.success("SAHA hareket belgesi bu cihazda oluşturuldu; sunucuya kaydedilmedi.");
+      toast.success("YEVMİYE VE FİNANS hareket belgesi bu cihazda oluşturuldu; sunucuya kaydedilmedi.");
     } catch {
       toast.error("Hareket belgesi oluşturulamadı veya saklanamadı");
     }
@@ -802,7 +802,7 @@ function Bank() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `saha-banka-kasa-yedegi-${todayISO()}.json`;
+      link.download = `yevmiye-ve-finans-banka-kasa-yedegi-${todayISO()}.json`;
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
       toast.success("Şifreli kasa yedeği indirildi. Açma parolası yedek dosyasına eklenmedi.");
@@ -1108,7 +1108,7 @@ function Bank() {
     <div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/><Input aria-label="Hareketlerde ara" placeholder="Kişi veya açıklamada ara" value={search} onChange={(e) => setSearch(e.target.value)} className="h-11 rounded-xl pl-9"/></div>
     {displayedRows.map((row) => <article key={row.id} className="flex items-start justify-between gap-3 rounded-2xl border bg-card p-4 shadow-sm">
       <div className="flex min-w-0 gap-3"><div className={"mt-0.5 rounded-xl p-2 " + (row.direction === "incoming" ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600")}>{row.direction === "incoming" ? <ArrowDownLeft className="size-4"/> : <ArrowUpRight className="size-4"/>}</div><div className="min-w-0"><p className="truncate font-medium">{row.counterparty || (row.source === "open_banking" ? "Karşı taraf banka verisinde yok" : row.direction === "incoming" ? "Gelen para" : "Çıkan para")}</p><p className="mt-1 text-xs text-muted-foreground">{formatDate(row.date)} · {row.direction === "incoming" ? "Kimden" : "Kime"}{row.status && row.status !== "completed" ? ` · ${row.status}` : ""}{row.source === "open_banking" ? " · Bankadan eşitlendi" : row.source === "email_attachment" ? " · Ekstre dosyasından" : row.source === "email_auto" ? " · Gmail taraması" : ""}</p>{row.description && <p className="mt-2 break-words text-sm text-muted-foreground">{row.description}</p>}{row.reference && <p className="mt-1 truncate font-mono text-[10px] text-muted-foreground">Ref: {row.reference}</p>}</div></div>
-      <div className="flex shrink-0 items-start gap-1"><span className={"num pt-1 text-right text-sm font-semibold " + (row.direction === "incoming" ? "text-emerald-600" : "text-rose-600")}>{row.direction === "incoming" ? "+" : "−"}{formatTL(row.amount)}</span><Button variant="ghost" size="icon" aria-label="Hareket ayrıntılarını aç" title="Hareket ayrıntıları" onClick={() => setSelectedMovementId(row.id)}><Eye className="size-4"/></Button><Button variant="ghost" size="icon" aria-label="SAHA hareket belgesini indir" title="SAHA belgesi (resmi banka dekontu değildir)" onClick={() => void downloadSahaReceipt(row)}><FileDown className="size-4"/></Button><Button variant="ghost" size="icon" aria-label="Hareketi kalıcı sil" title="Kalıcı sil" disabled={remove.isPending} onClick={() => remove.mutate(row.id)}><Trash2 className="size-4"/></Button></div>
+      <div className="flex shrink-0 items-start gap-1"><span className={"num pt-1 text-right text-sm font-semibold " + (row.direction === "incoming" ? "text-emerald-600" : "text-rose-600")}>{row.direction === "incoming" ? "+" : "−"}{formatTL(row.amount)}</span><Button variant="ghost" size="icon" aria-label="Hareket ayrıntılarını aç" title="Hareket ayrıntıları" onClick={() => setSelectedMovementId(row.id)}><Eye className="size-4"/></Button><Button variant="ghost" size="icon" aria-label="YEVMİYE VE FİNANS hareket belgesini indir" title="YEVMİYE VE FİNANS belgesi (resmi banka dekontu değildir)" onClick={() => void downloadSahaReceipt(row)}><FileDown className="size-4"/></Button><Button variant="ghost" size="icon" aria-label="Hareketi kalıcı sil" title="Kalıcı sil" disabled={remove.isPending} onClick={() => remove.mutate(row.id)}><Trash2 className="size-4"/></Button></div>
     </article>)}
     {!displayedRows.length && !records.isLoading && !records.error && (rows.length ? <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">Aramanla eşleşen hareket yok.</p> : <div className="rounded-2xl border border-dashed bg-card/60 px-5 py-10 text-center"><div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary"><WalletCards className="size-6"/></div><p className="mt-3 font-semibold">Bu ay için hareket yok</p><p className="mt-1 text-sm text-muted-foreground">İlk gelen veya çıkan para kaydını ekleyebilirsin.</p><Button className="mt-4" variant="secondary" onClick={() => setAdding(true)}><Plus/>Hareket ekle</Button></div>)}
     </div>

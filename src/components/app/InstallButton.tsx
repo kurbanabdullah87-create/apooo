@@ -21,7 +21,7 @@ export function InstallButton() {
     window.addEventListener("appinstalled", installedListener);
     return () => { window.removeEventListener("beforeinstallprompt", listener); window.removeEventListener("appinstalled", installedListener); };
   }, []);
-  if (installed) return <p className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] px-3 text-sm font-medium text-emerald-300">✓ Saha bu cihazda uygulama olarak yüklü</p>;
+  if (installed) return <p className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] px-3 text-sm font-medium text-emerald-300">✓ Yevmiye ve Finans bu cihazda yüklü</p>;
   return (
     <div className="space-y-2">
       <Button
@@ -43,11 +43,11 @@ export function InstallButton() {
         }}
       >
         <Download />
-        Saha’yı telefona uygulama olarak ekle
+        Yevmiye ve Finans’ı telefona uygulama olarak ekle
       </Button>
       {help && (
         <p className="rounded-xl border bg-card p-3 text-sm leading-relaxed text-muted-foreground">
-          Android: Chrome menüsü → <strong>Uygulamayı yükle</strong>. iPhone/iPad: Safari’de Paylaş → <strong>Ana Ekrana Ekle</strong> → Ekle. Sonra Saha simgesine dokun; uygulama tarayıcı çerçevesi olmadan açılır.
+          Android: Chrome menüsü → <strong>Uygulamayı yükle</strong>. iPhone/iPad: Safari’de Paylaş → <strong>Ana Ekrana Ekle</strong> → Ekle. Sonra Yevmiye ve Finans simgesine dokun; uygulama tarayıcı çerçevesi olmadan açılır.
         </p>
       )}
     </div>

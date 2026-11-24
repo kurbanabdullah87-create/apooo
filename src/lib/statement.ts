@@ -7,7 +7,7 @@ const s = (v: unknown) => (v == null ? "" : String(v));
 /** WhatsApp için resmi cari hesap ekstresi (kalın yazı için *…* kullanır). */
 export function buildStatementText(opts: { customer: Customer; txs: Tx[]; profile?: Payload | undefined; limit?: number }) {
   const { customer, txs, profile } = opts;
-  const business = s(profile?.business) || "Saha";
+  const business = s(profile?.business) || "Yevmiye ve Finans";
   const sorted = [...txs].sort((a, b) => b.occurred_on.localeCompare(a.occurred_on));
   const debt = txs.filter((t) => t.kind === "debt").reduce((a, t) => a + t.amount, 0);
   const paid = txs.filter((t) => t.kind === "payment").reduce((a, t) => a + t.amount, 0);
@@ -36,7 +36,7 @@ export function buildStatementText(opts: { customer: Customer; txs: Tx[]; profil
 
 /** Randevudan bir gün önce müşteriye gönderilecek resmi hatırlatma taslağı. */
 export function appointmentReminderText(profile: Payload | undefined, a: Payload) {
-  const business = s(profile?.business) || "Saha";
+  const business = s(profile?.business) || "Yevmiye ve Finans";
   return [
     `Sayın ${s(a.name)},`,
     "",
