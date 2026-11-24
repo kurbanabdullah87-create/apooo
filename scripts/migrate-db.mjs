@@ -207,6 +207,31 @@ try {
       throw new Error("Exchange-rate snapshot RPC exists but its security settings are incomplete; refusing automatic repair.");
     }
     console.log("[db:migrate] Exchange-rate snapshot RPC is secured.");
+
+    const [{ cardPaymentFunctionExists }] = await tx`
+      SELECT to_regprocedure('public.record_credit_card_installment_payment(uuid,integer,numeric,date,text,text,text,text)') IS NOT NULL AS "cardPaymentFunctionExists"
+    `;
+    let appliedCardPaymentMigration = false;
+    if (!cardPaymentFunctionExists) {
+      await applyMigration(tx, "0022_record_credit_card_installment_payment.sql", "0022_record_credit_card_installment_payment");
+      appliedCardPaymentMigration = true;
+    }
+    const [{ cardPaymentFunctionReady }] = await tx`
+      SELECT EXISTS (
+        SELECT 1 FROM pg_proc
+        WHERE oid=to_regprocedure('public.record_credit_card_installment_payment(uuid,integer,numeric,date,text,text,text,text)')
+          AND prosecdef
+          AND proconfig @> ARRAY['search_path=""']::text[]
+      )
+      AND has_function_privilege('authenticated', 'public.record_credit_card_installment_payment(uuid,integer,numeric,date,text,text,text,text)', 'EXECUTE')
+      AND NOT has_function_privilege('anon', 'public.record_credit_card_installment_payment(uuid,integer,numeric,date,text,text,text,text)', 'EXECUTE')
+      AS "cardPaymentFunctionReady"
+    `;
+    if (!cardPaymentFunctionReady) {
+      if (appliedCardPaymentMigration) throw new Error("Credit-card payment RPC verification failed after apply.");
+      throw new Error("Credit-card payment RPC exists but its security settings are incomplete; refusing automatic repair.");
+    }
+    console.log("[db:migrate] Credit-card payment RPC is secured.");
   });
 
   const requiredTables = ["debt_records", "debt_installments", "debt_payments", "debt_payment_promises", "credit_card_records", "business_profiles", "business_profile_audit"];
