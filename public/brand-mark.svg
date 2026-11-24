@@ -1,20 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none" role="img" aria-labelledby="title">
+  <title id="title">Saha360 saha ve iş yönetimi simgesi</title>
   <defs>
-    <linearGradient id="bg" x1="8" y1="8" x2="120" y2="120" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#183b49"/>
-      <stop offset="1" stop-color="#101923"/>
+    <linearGradient id="field" x1="13" y1="9" x2="112" y2="119" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#173a50"/>
+      <stop offset="1" stop-color="#101a2b"/>
     </linearGradient>
-    <linearGradient id="mint" x1="30" y1="28" x2="98" y2="99" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#8df4d8"/>
-      <stop offset="1" stop-color="#35c6a8"/>
+    <linearGradient id="mint" x1="31" y1="27" x2="100" y2="97" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8cf5da"/>
+      <stop offset="1" stop-color="#37d0ae"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="80" y1="32" x2="98" y2="68" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffe29a"/>
+      <stop offset="1" stop-color="#ffb84d"/>
     </linearGradient>
   </defs>
-  <rect x="4" y="4" width="120" height="120" rx="36" fill="url(#bg)"/>
-  <rect x="5" y="5" width="118" height="118" rx="35" stroke="#9bf2db" stroke-opacity=".22" stroke-width="2"/>
-  <path d="M94 43a35 35 0 0 0-59-9" stroke="url(#mint)" stroke-width="12" stroke-linecap="round"/>
-  <path d="m29 32 4 17 16-8" fill="#8df4d8"/>
-  <path d="M34 85a35 35 0 0 0 59 9" stroke="url(#mint)" stroke-width="12" stroke-linecap="round"/>
-  <path d="m99 96-4-17-16 8" fill="#35c6a8"/>
-  <path d="m46 74 12 12 26-31" stroke="#f2fffb" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="96" cy="32" r="5" fill="#ffd783"/>
+  <rect x="3" y="3" width="122" height="122" rx="36" fill="url(#field)"/>
+  <rect x="4" y="4" width="120" height="120" rx="35" stroke="#a5f3e3" stroke-opacity=".2" stroke-width="2"/>
+  <path d="M25 59 64 29l39 30v37a8 8 0 0 1-8 8H33a8 8 0 0 1-8-8V59Z" fill="#14283a" stroke="#d9fff5" stroke-opacity=".78" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M44 57a20 20 0 0 1 40 0" stroke="url(#gold)" stroke-width="9" stroke-linecap="round"/>
+  <path d="M39 58h50a5 5 0 0 1 0 10H39a5 5 0 0 1 0-10Z" fill="url(#gold)"/>
+  <path d="M50 91h9v13h-9zM69 83h9v21h-9zM87 73h9v31h-9z" fill="url(#mint)"/>
+  <path d="m48 82 14-10 11 5 17-16" stroke="#f2fffb" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="90" cy="61" r="4" fill="#fff"/>
 </svg>

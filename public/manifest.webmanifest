@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Saha Pro · Saha Operasyon ve Finans",
-  "short_name": "Saha Pro",
-  "description": "Saha işleri, müşteriler, randevular ve finans için profesyonel çalışma alanı",
+  "name": "Saha360 · İş, Ekip ve Finans Yönetimi",
+  "short_name": "Saha360",
+  "description": "Saha işleri, müşteriler, ekip ve günlük finansı tek yerde yönetin.",
   "start_url": "/auth",
   "scope": "/",
   "display": "standalone",
