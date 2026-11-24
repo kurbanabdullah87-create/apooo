@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDownLeft, ArrowUpRight, BellRing, CalendarClock, Check, ChevronDown, ChevronUp, CircleDollarSign, HandCoins, Plus, Trash2, Clock3 } from "lucide-react";
@@ -13,6 +13,7 @@ import { formatTL, todayISO } from "@/lib/finance";
 import { supabase } from "@/integrations/supabase/client";
 import { askNotifyPermission, notifySupported } from "@/lib/reminders";
 import { CreditCardInstallments } from "@/components/app/CreditCardInstallments";
+import { useMe } from "@/hooks/use-me";
 
 export const Route = createFileRoute("/_authenticated/borc")({
   head: () => pageHead("Borç & Alacak", "Borçlar, alacaklar ve taksit ödeme planı."),
@@ -46,6 +47,13 @@ const dateLabel = (value: string) => new Date(`${value}T12:00:00`).toLocaleDateS
 const leftAmount = (i: Installment) => Math.max(0, Number(i.amount) - Number(i.paid_amount));
 
 function DebtPage() {
+  const me = useMe();
+  if (me.isLoading) return <div className="rounded-3xl border bg-card p-8 text-center text-muted-foreground">Erişim kontrol ediliyor…</div>;
+  if (!me.data?.hasFullAccess) return <section className="space-y-4 rounded-3xl border bg-card p-6 shadow-sm"><p className="text-xs font-bold uppercase tracking-widest text-primary">DEMO · GERÇEK VERİ YOK</p><h1 className="text-2xl font-bold">Taksit ve hatırlatmalar</h1><p className="max-w-xl text-sm text-muted-foreground">Bu önizleme yalnızca örnek içerik gösterir; borç, taksit veya hatırlatma verilerinize erişmez. Bu özellik Premium planda kullanılabilir.</p><Button asChild><Link to="/premium">Premium planı incele</Link></Button></section>;
+  return <DebtPremium />;
+}
+
+function DebtPremium() {
   const qc = useQueryClient();
   const [section, setSection] = useState<"debts" | "credit-cards">("debts");
   const [direction, setDirection] = useState<Direction>("receivable");

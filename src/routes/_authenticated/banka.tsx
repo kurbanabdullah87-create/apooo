@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ArrowDownLeft, ArrowUpRight, CalendarDays, Download, FileDown, FileText, LockKeyhole, Plus, Search, ShieldCheck, Sparkles, Trash2, WalletCards, KeyRound, MessageSquareText, Mail, Paperclip, RefreshCw, Fingerprint, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { parseBankSms } from "@/lib/bank-sms";
 import { isSupportedBankStatement, parseBankStatement, parseBankStatementFile, type ImportedBankMovement } from "@/lib/bank-statement";
 import { scanBankEmails } from "@/lib/gmail-bank";
+import { useMe } from "@/hooks/use-me";
 
 export const Route = createFileRoute("/_authenticated/banka")({
   head: () => pageHead("Banka hareketleri", "Kişisel hesap hareketleri ve aylık harcama özeti."),
@@ -31,6 +32,22 @@ function classifyBankMovement(row: { type?: string; description?: string; transa
 }
 
 function Bank() {
+  const me = useMe();
+  if (me.isLoading) return <div className="rounded-3xl border bg-card p-8 text-center text-muted-foreground">Erişim kontrol ediliyor…</div>;
+  if (!me.data?.hasFullAccess) return <BankDemo />;
+  return <BankPremium />;
+}
+
+function BankDemo() {
+  return <section className="space-y-5 rounded-3xl border bg-card p-6 shadow-sm sm:p-8">
+    <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary"><LockKeyhole /></div>
+    <div><p className="text-xs font-bold uppercase tracking-widest text-primary">DEMO · GERÇEK VERİ YOK</p><h1 className="mt-2 text-2xl font-bold">Banka hesabı hareketleri</h1><p className="mt-2 max-w-xl text-sm text-muted-foreground">Bu önizleme örnek veriler kullanır ve gerçek banka hesabınıza bağlanmaz. Kişisel banka hareketleri yalnızca yetkili veya Premium hesaplarda açılır.</p></div>
+    <div className="grid gap-3 sm:grid-cols-3"><div className="rounded-2xl border p-4"><p className="text-xs text-muted-foreground">Örnek gelen</p><strong>₺12.450,00</strong></div><div className="rounded-2xl border p-4"><p className="text-xs text-muted-foreground">Örnek giden</p><strong>₺8.210,00</strong></div><div className="rounded-2xl border p-4"><p className="text-xs text-muted-foreground">Hesap durumu</p><strong>Demo</strong></div></div>
+    <Button asChild><Link to="/premium">Premium planı incele</Link></Button>
+  </section>;
+}
+
+function BankPremium() {
   const ownerId = useBankOwnerId();
   const vault = useBankVault(ownerId);
   const queryClient = useQueryClient();

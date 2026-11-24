@@ -1,7 +1,7 @@
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
-import { LayoutDashboard, Users, Receipt, Settings, Plus, Search, Loader2, ArrowDown, HardHat, CalendarDays, Wrench, CalendarClock, Cloud, CloudUpload, Landmark, Coins, HandCoins, Building2 } from "lucide-react";
+import { LayoutDashboard, Users, Receipt, Settings, Plus, Search, Loader2, ArrowDown, HardHat, CalendarDays, Wrench, CalendarClock, Cloud, CloudUpload, Landmark, Coins, HandCoins, Building2, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DeviceLock } from "./DeviceLock";
 import { useEffect } from "react";
@@ -203,7 +203,7 @@ export function AppShell() {
         <div className="mx-3 my-3 h-px bg-white/10" />
         <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/75">Çalışma alanı</p>
         <nav className="flex-1 space-y-1 overflow-y-auto" aria-label="Sayfalar">
-          {NAV.filter((item) => isUsta || ["/isler", "/yevmiye"].includes(item.to)).map((item) => {
+          {NAV.filter((item) => isUsta || item.to === "/yevmiye").map((item) => {
             const active = path.startsWith(item.to);
             return <Link key={item.to} to={item.to} onClick={() => haptic(8)} aria-current={active ? "page" : undefined} className={cn("glass-nav-item group relative flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors duration-200", active ? "is-active text-primary" : "text-muted-foreground hover:bg-white/[0.055] hover:text-foreground")}>
               <item.icon className="size-[18px] shrink-0" />
@@ -214,14 +214,16 @@ export function AppShell() {
           <div className="mx-3 my-3 h-px bg-white/10" />
           <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/75">Araçlar</p>
           {[
+            { to: "/premium", label: "Premium plan", icon: Award },
+            { to: "/borc", label: isUsta ? "Taksitler" : "Taksitler · Demo", icon: HandCoins },
             { to: "/randevu", label: "Randevular", icon: CalendarClock },
             { to: "/rapor", label: "Aylık rapor", icon: LayoutDashboard },
             { to: "/hesaplayici", label: "Maliyet hesaplayıcı", icon: Coins },
-            { to: "/banka", label: "Hesap hareketleri", icon: Landmark },
+            { to: "/banka", label: isUsta ? "Hesap hareketleri" : "Banka · Demo", icon: Landmark },
             { to: "/giderler", label: "Giderler", icon: Receipt },
             { to: "/hava", label: "Hava durumu", icon: Cloud },
             { to: "/ayarlar", label: "Ayarlar", icon: Settings },
-          ].filter((item) => isUsta || item.to === "/ayarlar").map((item) => {
+          ].filter((item) => isUsta || ["/ayarlar", "/premium", "/borc", "/banka"].includes(item.to)).map((item) => {
             const active = path.startsWith(item.to);
             return <Link key={item.to} to={item.to} onClick={() => haptic(8)} aria-current={active ? "page" : undefined} className={cn("glass-nav-item group flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors duration-200", active ? "is-active text-primary" : "text-muted-foreground hover:bg-white/[0.055] hover:text-foreground")}><item.icon className="size-[18px] shrink-0"/><span>{item.label}</span></Link>;
           })}
@@ -239,7 +241,7 @@ export function AppShell() {
           className="flex h-10 min-w-0 basis-36 flex-1 justify-start gap-3 rounded-xl px-3 text-sm text-muted-foreground hover:bg-white/[0.06] lg:basis-auto"
         >
           <Search className="size-4" /><span className="truncate">Ara: müşteri, iş, tutar…</span><kbd className="ml-auto hidden rounded-md border border-white/10 bg-black/10 px-1.5 py-0.5 text-[10px] font-medium lg:inline-block">Ctrl K</kbd>
-        </Button>{activeJob && <span className="hidden items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary sm:inline-flex" role="status"><span className="size-1.5 animate-pulse rounded-full bg-primary"/> {(() => { const seconds = Math.max(0, Math.floor((clockNow - Date.parse(String(activeJob.payload.started_at))) / 1000)); return `${String(Math.floor(seconds / 3600)).padStart(2, "0")}:${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`; })()}</span>}{isUsta&&<VoiceCommandButton onSearch={(query) => { setSearchSeed(query); setSearchOpen(true); }}/>}{isUsta&&<NotificationCenter/>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Randevular" className="rounded-xl hover:bg-white/[0.07]"><Link to="/randevu"><CalendarClock/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Hava Durumu" className="rounded-xl hover:bg-white/[0.07]"><Link to="/hava"><Cloud/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Borç ve alacak" className="rounded-xl hover:bg-white/[0.07]"><Link to="/borc"><HandCoins/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Hesap hareketleri" className="rounded-xl hover:bg-white/[0.07]"><Link to="/banka"><Landmark/></Link></Button>{isUsta&&<Button asChild variant="ghost" size="icon" title="Giderler" className="rounded-xl hover:bg-white/[0.07]"><Link to="/giderler"><Receipt/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Ayarlar" className="rounded-xl hover:bg-white/[0.07]"><Link to="/ayarlar"><Settings/></Link></Button></div>
+        </Button>{activeJob && <span className="hidden items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary sm:inline-flex" role="status"><span className="size-1.5 animate-pulse rounded-full bg-primary"/> {(() => { const seconds = Math.max(0, Math.floor((clockNow - Date.parse(String(activeJob.payload.started_at))) / 1000)); return `${String(Math.floor(seconds / 3600)).padStart(2, "0")}:${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`; })()}</span>}{isUsta&&<VoiceCommandButton onSearch={(query) => { setSearchSeed(query); setSearchOpen(true); }}/>}{isUsta&&<NotificationCenter/>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Randevular" className="rounded-xl hover:bg-white/[0.07]"><Link to="/randevu"><CalendarClock/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Hava Durumu" className="rounded-xl hover:bg-white/[0.07]"><Link to="/hava"><Cloud/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Borç ve alacak" className="rounded-xl hover:bg-white/[0.07]"><Link to="/borc"><HandCoins/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Hesap hareketleri"><Link to="/banka"><Landmark/></Link></Button><Button asChild variant="ghost" size="icon" title="Taksitler"><Link to="/borc"><HandCoins/></Link></Button>{!isUsta && <Button asChild variant="ghost" size="icon" title="Premium plan"><Link to="/premium"><Award/></Link></Button>}{isUsta&&<Button asChild variant="ghost" size="icon" title="Giderler" className="rounded-xl hover:bg-white/[0.07]"><Link to="/giderler"><Receipt/></Link></Button>}<Button asChild variant="ghost" size="icon" title="Ayarlar" className="rounded-xl hover:bg-white/[0.07]"><Link to="/ayarlar"><Settings/></Link></Button></div>
         {isUsta && businessProfile.profileError && <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100" role="status"><Building2 className="size-4 shrink-0"/><span className="min-w-0 flex-1">{businessProfile.profileError}</span>{businessProfile.profiles.length === 0 && <Button asChild size="sm" variant="secondary"><Link to="/ayarlar">Ayarları aç</Link></Button>}<Button type="button" size="sm" variant="ghost" onClick={() => void businessProfile.refreshProfiles()}>Yenile</Button></div>}
         {isUsta && businessProfile.isUsta && businessProfile.activeProfile && <div className="mt-2 flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/[0.045] px-3 py-2"><Building2 className="size-4 shrink-0 text-primary"/><label htmlFor="active-business-profile" className="sr-only">Etkin usta profili</label><select id="active-business-profile" value={businessProfile.activeProfileId ?? ""} onChange={(event) => businessProfile.switchProfile(event.target.value)} className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-foreground outline-none" aria-label="Etkin usta profili">{businessProfile.profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}{profile.is_default ? " · Varsayılan" : ""}{profile.is_archived ? " · Arşivli (yalnızca geçmiş)" : ""}</option>)}</select><span className="hidden text-[10px] text-muted-foreground sm:inline">Kayıt ve rapor kapsamı</span></div>}
         {(!isOnline || queuedWrites > 0) && <div className={cn("mt-2 flex items-center gap-1.5 text-xs font-semibold", isOnline ? "text-warning" : "text-destructive")} role="status"><span className={cn("size-2 rounded-full", isOnline ? "bg-warning" : "animate-pulse bg-destructive")}/>{!isOnline ? "Çevrimdışı" : "Senkronizasyon bekliyor"}{queuedWrites > 0 && <> · <CloudUpload className="size-3.5"/>{queuedWrites} kayıt</>}</div>}
@@ -278,12 +280,11 @@ export function AppShell() {
           <div className="flex justify-center py-20">
             <Loader2 className="size-6 animate-spin text-muted-foreground" />
           </div>
-        ) : !isUsta && !["/ayarlar", "/isler", "/yevmiye", "/banka"].includes(path) ? (
+        ) : !isUsta && !["/ayarlar", "/yevmiye", "/banka", "/borc", "/premium"].includes(path) ? (
           <div className="rounded-2xl border bg-card p-6 text-center">
-            <h2 className="text-lg font-semibold">Çırak hesabı</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Finansal veriler yalnızca Usta tarafından görülebilir.
-            </p>
+            <h2 className="text-lg font-semibold">Bu bölüm Premium planda</h2>
+            <p className="mt-2 text-sm text-muted-foreground">Ücretsiz hesaplarda yalnızca Yevmiye kullanılabilir. Özellik erişimi sunucu tarafında da denetlenir.</p>
+            <Button asChild className="mt-4"><Link to="/premium">Premium planı incele</Link></Button>
           </div>
         ) : (
           <div key={path} className="app-page-enter min-w-0">
@@ -293,8 +294,8 @@ export function AppShell() {
       </main>
 
       <nav className="glass-dock safe-bottom fixed inset-x-3 bottom-3 z-30 rounded-[1.4rem] p-1.5 lg:hidden">
-        <div className={`mx-auto grid max-w-md ${isUsta ? "grid-cols-13" : "grid-cols-2"}`}>
-          {NAV.filter(n => isUsta || ["/isler", "/yevmiye"].includes(n.to)).map((n, index) => {
+        <div className={`mx-auto grid max-w-md ${isUsta ? "grid-cols-13" : "grid-cols-1"}`}>
+          {NAV.filter(n => isUsta || n.to === "/yevmiye").map((n, index) => {
             const active = path.startsWith(n.to);
             return <div key={n.to} className="contents">
               {isUsta && index === 3 && <button type="button" aria-label="Hızlı işlem ekle" onClick={() => { haptic(); setAddOpen(true); }} className="-mt-4 flex flex-col items-center justify-start gap-1 py-1 text-[10px] font-semibold text-primary"><span className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition active:scale-95"><Plus className="size-6"/></span>Ekle</button>}

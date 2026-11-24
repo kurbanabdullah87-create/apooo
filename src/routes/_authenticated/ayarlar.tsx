@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Save, UserPlus, LogOut, Fingerprint, LockKeyhole, Award, Link2, Loader2, Plus, X, ShieldCheck, CheckCircle2, ArchiveRestore, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -75,6 +75,8 @@ function Settings() {
         </p>
         <p className="text-sm text-muted-foreground">{me.data?.isUsta ? "Usta" : "Çırak"}</p>
       </div>
+      {me.data?.isAdmin && <AuthorizedAccounts />}
+      <section className="rounded-2xl border bg-card p-4"><h2 className="font-semibold">Plan ve erişim</h2><p className="mt-1 text-sm text-muted-foreground">{me.data?.hasFullAccess ? "Premium özelliklere erişiminiz açık." : "Ücretsiz planda Yevmiye kullanılabilir; finans özellikleri örnek modundadır."}</p><Button asChild variant="outline" className="mt-3"><a href="/premium">Planı görüntüle</a></Button></section>
       <InstallButton />
       {me.data?.isUsta && (
         <>
@@ -320,6 +322,21 @@ function Settings() {
       </Button>
     </div>
   );
+}
+
+function AuthorizedAccounts() {
+  const qc = useQueryClient();
+  const [email, setEmail] = useState("");
+  const list = useQuery({ queryKey: ["authorized-emails"], queryFn: async () => {
+    const { data, error } = await supabase.rpc("list_authorized_emails");
+    if (error) throw error;
+    return data ?? [];
+  }});
+  const change = useMutation({ mutationFn: async ({ email: target, enabled }: { email: string; enabled: boolean }) => {
+    const { error } = await supabase.rpc("set_authorized_email", { _email: target, _enabled: enabled });
+    if (error) throw error;
+  }, onSuccess: async () => { setEmail(""); toast.success("Yetkili hesap listesi güncellendi."); await qc.invalidateQueries({ queryKey: ["authorized-emails"] }); }, onError: (error: Error) => toast.error(error.message) });
+  return <section className="space-y-3 rounded-2xl border border-primary/20 bg-primary/[.035] p-4"><div><h2 className="font-semibold">Yönetici · yetkili hesaplar</h2><p className="mt-1 text-xs text-muted-foreground">Tam erişim yalnızca burada listelenen, e-postası doğrulanmış kayıtlı hesaplara verilir. Şifre girmeyin veya paylaşmayın.</p></div><form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); if (email.trim()) change.mutate({ email: email.trim(), enabled: true }); }}><Input type="email" autoComplete="off" required maxLength={254} placeholder="kullanici@example.com" value={email} onChange={(event) => setEmail(event.target.value)} /><Button disabled={change.isPending}>Yetkili ekle</Button></form><div className="space-y-2">{list.data?.map((item) => <div key={item.email} className="flex items-center justify-between gap-3 rounded-xl border bg-background p-3 text-sm"><span className="truncate">{item.email}</span><Button variant="outline" size="sm" disabled={change.isPending || item.email === "abdullahkurban670@gmail.com"} onClick={() => change.mutate({ email: item.email, enabled: false })}>Erişimi kaldır</Button></div>)}</div></section>;
 }
 function useCreateServerFn() {
   return useServerFn(createApprentice);

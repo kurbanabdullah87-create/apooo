@@ -232,9 +232,27 @@ try {
       throw new Error("Credit-card payment RPC exists but its security settings are incomplete; refusing automatic repair.");
     }
     console.log("[db:migrate] Credit-card payment RPC is secured.");
+
+    const [{ accessSchemaReady }] = await tx`
+      SELECT to_regclass('public.authorized_emails') IS NOT NULL
+        AND to_regclass('public.plan_entitlements') IS NOT NULL
+        AND to_regprocedure('public.get_current_access()') IS NOT NULL
+        AND to_regprocedure('public.set_authorized_email(text,boolean)') IS NOT NULL
+        AND EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='work_records' AND policyname='access scoped work record writes')
+        AND EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='bank_accounts' AND policyname='premium owner manages bank accounts')
+        AND has_function_privilege('authenticated', 'public.get_current_access()', 'EXECUTE')
+        AND NOT has_function_privilege('anon', 'public.get_current_access()', 'EXECUTE')
+        AND EXISTS (SELECT 1 FROM public.authorized_emails WHERE email='abdullahkurban670@gmail.com' AND enabled AND is_admin)
+        AS "accessSchemaReady"
+    `;
+    if (!accessSchemaReady) {
+      await applyMigration(tx, "0023_user_access_and_premium.sql", "0023_user_access_and_premium");
+    } else {
+      console.log("[db:migrate] Account access and premium entitlement schema are already secured.");
+    }
   });
 
-  const requiredTables = ["debt_records", "debt_installments", "debt_payments", "debt_payment_promises", "credit_card_records", "business_profiles", "business_profile_audit"];
+  const requiredTables = ["debt_records", "debt_installments", "debt_payments", "debt_payment_promises", "credit_card_records", "business_profiles", "business_profile_audit", "authorized_emails", "plan_entitlements"];
   const missing = [];
   for (const name of requiredTables) {
     if (!(await tableExists(client, name))) missing.push(name);

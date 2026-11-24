@@ -523,6 +523,9 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_current_access: { Args: never; Returns: { is_admin: boolean; is_premium: boolean; expires_at: string | null }[] }
+      list_authorized_emails: { Args: never; Returns: { email: string; created_at: string }[] }
+      set_authorized_email: { Args: { _email: string; _enabled: boolean }; Returns: undefined }
       save_exchange_rate_snapshot: { Args: { _profile_id: string; _usd: number; _eur: number; _gbp: number; _provider_updated_at: string }; Returns: string }
       record_credit_card_installment_payment: { Args: { _purchase_id: string; _installment_no: number; _amount: number; _paid_on: string; _method?: string; _account?: string; _reference?: string; _note?: string }; Returns: string }
       record_debt_payment: { Args: { _debt_id: string; _installment_id: string; _amount: number; _paid_on: string; _note?: string }; Returns: string }

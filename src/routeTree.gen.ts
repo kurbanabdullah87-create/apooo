@@ -26,6 +26,7 @@ import { Route as AuthenticatedHavaRouteImport } from './routes/_authenticated/h
 import { Route as AuthenticatedHesaplayiciRouteImport } from './routes/_authenticated/hesaplayici'
 import { Route as AuthenticatedIslerRouteImport } from './routes/_authenticated/isler'
 import { Route as AuthenticatedPanelRouteImport } from './routes/_authenticated/panel'
+import { Route as AuthenticatedPremiumRouteImport } from './routes/_authenticated/premium'
 import { Route as AuthenticatedPuantajRouteImport } from './routes/_authenticated/puantaj'
 import { Route as AuthenticatedRandevuRouteImport } from './routes/_authenticated/randevu'
 import { Route as AuthenticatedRaporRouteImport } from './routes/_authenticated/rapor'
@@ -120,6 +121,11 @@ const AuthenticatedPanelRoute = AuthenticatedPanelRouteImport.update({
   path: '/panel',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedPremiumRoute = AuthenticatedPremiumRouteImport.update({
+  id: '/premium',
+  path: '/premium',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedPuantajRoute = AuthenticatedPuantajRouteImport.update({
   id: '/puantaj',
   path: '/puantaj',
@@ -178,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/hesaplayici': typeof AuthenticatedHesaplayiciRoute
   '/isler': typeof AuthenticatedIslerRoute
   '/panel': typeof AuthenticatedPanelRoute
+  '/premium': typeof AuthenticatedPremiumRoute
   '/puantaj': typeof AuthenticatedPuantajRoute
   '/randevu': typeof AuthenticatedRandevuRoute
   '/rapor': typeof AuthenticatedRaporRoute
@@ -204,6 +211,7 @@ export interface FileRoutesByTo {
   '/hesaplayici': typeof AuthenticatedHesaplayiciRoute
   '/isler': typeof AuthenticatedIslerRoute
   '/panel': typeof AuthenticatedPanelRoute
+  '/premium': typeof AuthenticatedPremiumRoute
   '/puantaj': typeof AuthenticatedPuantajRoute
   '/randevu': typeof AuthenticatedRandevuRoute
   '/rapor': typeof AuthenticatedRaporRoute
@@ -232,6 +240,7 @@ export interface FileRoutesById {
   '/_authenticated/hesaplayici': typeof AuthenticatedHesaplayiciRoute
   '/_authenticated/isler': typeof AuthenticatedIslerRoute
   '/_authenticated/panel': typeof AuthenticatedPanelRoute
+  '/_authenticated/premium': typeof AuthenticatedPremiumRoute
   '/_authenticated/puantaj': typeof AuthenticatedPuantajRoute
   '/_authenticated/randevu': typeof AuthenticatedRandevuRoute
   '/_authenticated/rapor': typeof AuthenticatedRaporRoute
@@ -260,6 +269,7 @@ export interface FileRouteTypes {
     | '/hesaplayici'
     | '/isler'
     | '/panel'
+    | '/premium'
     | '/puantaj'
     | '/randevu'
     | '/rapor'
@@ -286,6 +296,7 @@ export interface FileRouteTypes {
     | '/hesaplayici'
     | '/isler'
     | '/panel'
+    | '/premium'
     | '/puantaj'
     | '/randevu'
     | '/rapor'
@@ -313,6 +324,7 @@ export interface FileRouteTypes {
     | '/_authenticated/hesaplayici'
     | '/_authenticated/isler'
     | '/_authenticated/panel'
+    | '/_authenticated/premium'
     | '/_authenticated/puantaj'
     | '/_authenticated/randevu'
     | '/_authenticated/rapor'
@@ -453,6 +465,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPanelRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/premium': {
+      id: '/_authenticated/premium'
+      path: '/premium'
+      fullPath: '/premium'
+      preLoaderRoute: typeof AuthenticatedPremiumRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/puantaj': {
       id: '/_authenticated/puantaj'
       path: '/puantaj'
@@ -524,6 +543,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedHesaplayiciRoute: typeof AuthenticatedHesaplayiciRoute
   AuthenticatedIslerRoute: typeof AuthenticatedIslerRoute
   AuthenticatedPanelRoute: typeof AuthenticatedPanelRoute
+  AuthenticatedPremiumRoute: typeof AuthenticatedPremiumRoute
   AuthenticatedPuantajRoute: typeof AuthenticatedPuantajRoute
   AuthenticatedRandevuRoute: typeof AuthenticatedRandevuRoute
   AuthenticatedRaporRoute: typeof AuthenticatedRaporRoute
@@ -544,6 +564,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedHesaplayiciRoute: AuthenticatedHesaplayiciRoute,
   AuthenticatedIslerRoute: AuthenticatedIslerRoute,
   AuthenticatedPanelRoute: AuthenticatedPanelRoute,
+  AuthenticatedPremiumRoute: AuthenticatedPremiumRoute,
   AuthenticatedPuantajRoute: AuthenticatedPuantajRoute,
   AuthenticatedRandevuRoute: AuthenticatedRandevuRoute,
   AuthenticatedRaporRoute: AuthenticatedRaporRoute,

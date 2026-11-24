@@ -101,7 +101,7 @@ function Panel() {
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["exchange-rate-history", me.data?.id] }); },
     onError: (error) => {
       console.error("Kur geçmişi kaydedilemedi:", error);
-      const detail = error instanceof Error ? error.message : typeof error === "object" && error !== null && "message" in error ? String(error.message) : "Kur geçmişi yazma isteği tamamlanamadı.";
+      const detail = error instanceof Error ? error.message : "Kur geçmişi yazma isteği tamamlanamadı.";
       toast.error("Kur geçmişi kaydedilemedi", { description: detail });
     },
   });
