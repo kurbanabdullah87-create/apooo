@@ -79,7 +79,7 @@ function Settings() {
       {me.data?.isAdmin && <AuthorizedAccounts />}
       {me.data?.isAdmin && <AdminUsageDashboard />}
       {me.data?.isAdmin && <PlanCampaignAdmin />}
-      <section className="rounded-2xl border bg-card p-4"><h2 className="font-semibold">Plan ve erişim</h2><p className="mt-1 text-sm text-muted-foreground">{me.data?.hasFullAccess ? "Premium erişiminiz açık; banka ve taksit bölümleri kullanılabilir." : "Ücretsiz planda yevmiye, işler, cari, randevu, ekipman, stok, gider ve raporlar kullanılabilir. Yalnızca banka ve taksit bölümleri Premium erişim ister."}</p><Button asChild variant="outline" className="mt-3"><a href="/premium">Planı görüntüle</a></Button></section>
+      <section className="rounded-2xl border bg-card p-4"><h2 className="font-semibold">Plan ve erişim</h2><p className="mt-1 text-sm text-muted-foreground">{me.data?.hasFullAccess ? "Premium erişiminiz açık; tüm bölümler kullanılabilir." : "Ücretsiz planda Panel, işler, cari ve yevmiye kullanılabilir. Diğer bölümler görünür; kullanmak için Premium gerekir."}</p><Button asChild variant="outline" className="mt-3"><a href="/premium">Planı görüntüle</a></Button></section>
       <InstallButton />
       {me.data?.isUsta && (
         <>

@@ -30,6 +30,9 @@ const NAV = [
   { to: "/doviz", label: "Döviz", icon: Coins },
 ] as const;
 
+const FREE_ROUTES = ["/panel", "/isler", "/cari", "/yevmiye", "/ayarlar", "/premium"];
+const isFreeRoute = (path: string) => FREE_ROUTES.some((route) => path === route || path.startsWith(`${route}/`));
+
 export function AppShell() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const me = useMe();
@@ -205,11 +208,12 @@ export function AppShell() {
         <div className="mx-3 my-3 h-px bg-white/10" />
         <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/75">Çalışma alanı</p>
         <nav className="flex-1 space-y-1 overflow-y-auto" aria-label="Sayfalar">
-          {NAV.filter((item) => isUsta || item.to === "/yevmiye").map((item) => {
+          {NAV.map((item) => {
             const active = path.startsWith(item.to);
+            const locked = !hasFullAccess && !isFreeRoute(item.to);
             return <Link key={item.to} to={item.to} onClick={() => haptic(8)} aria-current={active ? "page" : undefined} className={cn("glass-nav-item group relative flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors duration-200", active ? "is-active text-primary" : "text-muted-foreground hover:bg-white/[0.055] hover:text-foreground")}>
               <item.icon className="size-[18px] shrink-0" />
-              <span className="flex-1">{item.label}</span>
+              <span className="flex-1">{item.label}</span>{locked && <span className="rounded-full border border-primary/20 px-2 py-0.5 text-[9px] font-bold text-primary">PREMIUM</span>}
               {item.to === "/isler" && openToday.length > 0 && <span className="min-w-5 rounded-full bg-primary/15 px-1.5 text-center text-[10px] font-bold leading-5 text-primary">{openToday.length}</span>}
             </Link>;
           })}
@@ -217,17 +221,18 @@ export function AppShell() {
           <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/75">Araçlar</p>
           {[
             { to: "/premium", label: "Premium plan", icon: Award },
-            { to: "/borc", label: hasFullAccess ? "Taksitler" : "Taksitler · Premium", icon: HandCoins },
+            { to: "/borc", label: "Taksitler", icon: HandCoins },
             { to: "/randevu", label: "Randevular", icon: CalendarClock },
             { to: "/rapor", label: "Aylık rapor", icon: LayoutDashboard },
             { to: "/hesaplayici", label: "Maliyet hesaplayıcı", icon: Coins },
-            { to: "/banka", label: hasFullAccess ? "Hesap hareketleri" : "Banka · Premium", icon: Landmark },
+            { to: "/banka", label: "Banka", icon: Landmark },
             { to: "/giderler", label: "Giderler", icon: Receipt },
             { to: "/hava", label: "Hava durumu", icon: Cloud },
             { to: "/ayarlar", label: "Ayarlar", icon: Settings },
-          ].filter((item) => isUsta || ["/ayarlar", "/premium", "/borc", "/banka"].includes(item.to)).map((item) => {
+          ].map((item) => {
             const active = path.startsWith(item.to);
-            return <Link key={item.to} to={item.to} onClick={() => haptic(8)} aria-current={active ? "page" : undefined} className={cn("glass-nav-item group flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors duration-200", active ? "is-active text-primary" : "text-muted-foreground hover:bg-white/[0.055] hover:text-foreground")}><item.icon className="size-[18px] shrink-0"/><span>{item.label}</span></Link>;
+            const locked = !hasFullAccess && !isFreeRoute(item.to);
+            return <Link key={item.to} to={item.to} onClick={() => haptic(8)} aria-current={active ? "page" : undefined} className={cn("glass-nav-item group flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors duration-200", active ? "is-active text-primary" : "text-muted-foreground hover:bg-white/[0.055] hover:text-foreground")}><item.icon className="size-[18px] shrink-0"/><span className="flex-1">{item.label}</span>{locked && <span className="rounded-full border border-primary/20 px-2 py-0.5 text-[9px] font-bold text-primary">PREMIUM</span>}</Link>;
           })}
         </nav>
         {isUsta && <Button onClick={() => { haptic(); setAddOpen(true); }} className="mt-3 h-12 w-full rounded-2xl shadow-lg shadow-primary/15"><Plus/>Hızlı işlem ekle</Button>}
@@ -248,9 +253,17 @@ export function AppShell() {
             { to: "/alim", label: "Alım ve stok", icon: ShoppingCart },
             { to: "/rapor", label: "Raporlar", icon: ClipboardList },
             { to: "/hesaplayici", label: "Maliyet hesaplayıcı", icon: Calculator },
+            { to: "/puantaj", label: "Puantaj", icon: CalendarDays },
+            { to: "/ekipman", label: "Ekipman", icon: Wrench },
+            { to: "/doviz", label: "Döviz", icon: Coins },
+            { to: "/giderler", label: "Giderler", icon: Receipt },
+            { to: "/banka", label: hasFullAccess ? "Banka hareketleri" : "Banka · Premium", icon: Landmark },
+            { to: "/borc", label: hasFullAccess ? "Taksitler" : "Taksitler · Premium", icon: HandCoins },
+            { to: "/randevu", label: "Randevular", icon: CalendarClock },
+            { to: "/hava", label: "Hava durumu", icon: Cloud },
             { to: "/premium", label: "Premium plan", icon: Award },
           ] : [{ to: "/premium", label: "Premium plan", icon: Award }]),
-        ].map((item) => <DropdownMenuItem key={item.to} asChild><Link to={item.to} className="flex items-center gap-2"><item.icon className="size-4"/>{item.label}</Link></DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu></div>
+        ].filter((item) => isUsta || item.to === "/premium").map((item) => <DropdownMenuItem key={item.to} asChild><Link to={item.to} className="flex items-center gap-2"><item.icon className="size-4"/>{item.label}{!hasFullAccess && !isFreeRoute(item.to) && <span className="ml-auto text-[9px] font-bold text-primary">PREMIUM</span>}</Link></DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu></div>
         {isUsta && businessProfile.profileError && <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100" role="status"><Building2 className="size-4 shrink-0"/><span className="min-w-0 flex-1">{businessProfile.profileError}</span>{businessProfile.profiles.length === 0 && <Button asChild size="sm" variant="secondary"><Link to="/ayarlar">Ayarları aç</Link></Button>}<Button type="button" size="sm" variant="ghost" onClick={() => void businessProfile.refreshProfiles()}>Yenile</Button></div>}
         {isUsta && businessProfile.isUsta && businessProfile.activeProfile && <div className="mt-2 flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/[0.045] px-3 py-2"><Building2 className="size-4 shrink-0 text-primary"/><label htmlFor="active-business-profile" className="sr-only">Etkin usta profili</label><select id="active-business-profile" value={businessProfile.activeProfileId ?? ""} onChange={(event) => businessProfile.switchProfile(event.target.value)} className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-foreground outline-none" aria-label="Etkin usta profili">{businessProfile.profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}{profile.is_default ? " · Varsayılan" : ""}{profile.is_archived ? " · Arşivli (yalnızca geçmiş)" : ""}</option>)}</select><span className="hidden text-[10px] text-muted-foreground sm:inline">Kayıt ve rapor kapsamı</span></div>}
         {(!isOnline || queuedWrites > 0) && <div className={cn("mt-2 flex items-center gap-1.5 text-xs font-semibold", isOnline ? "text-warning" : "text-destructive")} role="status"><span className={cn("size-2 rounded-full", isOnline ? "bg-warning" : "animate-pulse bg-destructive")}/>{!isOnline ? "Çevrimdışı" : "Senkronizasyon bekliyor"}{queuedWrites > 0 && <> · <CloudUpload className="size-3.5"/>{queuedWrites} kayıt</>}</div>}
@@ -295,11 +308,11 @@ export function AppShell() {
             <p className="mt-2 text-sm text-muted-foreground">Ekip hesabınızın izin verdiği bölümleri kullanabilirsiniz.</p>
             <Button asChild className="mt-4"><Link to="/premium">Premium planı incele</Link></Button>
           </div>
-        ) : !hasFullAccess && (path === "/banka" || path === "/borc") ? (
+        ) : !hasFullAccess && !isFreeRoute(path) ? (
           <div className="mx-auto max-w-md rounded-2xl border bg-card p-6 text-center">
             <Landmark className="mx-auto size-8 text-primary" />
-            <h2 className="mt-3 text-lg font-semibold">Banka ve taksit bölümleri Premium</h2>
-            <p className="mt-2 text-sm text-muted-foreground">Ücretsiz hesapta Panel, işler, cari, yevmiye, randevu, ekipman, stok, raporlar ve diğer çalışma araçları kullanılabilir. Banka hareketleri ve taksit kayıtları Premium erişim gerektirir.</p>
+            <h2 className="mt-3 text-lg font-semibold">Bu özellik Premium planında</h2>
+            <p className="mt-2 text-sm text-muted-foreground">Bu bölüm ve özellikleri menüde görebilirsiniz. Kullanmak için Premium gerekir. Ücretsiz planda Panel, İşler, Cari ve Yevmiye kullanılabilir.</p>
             <Button asChild className="mt-4"><Link to="/premium">Planları görüntüle</Link></Button>
           </div>
         ) : (
@@ -313,8 +326,9 @@ export function AppShell() {
 
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 backdrop-blur">
         <div className="mx-auto grid max-w-xl grid-cols-6">
-          {NAV.filter(n => isUsta || n.to === "/yevmiye").map((n) => {
+          {NAV.map((n) => {
             const active = path.startsWith(n.to);
+            const locked = !hasFullAccess && !isFreeRoute(n.to);
             return <Link
                 key={n.to}
                 to={n.to}
@@ -322,7 +336,7 @@ export function AppShell() {
                 aria-current={active ? "page" : undefined}
                 className={cn("relative flex min-w-0 flex-col items-center gap-1 py-3 text-[11px] font-medium", active ? "text-primary" : "text-muted-foreground")}
               >
-                <n.icon className="size-5" />
+                <span className="relative"><n.icon className="size-5" />{locked && <span className="absolute -right-2 -top-1 rounded-full bg-primary px-1 text-[7px] font-bold text-primary-foreground">P</span>}</span>
                 {n.label}
                 {n.to === "/isler" && openToday.length > 0 && <span className="absolute right-1/4 top-1 min-w-4 rounded-full bg-primary px-1 text-center text-[9px] leading-4 text-primary-foreground" aria-label={`${openToday.length} açık iş`}>{openToday.length}</span>}
               </Link>;

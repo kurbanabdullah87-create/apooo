@@ -238,7 +238,7 @@ try {
         AND to_regclass('public.plan_entitlements') IS NOT NULL
         AND to_regprocedure('public.get_current_access()') IS NOT NULL
         AND to_regprocedure('public.set_authorized_email(text,boolean)') IS NOT NULL
-        AND EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='work_records' AND policyname IN ('access scoped work record writes','owner operational work record writes'))
+        AND EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='work_records' AND policyname IN ('access scoped work record writes','owner operational work record writes','free core work record writes'))
         AND EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='bank_accounts' AND policyname='premium owner manages bank accounts')
         AND has_function_privilege('authenticated', 'public.get_current_access()', 'EXECUTE')
         AND NOT has_function_privilege('anon', 'public.get_current_access()', 'EXECUTE')
@@ -291,12 +291,35 @@ try {
     }
     const [{ freeCoreAccessReady }] = await tx`
       SELECT
-        coalesce(pg_get_functiondef(to_regprocedure('public.is_team_usta()')), '') ILIKE '%current_team() = auth.uid()%'
+        coalesce(pg_get_functiondef(to_regprocedure('public.is_team_usta()')), '') ILIKE '%has_full_access()%'
+        AND NOT coalesce(pg_get_functiondef(to_regprocedure('public.is_team_usta()')), '') ILIKE '%current_team() = auth.uid()%'
         AND EXISTS (
           SELECT 1 FROM pg_policies
           WHERE schemaname='public' AND tablename='work_records'
-            AND policyname='owner operational work record writes'
+            AND policyname='free core work record writes'
         )
+        AND EXISTS (
+          SELECT 1 FROM pg_policies
+          WHERE schemaname='public' AND tablename='customers'
+            AND policyname='plan scoped customers'
+        )
+        AND EXISTS (
+          SELECT 1 FROM pg_policies
+          WHERE schemaname='public' AND tablename='transactions'
+            AND policyname='plan scoped transactions'
+        )
+        AND EXISTS (
+          SELECT 1 FROM pg_policies
+          WHERE schemaname='public' AND tablename='expenses'
+            AND policyname='plan scoped expenses'
+        )
+        AND EXISTS (
+          SELECT 1 FROM pg_policies
+          WHERE schemaname='public' AND tablename='business_profiles'
+            AND policyname='free owner reads own business profile'
+        )
+        AND coalesce(pg_get_functiondef(to_regprocedure('public.bill_job(uuid)')), '') ILIKE '%public.current_team() = auth.uid()%'
+        AND coalesce(pg_get_functiondef(to_regprocedure('public.get_plan_catalog()')), '') ILIKE '%Panel, işler, cari hesap%'
         AND EXISTS (
           SELECT 1 FROM pg_policies
           WHERE schemaname='public' AND tablename='debt_records'
@@ -330,7 +353,12 @@ try {
     if (!freeCoreAccessReady) {
       await applyMigration(tx, "0027_free_core_modules_premium_finance.sql", "0027_free_core_modules_premium_finance");
     } else {
-      console.log("[db:migrate] Free operational modules and premium financial gates are already secured.");
+      console.log("[db:migrate] Free core access and premium finance gates are already secured.");
+    }
+    if (!freeCoreAccessReady) {
+      await applyMigration(tx, "0028_free_lite_with_premium_modules.sql", "0028_free_lite_with_premium_modules");
+    } else {
+      console.log("[db:migrate] Free plan boundaries are already secured.");
     }
   });
 
