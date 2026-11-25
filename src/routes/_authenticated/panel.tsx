@@ -99,7 +99,7 @@ function Panel() {
   const cachedRates = readCachedRates();
   const rates = useQuery({ queryKey: ["live-currency-rates"], queryFn: () => getLiveCurrencyRates(), ...(cachedRates ? { initialData: cachedRates.value, initialDataUpdatedAt: cachedRates.savedAt } : {}), staleTime: 5 * 60_000, gcTime: 24 * 60 * 60_000, refetchInterval: (query) => Math.max(60, query.state.data?.updateIntervalSeconds ?? 86_400) * 1000, refetchOnWindowFocus: true, retry: 1 });
   const rateHistory = useQuery({
-    queryKey: ["exchange-rate-history", me.data?.id], enabled: Boolean(me.data?.id), staleTime: 30_000,
+    queryKey: ["exchange-rate-history", me.data?.id], enabled: Boolean(me.data?.id && me.data.canUseFeature("doviz")), staleTime: 30_000,
     queryFn: async () => {
       if (!me.data?.id) return null;
       const { data, error } = await supabase.from("work_records").select("id,created_at,payload").eq("kind", "exchange_rate").eq("owner_id", me.data.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
@@ -131,7 +131,10 @@ function Panel() {
     },
   });
   useEffect(() => {
-    if (!rates.data || !me.data?.id || !me.data.isUsta || businessProfile.loading || !businessProfile.activeProfileId || !online || saveRateSnapshot.isPending) return;
+    // Current rates are public and remain available on the free plan. Persisting
+    // rate history is separately gated, so do not send a write that the RLS layer
+    // is expected to reject for users without the exchange-history feature.
+    if (!rates.data || !me.data?.id || !me.data.isUsta || !me.data.canUseFeature("doviz") || businessProfile.loading || !businessProfile.activeProfileId || !online || saveRateSnapshot.isPending) return;
     const previous = rateHistory.data;
     const previousAt = Date.parse(String(previous?.payload.snapshot_at ?? previous?.created_at ?? ""));
     const providerStamp = rates.data.lastUpdatedAt;
@@ -149,7 +152,7 @@ function Panel() {
       lastRateSnapshotAttempt.current = providerStamp;
       saveRateSnapshot.mutate(payload);
     }
-  }, [rates.data, me.data?.id, me.data?.isUsta, businessProfile.loading, businessProfile.activeProfileId, businessProfile.activeProfile, online, rateHistory.data, saveRateSnapshot]);
+  }, [rates.data, me.data?.id, me.data?.isUsta, me.data?.canUseFeature, businessProfile.loading, businessProfile.activeProfileId, businessProfile.activeProfile, online, rateHistory.data, saveRateSnapshot]);
   useEffect(() => {
     const on = () => setOnline(true); const off = () => setOnline(false);
     window.addEventListener("online", on); window.addEventListener("offline", off);
