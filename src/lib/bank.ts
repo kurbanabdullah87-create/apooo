@@ -22,6 +22,14 @@ export interface BankMovement {
   counterparty_iban?: string;
   transaction_reason?: string;
   bank_name?: string;
+  transaction_type?: string;
+  channel?: string;
+  location?: string;
+  fee_amount?: number;
+  currency?: string;
+  value_date?: string;
+  source_fields?: Record<string, string>;
+  source_document_name?: string;
   raw_source_snippet?: string;
   source?: string | null;
   created_at: string;
@@ -475,8 +483,16 @@ export async function importBankStatementFile(ownerId: string, accountId: string
       ...(row.balance_after !== undefined ? { balance_after: row.balance_after } : {}),
       ...(row.counterparty_iban ? { counterparty_iban: row.counterparty_iban } : {}),
       ...(row.transaction_reason ? { transaction_reason: row.transaction_reason } : {}),
+      ...(row.transaction_type ? { transaction_type: row.transaction_type } : {}),
+      ...(row.channel ? { channel: row.channel } : {}),
+      ...(row.location ? { location: row.location } : {}),
+      ...(row.fee_amount !== undefined && Number.isFinite(row.fee_amount) ? { fee_amount: row.fee_amount } : {}),
+      ...(row.currency ? { currency: row.currency } : {}),
+      ...(row.value_date ? { value_date: row.value_date } : {}),
+      ...(row.source_fields ? { source_fields: row.source_fields } : {}),
+      ...(row.source_document_name ? { source_document_name: row.source_document_name.slice(0, 180) } : { source_document_name: file.name.slice(0, 180) }),
       bank_name: row.bank_name || account.bank_name,
-      ...(row.raw_source_snippet ? { raw_source_snippet: row.raw_source_snippet } : {}),
+      ...(row.raw_source_snippet ? { raw_source_snippet: row.raw_source_snippet.slice(0, 4000) } : {}),
       status: "completed", source: "email_attachment", created_at: now,
     });
     importedCount++;
@@ -514,9 +530,17 @@ export async function importEmailBankMovements(ownerId: string, accountId: strin
       ...(row.balance_after !== undefined && Number.isFinite(row.balance_after) ? { balance_after: row.balance_after } : {}),
       ...(row.counterparty_iban ? { counterparty_iban: row.counterparty_iban.slice(0, 64) } : {}),
       ...(row.transaction_reason ? { transaction_reason: row.transaction_reason.slice(0, 300) } : {}),
+      ...(row.transaction_type ? { transaction_type: row.transaction_type.slice(0, 120) } : {}),
+      ...(row.channel ? { channel: row.channel.slice(0, 120) } : {}),
+      ...(row.location ? { location: row.location.slice(0, 160) } : {}),
+      ...(row.fee_amount !== undefined && Number.isFinite(row.fee_amount) ? { fee_amount: row.fee_amount } : {}),
+      ...(row.currency ? { currency: row.currency.slice(0, 8) } : {}),
+      ...(row.value_date ? { value_date: row.value_date.slice(0, 40) } : {}),
+      ...(row.source_fields ? { source_fields: Object.fromEntries(Object.entries(row.source_fields).slice(0, 30).map(([key, value]) => [key.slice(0, 80), value.slice(0, 500)])) } : {}),
+      ...(row.source_document_name ? { source_document_name: row.source_document_name.slice(0, 180) } : {}),
       ...(row.bank_name ? { bank_name: row.bank_name.slice(0, 120) } : { bank_name: account.bank_name }),
-      ...(row.raw_source_snippet ? { raw_source_snippet: row.raw_source_snippet.slice(0, 1000) } : {}),
-      status: "completed", source: "email_auto", created_at: now,
+      ...(row.raw_source_snippet ? { raw_source_snippet: row.raw_source_snippet.slice(0, 4000) } : {}),
+      status: "completed", source: row.source_document_name ? "email_attachment" : "email_auto", created_at: now,
     });
     importedCount++;
   }

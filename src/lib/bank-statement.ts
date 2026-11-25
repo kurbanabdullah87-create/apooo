@@ -11,6 +11,14 @@ export interface ImportedBankMovement {
   counterparty_iban?: string;
   transaction_reason?: string;
   bank_name?: string;
+  transaction_type?: string;
+  channel?: string;
+  location?: string;
+  fee_amount?: number;
+  currency?: string;
+  value_date?: string;
+  source_fields?: Record<string, string>;
+  source_document_name?: string;
   raw_source_snippet?: string;
 }
 
@@ -52,6 +60,60 @@ function parseDate(date: string, time = ""): string | null {
   return `${datePart}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:${String(second).padStart(2, "0")}`;
 }
 
+export function extractStatementDetails(text: string) {
+  const source = text.replace(/\s+/g, " ").trim();
+  const normalized = normalize(source);
+  const fields: Record<string, string> = {};
+  const labeled: Array<[string, RegExp]> = [
+    ["İşlem türü", /(?:işlem türü|işlem tipi|işlem kanalı|transaction type)\s*[:：=-]\s*([^|;]{2,100})/i],
+    ["İşlem kanalı", /(?:kanal|işlem kanalı|channel)\s*[:：=-]\s*([^|;]{2,100})/i],
+    ["İşyeri / alıcı unvanı", /(?:işyeri adı|üye işyeri|işyeri|merchant|firma adı)\s*[:：=-]\s*([^|;]{2,140})/i],
+    ["İşlem yeri", /(?:işlem yeri|konum|lokasyon|location|şube adı)\s*[:：=-]\s*([^|;]{2,140})/i],
+    ["Terminal", /(?:terminal|terminal no|terminal numarası|pos no)\s*[:：=-]\s*([\w/-]{2,80})/i],
+    ["Şube", /(?:şube|şube kodu|branch)\s*[:：=-]\s*([^|;]{2,100})/i],
+    ["Kart", /(?:kart no|kart numarası|kart)\s*[:：=-]?\s*((?:\*{2,}|x{2,}|\d{4})[\s-]*\d{4})/i],
+    ["Provizyon", /(?:provizyon|authorization)\s*(?:no|numarası)?\s*[:：=-]\s*([\w/-]{3,80})/i],
+    ["Vergi / TCKN", /(?:vergi no|vkn|tckn)\s*[:：=-]\s*(\d{10,11})/i],
+    ["Karşı taraf IBAN", /(?:gönderen|alıcı|karşı taraf)?\s*iban\s*[:：=-]?\s*(TR\s?(?:\d\s?){24})/i],
+    ["Valör tarihi", /(?:valör|valor|value date)\s*(?:tarihi)?\s*[:：=-]\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})/i],
+    ["Döviz kuru", /(?:döviz kuru|kur|exchange rate)\s*[:：=-]\s*(\d+[,.]\d+)/i],
+    ["İşlem açıklaması", /(?:açıklama|işlem açıklaması|description|not)\s*[:：=-]\s*([^|;]{2,240})/i],
+  ];
+  for (const [label, pattern] of labeled) {
+    const value = pattern.exec(source)?.[1]?.replace(/\s+/g, " ").trim();
+    if (value) fields[label] = value.slice(0, 240);
+  }
+  const typePatterns: Array<[RegExp, string]> = [
+    [/\bfast\b/i, "FAST transferi"], [/\beft\b/i, "EFT"], [/\bswift\b/i, "SWIFT"],
+    [/\bhavale\b/i, "Havale"], [/\b(pos|uye isyeri|kart harcamasi|kart alisverisi)\b/i, "Kart / POS işlemi"],
+    [/\batm|nakit cekim|para cekme\b/i, "ATM / nakit çekim"], [/\bfatura|vergi|sgk|kamu odemesi\b/i, "Fatura / kamu ödemesi"],
+    [/\biade|iptal|geri odeme\b/i, "İade / geri ödeme"], [/\bkomisyon|masraf|ucret tahsilati\b/i, "Ücret / komisyon"],
+    [/\b(otomatik odeme|duzenli odeme|talimat)\b/i, "Otomatik / talimatlı ödeme"],
+  ];
+  const transactionType = fields["İşlem türü"] || typePatterns.find(([pattern]) => pattern.test(normalized))?.[1];
+  const channelPatterns: Array<[RegExp, string]> = [
+    [/mobil|mobile|cep sube/i, "Mobil bankacılık"], [/internet sube|internet bankaciligi|web sube/i, "İnternet bankacılığı"],
+    [/\bsube\b|gise/i, "Şube / gişe"], [/\batm\b/i, "ATM"], [/\bpos\b|uye isyeri/i, "POS / işyeri"],
+    [/telefon bankaciligi|cagri merkezi/i, "Telefon bankacılığı"], [/otomatik|talimat/i, "Otomatik işlem"],
+  ];
+  const channel = fields["İşlem kanalı"] || channelPatterns.find(([pattern]) => pattern.test(normalized))?.[1];
+  const location = fields["İşlem yeri"] || fields["İşyeri / alıcı unvanı"] || fields["Şube"];
+  const feeText = /(?:komisyon|masraf|işlem ücreti|islem ucreti)\s*[:：=-]?\s*(?:₺\s*)?([\d.,]+)\s*(?:TL|TRY|₺)?/i.exec(source)?.[1];
+  const feeAmount = feeText ? parseAmount(feeText) : null;
+  const currency = /\b(USD|EUR|GBP|CHF|SAR|AED|TRY|TL)\b|₺|€/i.exec(source)?.[1]?.toUpperCase() || (source.includes("€") ? "EUR" : source.includes("₺") ? "TRY" : undefined);
+  const valueDateText = fields["Valör tarihi"];
+  const valueDate = valueDateText ? parseDate(valueDateText) ?? undefined : undefined;
+  return {
+    ...(transactionType ? { transaction_type: transactionType.slice(0, 120) } : {}),
+    ...(channel ? { channel: channel.slice(0, 120) } : {}),
+    ...(location ? { location: location.slice(0, 160) } : {}),
+    ...(feeAmount !== null && feeAmount !== undefined ? { fee_amount: Math.abs(feeAmount) } : {}),
+    ...(currency ? { currency: currency === "TL" ? "TRY" : currency } : {}),
+    ...(valueDate ? { value_date: valueDate } : {}),
+    ...(Object.keys(fields).length ? { source_fields: fields } : {}),
+  };
+}
+
 function splitCsvLine(line: string, delimiter: string): string[] {
   const fields: string[] = [];
   let value = "", quoted = false;
@@ -86,6 +148,12 @@ function parseCsv(text: string): ImportedBankMovement[] {
   const ibanIndex = find("karsi taraf iban", "gonderen iban", "alici iban", "iban", "account number");
   const reasonIndex = find("islem nedeni", "transfer nedeni", "odeme nedeni", "payment reason", "reason");
   const bankIndex = find("banka", "bank name", "financial institution");
+  const transactionTypeIndex = find("islem tipi", "islem turu", "transaction type");
+  const channelIndex = find("islem kanali", "channel", "kanal");
+  const locationIndex = find("islem yeri", "isyeri", "merchant", "location", "konum");
+  const feeIndex = find("komisyon", "islem ucreti", "masraf", "fee", "commission");
+  const currencyIndex = find("para birimi", "currency", "doviz cinsi");
+  const valueDateIndex = find("valor tarihi", "valör tarihi", "value date");
   if (dateIndex < 0 || (amountIndex < 0 && debitIndex < 0 && creditIndex < 0)) return [];
   const rows: ImportedBankMovement[] = [];
   for (const line of lines.slice(1)) {
@@ -104,9 +172,28 @@ function parseCsv(text: string): ImportedBankMovement[] {
     const explicitlyOutgoing = /\b(giden|cikis|odeme|harcama|borc|debit|outgoing)\b/.test(directionText);
     const explicitlyIncoming = /\b(gelen|giris|tahsil|alacak|credit|incoming)\b/.test(directionText);
     const balance = parseAmount(get(balanceIndex));
+    const feeAmount = parseAmount(get(feeIndex));
+    const sourceFields: Record<string, string> = {};
+    for (const [label, index] of [["İşlem türü", transactionTypeIndex], ["İşlem kanalı", channelIndex], ["İşlem yeri", locationIndex], ["Ücret / komisyon", feeIndex], ["Para birimi", currencyIndex], ["Valör tarihi", valueDateIndex]] as const) {
+      const value = get(index).trim();
+      if (value) sourceFields[label] = value.slice(0, 240);
+    }
     const direction = rawAmount < 0 || (explicitlyOutgoing && !explicitlyIncoming) ? "outgoing" : "incoming";
     const iban = get(ibanIndex) || /\bTR\d{24}\b/i.exec(line)?.[0] || "";
-    rows.push({ direction, amount: Math.abs(rawAmount), date, counterparty, description, ...(get(referenceIndex) ? { reference: get(referenceIndex).slice(0, 120) } : {}), ...(balance !== null ? { balance_after: balance } : {}), ...(iban ? { counterparty_iban: iban.slice(0, 64) } : {}), ...(get(reasonIndex) ? { transaction_reason: get(reasonIndex).slice(0, 300) } : {}), ...(get(bankIndex) ? { bank_name: get(bankIndex).slice(0, 120) } : {}), raw_source_snippet: line.slice(0, 1000) });
+    const valueDate = get(valueDateIndex) ? parseDate(get(valueDateIndex)) ?? undefined : undefined;
+    rows.push({ direction, amount: Math.abs(rawAmount), date, counterparty, description,
+      ...(get(referenceIndex) ? { reference: get(referenceIndex).slice(0, 120) } : {}),
+      ...(balance !== null ? { balance_after: balance } : {}), ...(iban ? { counterparty_iban: iban.slice(0, 64) } : {}),
+      ...(get(reasonIndex) ? { transaction_reason: get(reasonIndex).slice(0, 300) } : {}),
+      ...(get(bankIndex) ? { bank_name: get(bankIndex).slice(0, 120) } : {}),
+      ...(get(transactionTypeIndex) ? { transaction_type: get(transactionTypeIndex).slice(0, 120) } : {}),
+      ...(get(channelIndex) ? { channel: get(channelIndex).slice(0, 120) } : {}),
+      ...(get(locationIndex) ? { location: get(locationIndex).slice(0, 160) } : {}),
+      ...(feeAmount !== null ? { fee_amount: Math.abs(feeAmount) } : {}),
+      ...(get(currencyIndex) ? { currency: get(currencyIndex).slice(0, 8).toUpperCase() } : {}),
+      ...(valueDate ? { value_date: valueDate } : {}),
+      ...(Object.keys(sourceFields).length ? { source_fields: sourceFields } : {}),
+      raw_source_snippet: line.slice(0, 4000) });
   }
   return rows;
 }
@@ -155,7 +242,7 @@ export function isSupportedBankStatement(fileName: string) {
 
 /** Extract selectable text from a bank statement PDF locally in the browser. */
 export async function parseBankStatementFile(file: File): Promise<ImportedBankMovement[]> {
-  if (!/\.pdf$/i.test(file.name)) return parseBankStatement(file.name, await file.text());
+  if (!/\.pdf$/i.test(file.name)) return parseBankStatement(file.name, await file.text()).map((row) => ({ ...row, source_document_name: file.name.slice(0, 180) }));
   const [{ getDocument, GlobalWorkerOptions }, worker] = await Promise.all([
     import("pdfjs-dist/legacy/build/pdf.mjs"),
     import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url"),
@@ -226,8 +313,14 @@ export async function parseBankStatementFile(file: File): Promise<ImportedBankMo
     const balance = amounts.length > 1 ? parseAmount(amounts[amounts.length - 1]?.value ?? "") : null;
     const iban = /\bTR\d{24}\b/i.exec(line)?.[0];
     const reference = /(?:referans|dekont|islem no)\s*[:：-]\s*([\w/-]+)/i.exec(line)?.[1];
-    rows.push({ direction, amount: Math.abs(signed), date, counterparty: sender.slice(0, 120), description, ...(balance !== null ? { balance_after: balance } : {}), ...(iban ? { counterparty_iban: iban } : {}), ...(reference ? { reference: reference.slice(0, 120) } : {}), transaction_reason: description.slice(0, 300), raw_source_snippet: line.slice(0, 1000) });
+    rows.push({ direction, amount: Math.abs(signed), date, counterparty: sender.slice(0, 120), description, ...extractStatementDetails(line), ...(balance !== null ? { balance_after: balance } : {}), ...(iban ? { counterparty_iban: iban } : {}), ...(reference ? { reference: reference.slice(0, 120) } : {}), transaction_reason: fieldsFromDescription(line, description), raw_source_snippet: line.slice(0, 4000) });
   }
   await pdf.cleanup();
-  return rows;
+  return rows.map((row) => ({ ...row, source_document_name: file.name.slice(0, 180) }));
+}
+
+function fieldsFromDescription(line: string, description: string) {
+  return /(?:açıklama|işlem nedeni|ödeme nedeni|purpose)\s*[:：=-]/i.test(line)
+    ? extractStatementDetails(line).source_fields?.["İşlem açıklaması"] ?? description.slice(0, 300)
+    : description.slice(0, 300);
 }

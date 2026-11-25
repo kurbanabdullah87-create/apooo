@@ -1,5 +1,5 @@
 import type { ImportedBankMovement } from "@/lib/bank-statement";
-import { parseBankStatementFile } from "@/lib/bank-statement";
+import { extractStatementDetails, parseBankStatementFile } from "@/lib/bank-statement";
 
 const GOOGLE_GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
 // Public OAuth client ID from the user's Google Cloud web client; client IDs are not secrets.
@@ -179,6 +179,7 @@ function parseTransactionMessage(message: GmailMessage): ImportedBankMovement[] 
     counterparty: parseCounterparty(body),
     description,
     ...(reference ? { reference } : {}),
+    ...extractStatementDetails(body),
     ...(cleanedSubject ? { transaction_reason: cleanedSubject } : {}),
     raw_source_snippet: `${fromName} · ${cleanedSubject}`.slice(0, 300),
   }];
@@ -254,10 +255,11 @@ export async function scanBankEmails(): Promise<{ rows: ImportedBankMovement[]; 
           return {
             ...row,
             ...(detectedBankName ? { bank_name: detectedBankName } : {}),
+            source_document_name: attachment.filename,
             ...(reference ? { reference } : {}),
             description: [row.description, row.transaction_reason].filter((value, i, all) => value?.trim() && all.findIndex((candidate) => candidate?.trim() === value?.trim()) === i).join(" · ").slice(0, 500),
             transaction_reason: row.transaction_reason || row.description.slice(0, 300),
-            raw_source_snippet: `${fromName} · ${subject} · Ek: ${attachment.filename}${row.raw_source_snippet ? ` · ${row.raw_source_snippet}` : ""}`.slice(0, 1000),
+            raw_source_snippet: `${fromName} · ${subject} · Ek: ${attachment.filename}${row.raw_source_snippet ? ` · ${row.raw_source_snippet}` : ""}`.slice(0, 4000),
           };
         });
       } catch {
