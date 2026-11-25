@@ -20,6 +20,8 @@ import { useRecords } from "@/lib/work";
 import { useCustomers } from "@/lib/data";
 import { toast } from "sonner";
 import { useBusinessProfile } from "@/lib/work-profile-context";
+import { readUserActivity, markUserActivity } from "@/lib/auth-activity";
+import { getRememberMe } from "@/integrations/supabase/rememberedAuthStorage";
 
 const NAV = [
   { to: "/panel", label: "Panel", icon: LayoutDashboard },
@@ -170,19 +172,17 @@ export function AppShell() {
   useEffect(() => {
     const userId = me.data?.id;
     if (!userId) return;
-    const key = `saha:last-activity:${userId}`;
-    const maxIdle = 8 * 60 * 60_000;
+    const maxIdle = getRememberMe() ? 30 * 24 * 60 * 60_000 : 8 * 60 * 60_000;
     let ending = false;
     const touch = () => {
       if (ending) return;
-      let last = 0;
-      try { last = Number(localStorage.getItem(key) ?? 0); } catch { last = 0; }
+      const last = readUserActivity(userId);
       if (last && Date.now() - last >= maxIdle) {
         ending = true;
         void supabase.auth.signOut({ scope: "local" }).finally(() => toast.info("Güvenlik için oturum kapatıldı. Yeniden giriş yapın."));
         return;
       }
-      try { localStorage.setItem(key, String(Date.now())); } catch { /* session expiry check remains active in memory */ }
+      markUserActivity(userId);
     };
     const timer = window.setInterval(touch, 60_000);
     const events = ["pointerdown", "keydown", "touchstart", "scroll"] as const;

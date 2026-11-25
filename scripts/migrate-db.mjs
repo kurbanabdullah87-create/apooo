@@ -416,9 +416,23 @@ try {
     } else {
       console.log("[db:migrate] Admin complimentary Premium grants are already secured.");
     }
+
+    const [{ manualBankTransferReady }] = await tx`
+      SELECT to_regclass('public.payment_settings') IS NOT NULL
+        AND to_regclass('public.bank_transfer_requests') IS NOT NULL
+        AND to_regprocedure('public.start_bank_transfer(text)') IS NOT NULL
+        AND to_regprocedure('public.submit_bank_transfer(uuid)') IS NOT NULL
+        AND to_regprocedure('public.admin_review_bank_transfer(uuid,boolean,text)') IS NOT NULL
+        AS "manualBankTransferReady"
+    `;
+    if (!manualBankTransferReady) {
+      await applyMigration(tx, "0031_manual_bank_transfer_payments.sql", "0031_manual_bank_transfer_payments");
+    } else {
+      console.log("[db:migrate] Manual bank-transfer checkout and access controls are ready.");
+    }
   });
 
-  const requiredTables = ["debt_records", "debt_installments", "debt_payments", "debt_payment_promises", "credit_card_records", "business_profiles", "business_profile_audit", "authorized_emails", "plan_entitlements", "admin_plan_grants", "admin_plan_grant_events", "plan_pricing", "plan_campaigns", "payment_orders", "app_usage_events"];
+  const requiredTables = ["debt_records", "debt_installments", "debt_payments", "debt_payment_promises", "credit_card_records", "business_profiles", "business_profile_audit", "authorized_emails", "plan_entitlements", "admin_plan_grants", "admin_plan_grant_events", "plan_pricing", "plan_campaigns", "payment_orders", "payment_settings", "bank_transfer_requests", "app_usage_events"];
   const missing = [];
   for (const name of requiredTables) {
     if (!(await tableExists(client, name))) missing.push(name);

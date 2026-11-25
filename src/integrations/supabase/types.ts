@@ -529,6 +529,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_payment_instructions: { Args: never; Returns: { bank_name: string; account_name: string; iban: string; instructions: string }[] }
+      set_payment_instructions: { Args: { _bank_name: string; _account_name: string; _iban: string; _instructions: string }; Returns: undefined }
+      start_bank_transfer: { Args: { _plan_code: string }; Returns: { request_id: string; amount: number; currency: string; transfer_reference: string; bank_name: string; account_name: string; iban: string; instructions: string; plan_code: string; status: string }[] }
+      submit_bank_transfer: { Args: { _request_id: string }; Returns: undefined }
+      list_my_bank_transfers: { Args: never; Returns: { id: string; plan_code: string; amount: number; currency: string; status: string; transfer_reference: string; created_at: string; submitted_at: string | null; review_note: string }[] }
+      admin_list_bank_transfers: { Args: never; Returns: { id: string; email: string; plan_code: string; amount: number; currency: string; status: string; transfer_reference: string; created_at: string; submitted_at: string | null }[] }
+      admin_review_bank_transfer: { Args: { _request_id: string; _approve: boolean; _review_note?: string }; Returns: undefined }
       record_app_usage: { Args: { _event_type: string; _module: string }; Returns: undefined }
       admin_usage_summary: { Args: never; Returns: Json }
       admin_list_user_plan_access: { Args: { _search?: string }; Returns: { user_id: string; email: string; display_name: string | null; username: string | null; email_confirmed: boolean; is_admin: boolean; is_authorized: boolean; has_premium: boolean; access_source: string; premium_expires_at: string | null; grant_reason: string | null; grant_status: string | null }[] }

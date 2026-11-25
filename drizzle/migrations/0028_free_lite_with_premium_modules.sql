@@ -1,6 +1,5 @@
 -- Free plan keeps a small working core; all other app modules remain visible
 -- but are subscription-gated. Replaces the broader owner unlock from 0027.
-BEGIN;
 
 -- This helper is used throughout privileged RPCs and non-core table policies.
 -- Do not treat a free workspace owner as a paid team master here.
@@ -19,16 +18,19 @@ CREATE POLICY "free owner reads own business profile" ON public.business_profile
 
 -- A free owner can use the simple customer ledger and expenses.
 DROP POLICY IF EXISTS "usta team customers" ON public.customers;
+DROP POLICY IF EXISTS "plan scoped customers" ON public.customers;
 CREATE POLICY "plan scoped customers" ON public.customers FOR ALL TO authenticated
 USING (team_id = public.current_team() AND (public.has_full_access() OR public.current_team() = auth.uid()))
 WITH CHECK (team_id = public.current_team() AND (public.has_full_access() OR public.current_team() = auth.uid()));
 
 DROP POLICY IF EXISTS "usta team transactions" ON public.transactions;
+DROP POLICY IF EXISTS "plan scoped transactions" ON public.transactions;
 CREATE POLICY "plan scoped transactions" ON public.transactions FOR ALL TO authenticated
 USING (team_id = public.current_team() AND (public.has_full_access() OR public.current_team() = auth.uid()))
 WITH CHECK (team_id = public.current_team() AND (public.has_full_access() OR public.current_team() = auth.uid()));
 
 DROP POLICY IF EXISTS "usta team expenses" ON public.expenses;
+DROP POLICY IF EXISTS "plan scoped expenses" ON public.expenses;
 CREATE POLICY "plan scoped expenses" ON public.expenses FOR ALL TO authenticated
 USING (team_id = public.current_team() AND (public.has_full_access() OR public.current_team() = auth.uid()))
 WITH CHECK (team_id = public.current_team() AND (public.has_full_access() OR public.current_team() = auth.uid()));
@@ -113,4 +115,3 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
 $$;
 
 NOTIFY pgrst, 'reload schema';
-COMMIT;
