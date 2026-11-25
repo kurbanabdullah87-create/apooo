@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Save, UserPlus, LogOut, Fingerprint, LockKeyhole, Award, Link2, Loader2, Plus, X, ShieldCheck, CheckCircle2, ArchiveRestore, Star, Trash2, Activity, RefreshCw } from "lucide-react";
+import { Save, UserPlus, LogOut, Fingerprint, LockKeyhole, Award, Link2, Loader2, Plus, X, ShieldCheck, CheckCircle2, ArchiveRestore, Star, Trash2, Activity, RefreshCw, Gift, Search, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,10 +77,11 @@ function Settings() {
         <p className="text-sm text-muted-foreground">{me.data?.isUsta ? "Usta" : "Çırak"}</p>
       </div>
       {me.data?.isAdmin && <AuthorizedAccounts />}
+      {me.data?.isAdmin && <AdminPremiumManager />}
       {me.data?.isAdmin && <AdminUsageDashboard />}
       {me.data?.isAdmin && <PlanCampaignAdmin />}
       {me.data?.email.toLocaleLowerCase("en-US") === "abdullahkurban670@gmail.com" && !me.data.isAdmin && <section role="alert" className="space-y-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4"><div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 size-5 shrink-0 text-amber-600"/><div><h2 className="font-semibold">Yönetici yetkisi doğrulanamadı</h2><p className="mt-1 text-sm text-muted-foreground">Oturum açık, ancak yönetici araçları için Supabase hesabının e-postası doğrulanmış ve yetki kaydı etkin olmalı. Yönetici hesabı normal giriş bilgileriyle veya hesabın bağlı olduğu Google hesabıyla açılır; ayrı bir yönetici parolası yoktur.</p><p className="mt-2 text-xs text-muted-foreground">{me.data.accessCheckError ? "Yetki doğrulama servisine ulaşılamadı. Veritabanı migration’ı veya bağlantı kontrol edilmeli." : "Hesap doğrulaması yanıt verdi fakat yönetici rolü dönmedi. E-posta doğrulaması ve 0023_user_access_and_premium migration’ındaki yetkili e-posta kaydı kontrol edilmeli."}</p><p className="mt-1 break-all text-[11px] text-muted-foreground">Oturum e-postası: {me.data.email}</p></div></div><Button type="button" variant="outline" size="sm" onClick={() => void me.refetch()} disabled={me.isFetching}><RefreshCw className={`mr-2 size-4 ${me.isFetching ? "animate-spin" : ""}`}/>Yönetici yetkisini yeniden kontrol et</Button></section>}
-      <section className="rounded-2xl border bg-card p-4"><h2 className="font-semibold">Plan ve erişim</h2><p className="mt-1 text-sm text-muted-foreground">{me.data?.hasFullAccess ? "Premium erişiminiz açık; tüm bölümler kullanılabilir." : "Ücretsiz planda Panel, işler, cari ve yevmiye kullanılabilir. Diğer bölümler görünür; kullanmak için Premium gerekir."}</p><Button asChild variant="outline" className="mt-3"><a href="/premium">Planı görüntüle</a></Button></section>
+      <section className="space-y-3 rounded-2xl border bg-card p-4"><div><h2 className="font-semibold">Plan ve erişim</h2><p className="mt-1 text-sm text-muted-foreground">{me.data?.hasFullAccess ? "Premium erişiminiz açık. Plan, yönetici hediyesi veya süresi burada gösterilir." : "Ücretsiz plan süresizdir; temel saha kayıtlarını kart bilgisi vermeden kullanabilirsiniz."}</p></div>{me.data?.hasFullAccess ? <ul className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2"><li className="rounded-lg bg-background/60 p-2">Banka kasası, işlem kayıtları ve ayrıntılı raporlar</li><li className="rounded-lg bg-background/60 p-2">Taksit, borç/alacak ve kart ödeme planları</li><li className="rounded-lg bg-background/60 p-2">Randevu, ekipman, bakım, stok ve puantaj</li><li className="rounded-lg bg-background/60 p-2">Çoklu işletme profili ve gelişmiş saha araçları</li></ul> : <ul className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2"><li className="rounded-lg bg-background/60 p-2">İş oluşturma, durum/zaman takibi ve teklif taslağı</li><li className="rounded-lg bg-background/60 p-2">Müşteri/cari kartları, borç ve tahsilat</li><li className="rounded-lg bg-background/60 p-2">Yevmiye, mesai, avans ve ödeme kaydı</li><li className="rounded-lg bg-background/60 p-2">Temel giderler, panel özeti ve tek işletme profili</li></ul>}<Button asChild variant="outline"><a href="/premium">Plan ayrıntılarını görüntüle</a></Button></section>
       <InstallButton />
       {me.data?.isUsta && (
         <>
@@ -343,6 +344,55 @@ function AuthorizedAccounts() {
     if (error) throw error;
   }, onSuccess: async () => { setEmail(""); toast.success("Yetkili hesap listesi güncellendi."); await qc.invalidateQueries({ queryKey: ["authorized-emails"] }); }, onError: (error: Error) => toast.error(error.message) });
   return <section className="space-y-3 rounded-2xl border border-primary/20 bg-primary/[.035] p-4"><div><h2 className="font-semibold">Yönetici · yetkili hesaplar</h2><p className="mt-1 text-xs text-muted-foreground">Tam erişim yalnızca burada listelenen, e-postası doğrulanmış kayıtlı hesaplara verilir. Şifre girmeyin veya paylaşmayın.</p></div>{list.error && <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">Yönetici listesi yüklenemedi. Oturum e-postasının doğrulandığını ve yönetici yetkisinin tanımlandığını kontrol edin.</p>}<form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); if (email.trim()) change.mutate({ email: email.trim(), enabled: true }); }}><Input type="email" autoComplete="off" required maxLength={254} placeholder="kullanici@example.com" value={email} onChange={(event) => setEmail(event.target.value)} /><Button disabled={change.isPending}>Yetkili ekle</Button></form><div className="space-y-2">{list.data?.map((item) => <div key={item.email} className="flex items-center justify-between gap-3 rounded-xl border bg-background p-3 text-sm"><span className="truncate">{item.email}</span><Button variant="outline" size="sm" disabled={change.isPending || item.email === "abdullahkurban670@gmail.com"} onClick={() => change.mutate({ email: item.email, enabled: false })}>Erişimi kaldır</Button></div>)}</div></section>;
+}
+
+type AdminPlanUser = {
+  user_id: string; email: string; display_name: string | null; username: string | null;
+  email_confirmed: boolean; is_admin: boolean; is_authorized: boolean; has_premium: boolean;
+  access_source: string; premium_expires_at: string | null; grant_reason: string | null; grant_status: string | null;
+};
+function AdminPremiumManager() {
+  const qc = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [days, setDays] = useState("30");
+  const [planCode, setPlanCode] = useState("premium_annual");
+  const [reason, setReason] = useState("Yönetici tarafından ücretsiz Premium erişimi verildi.");
+  const users = useQuery({ queryKey: ["admin-user-plan-access", search], queryFn: async () => {
+    const { data, error } = await supabase.rpc("admin_list_user_plan_access", { _search: search.trim() });
+    if (error) throw error;
+    return data as AdminPlanUser[];
+  }});
+  const events = useQuery({ queryKey: ["admin-plan-grant-events"], queryFn: async () => {
+    const { data, error } = await supabase.rpc("admin_list_plan_grant_events", { _limit: 20 });
+    if (error) throw error;
+    return data ?? [];
+  }});
+  const change = useMutation({ mutationFn: async ({ user, action, reasonOverride }: { user: AdminPlanUser; action: "grant" | "extend" | "revoke"; reasonOverride?: string }) => {
+    const operationReason = (reasonOverride ?? reason).trim();
+    if (operationReason.length < 5) throw new Error("İşlem gerekçesi en az 5 karakter olmalı.");
+    const { error } = await supabase.rpc("admin_set_user_premium", {
+      _user_id: user.user_id, _action: action, _plan_code: planCode,
+      _days: action === "revoke" ? 30 : Number(days), _reason: operationReason,
+    });
+    if (error) throw error;
+  }, onSuccess: async (_data, variables) => {
+    toast.success(variables.action === "revoke" ? "Ücretsiz yönetici Premium erişimi kaldırıldı. Satın alınmış planlar etkilenmedi." : variables.action === "extend" ? "Ücretsiz Premium süresi uzatıldı." : "Kullanıcıya ücretsiz Premium erişimi verildi.");
+    await Promise.all([qc.invalidateQueries({ queryKey: ["admin-user-plan-access"] }), qc.invalidateQueries({ queryKey: ["admin-plan-grant-events"] }), qc.invalidateQueries({ queryKey: ["me"] })]);
+  }, onError: (error: Error) => toast.error(error.message || "Plan erişimi güncellenemedi.") });
+  const grant = (user: AdminPlanUser) => change.mutate({ user, action: user.grant_status === "active" ? "extend" : "grant" });
+  const revoke = (user: AdminPlanUser) => {
+    if (!confirm(`${user.email} hesabının yönetici tarafından verilen ücretsiz Premium erişimi kaldırılsın mı? Satın alınmış Premium etkilenmez.`)) return;
+    const reasonOverride = window.prompt("Ücretsiz Premium erişimini kaldırma nedeni:", "Yönetici erişimi sonlandırdı.");
+    if (!reasonOverride?.trim()) return;
+    change.mutate({ user, action: "revoke", reasonOverride });
+  };
+  const dateLabel = (value: string | null) => value ? new Date(value).toLocaleDateString("tr-TR", { dateStyle: "long" }) : "Süresiz";
+  return <section className="space-y-4 rounded-2xl border border-emerald-500/20 bg-card p-4">
+    <div className="flex items-start gap-3"><span className="rounded-xl bg-emerald-500/10 p-2 text-emerald-500"><Gift className="size-5"/></span><div><h2 className="font-semibold">Kullanıcı planları · ücretsiz Premium tanımla</h2><p className="mt-1 text-xs leading-relaxed text-muted-foreground">Kayıtlı kullanıcıyı e-posta veya adla bul; gerekçe girip süreli ya da süresiz Premium ver, süresini uzat veya yalnızca yönetici hediyesini kaldır. Satın alınmış plan kaydı bu işlemle silinmez.</p></div></div>
+    <div className="grid gap-2 rounded-xl border bg-background/50 p-3 sm:grid-cols-3"><div className="relative sm:col-span-3"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/><Input aria-label="Kullanıcı ara" className="pl-9" maxLength={120} placeholder="E-posta, görünen ad veya kullanıcı adı" value={search} onChange={(event) => setSearch(event.target.value)}/></div><div className="space-y-1"><Label htmlFor="admin-grant-plan">Plan etiketi</Label><select id="admin-grant-plan" className="h-10 w-full rounded-xl border bg-background px-3 text-sm" value={planCode} onChange={(event) => setPlanCode(event.target.value)}><option value="premium_monthly">Premium · Aylık</option><option value="premium_annual">Premium · Yıllık</option></select></div><div className="space-y-1"><Label htmlFor="admin-grant-days">Erişim süresi</Label><select id="admin-grant-days" className="h-10 w-full rounded-xl border bg-background px-3 text-sm" value={days} onChange={(event) => setDays(event.target.value)}><option value="30">30 gün</option><option value="90">90 gün</option><option value="365">1 yıl</option><option value="0">Süresiz</option></select></div><div className="space-y-1 sm:col-span-1"><Label htmlFor="admin-grant-reason">İşlem gerekçesi · denetim kaydı</Label><Input id="admin-grant-reason" maxLength={500} minLength={5} value={reason} onChange={(event) => setReason(event.target.value)} /></div></div>
+    {users.isLoading ? <p className="rounded-xl border border-dashed p-4 text-center text-sm text-muted-foreground">Kullanıcılar yükleniyor…</p> : users.error ? <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">Kullanıcı planları alınamadı. Veritabanında 0030 yönetici Premium migration’ının uygulanmış olduğunu doğrula.</p> : !users.data?.length ? <p className="rounded-xl border border-dashed p-4 text-center text-sm text-muted-foreground">Eşleşen hesap bulunamadı. E-posta doğrulanmış ve kayıtlı olmalı.</p> : <div className="max-h-[34rem] space-y-2 overflow-y-auto">{users.data.map((user) => <article key={user.user_id} className="space-y-3 rounded-xl border bg-background/50 p-3"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><p className="break-all text-sm font-semibold">{user.email}</p><p className="text-xs text-muted-foreground">{user.display_name || user.username || "Ad eklenmemiş"} · {user.email_confirmed ? "E-posta doğrulanmış" : "E-posta doğrulanmamış"}{user.is_admin ? " · Yönetici" : ""}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${user.has_premium ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-secondary text-muted-foreground"}`}>{user.access_source}</span></div><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs text-muted-foreground">{user.has_premium ? `Erişim sonu: ${dateLabel(user.premium_expires_at)}` : "Premium erişimi yok"}{user.grant_reason ? ` · Gerekçe: ${user.grant_reason}` : ""}</p><div className="flex gap-2"><Button size="sm" variant={user.grant_status === "active" ? "outline" : "default"} disabled={change.isPending || !user.email_confirmed || user.is_admin || (user.grant_status === "active" && user.premium_expires_at === null)} onClick={() => grant(user)}><Gift className="size-4"/>{user.grant_status === "active" && user.premium_expires_at === null ? "Süresiz Premium aktif" : user.grant_status === "active" ? "Hediyeyi uzat" : "Ücretsiz Premium ver"}</Button>{user.grant_status === "active" && <Button size="sm" variant="destructive" disabled={change.isPending} onClick={() => revoke(user)}>Hediyeyi kaldır</Button>}</div></div>{user.is_admin && <p className="text-[11px] text-muted-foreground">Yönetici hesabı zaten tam erişime sahip; ayrı hediye uygulanmaz.</p>}{!user.email_confirmed && <p className="text-[11px] text-amber-700 dark:text-amber-300">E-posta doğrulanmadan yetki tanımlanamaz.</p>}</article>)}</div>}
+    <details className="rounded-xl border bg-background/40 p-3"><summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold"><UsersRound className="size-4"/>Son plan erişim işlemleri</summary>{events.error ? <p className="mt-2 text-xs text-destructive">Denetim kayıtları yüklenemedi.</p> : <div className="mt-3 space-y-2">{(events.data ?? []).map((event, index) => <div key={`${event.created_at}-${index}`} className="flex flex-wrap justify-between gap-2 rounded-lg bg-background p-2 text-xs"><span className="break-all">{event.email} · {event.action === "revoke" ? "erişim kaldırıldı" : event.action === "extend" ? "erişim uzatıldı" : "erişim verildi"}<span className="block text-muted-foreground">{event.reason} · yönetici: {event.actor_email}</span></span><span className="shrink-0 text-muted-foreground">{event.days === 0 ? "Süresiz" : event.days == null ? "—" : `${event.days} gün`} · {new Date(event.created_at).toLocaleString("tr-TR")}</span></div>)}{!events.data?.length && <p className="text-xs text-muted-foreground">Henüz hediye Premium işlemi yapılmadı.</p>}</div>}</details>
+  </section>;
 }
 
 function localDateTime(value: Date) {

@@ -36,10 +36,12 @@ export const Route = createFileRoute("/_authenticated/premium")({
 });
 
 const freeModules = [
-  { label: "Panel", detail: "Günlük iş ve cari özeti", icon: BriefcaseBusiness },
-  { label: "İşler", detail: "İş oluşturma ve cari hesaba aktarma", icon: CheckCircle2 },
-  { label: "Cari", detail: "Müşteri, borç ve tahsilat kaydı", icon: Users },
-  { label: "Yevmiye", detail: "Çalışma günleri ve ücret takibi", icon: CalendarDays },
+  { label: "Panel", detail: "Günlük iş akışı, tahsilat ve gider özeti", icon: BriefcaseBusiness },
+  { label: "İş yönetimi", detail: "İş oluşturma, müşteri atama, durum, zamanlayıcı, kontrol listesi ve teklif taslağı", icon: CheckCircle2 },
+  { label: "Müşteri ve cari", detail: "Müşteri kartı, iletişim bilgisi, borç/alacak görünümü ve tahsilat kaydı", icon: Users },
+  { label: "Yevmiye", detail: "Çalışan, gün, ücret, mesai, avans ve ödeme kayıtları", icon: CalendarDays },
+  { label: "Temel finans", detail: "İşten cariye aktarım, tahsilat ve gider girişi", icon: WalletCards },
+  { label: "İşletme ayarları", detail: "Tek çalışma profili, makbuz bilgileri ve temel hedefler", icon: ShieldCheck },
 ];
 
 const premiumModules = [
@@ -190,8 +192,9 @@ function PremiumPage() {
             </p>
           </div>
           {me.data?.hasFullAccess ? (
-            <span className="inline-flex items-center gap-2 rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary">
-              <BadgeCheck className="size-5" /> Premium etkin
+            <span className="inline-flex flex-col gap-1 rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary">
+              <span className="inline-flex items-center gap-2"><BadgeCheck className="size-5" /> Premium etkin</span>
+              <span className="pl-7 text-[11px] font-normal">{me.data.premiumExpiresAt ? `Erişim sonu: ${new Date(me.data.premiumExpiresAt).toLocaleDateString("tr-TR")}` : "Süresiz veya yetkili hesap erişimi"}</span>
             </span>
           ) : (
             <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm">
@@ -202,9 +205,9 @@ function PremiumPage() {
         </div>
         <div className="mt-7 grid gap-2 sm:grid-cols-3">
           {[
-            ["4 bölüm", "ücretsiz kullanıma açık"],
-            ["Tüm modüller", "menüde görünür"],
-            ["İstediğin zaman", "planını yükselt"],
+            ["6 temel akış", "ücretsiz kullanıma açık"],
+            ["Premium bölümler", "menüde görünür ve kilitli"],
+            ["Ücretsiz erişim", "yönetici tarafından tanımlanabilir"],
           ].map(([value, label]) => (
             <div
               key={value}
@@ -245,8 +248,10 @@ function PremiumPage() {
             ))}
           </div>
           <p className="mt-5 rounded-2xl bg-black/15 px-3.5 py-3 text-xs leading-5 text-muted-foreground">
-            Hızlı ekle’den müşteri, tahsilat ve gider kaydı oluşturabilirsin. Ücretsiz kullanım için
-            kart bilgisi gerekmez.
+            Ücretsiz plan süresizdir ve kart bilgisi istemez. Tek işletme çalışma alanında temel saha
+            kayıtlarını kullanabilirsin. Banka kasası, taksit/kredi kartı planları, gelişmiş saha
+            modülleri ve çoklu işletme profilleri Premium erişimi gerektirir. Yönetici, hesabına
+            ücretsiz Premium süresi veya süresiz erişim tanımlayabilir.
           </p>
         </article>
 

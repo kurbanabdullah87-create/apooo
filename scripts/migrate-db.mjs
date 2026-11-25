@@ -387,14 +387,38 @@ try {
     } else {
       console.log("[db:migrate] Free core access and premium finance gates are already secured.");
     }
-    if (!freeCoreAccessReady) {
+    const [{ freeLiteAccessReady }] = await tx`
+      SELECT EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE schemaname='public' AND tablename='work_records'
+          AND policyname='free core work record writes'
+      ) AND to_regprocedure('public.is_team_usta()') IS NOT NULL
+        AND coalesce(pg_get_functiondef(to_regprocedure('public.is_team_usta()')), '') NOT ILIKE '%current_team() = auth.uid()%'
+        AS "freeLiteAccessReady"
+    `;
+    if (!freeLiteAccessReady) {
       await applyMigration(tx, "0028_free_lite_with_premium_modules.sql", "0028_free_lite_with_premium_modules");
     } else {
       console.log("[db:migrate] Free plan boundaries are already secured.");
     }
+
+    const [{ adminGrantsReady }] = await tx`
+      SELECT to_regclass('public.admin_plan_grants') IS NOT NULL
+        AND to_regclass('public.admin_plan_grant_events') IS NOT NULL
+        AND to_regprocedure('public.admin_list_user_plan_access(text)') IS NOT NULL
+        AND to_regprocedure('public.admin_set_user_premium(uuid,text,text,integer,text)') IS NOT NULL
+        AND to_regprocedure('public.admin_list_plan_grant_events(integer)') IS NOT NULL
+        AND coalesce(pg_get_functiondef(to_regprocedure('public.has_full_access()')), '') ILIKE '%admin_plan_grants%'
+        AS "adminGrantsReady"
+    `;
+    if (!adminGrantsReady) {
+      await applyMigration(tx, "0030_admin_premium_grants_and_free_plan.sql", "0030_admin_premium_grants_and_free_plan");
+    } else {
+      console.log("[db:migrate] Admin complimentary Premium grants are already secured.");
+    }
   });
 
-  const requiredTables = ["debt_records", "debt_installments", "debt_payments", "debt_payment_promises", "credit_card_records", "business_profiles", "business_profile_audit", "authorized_emails", "plan_entitlements", "plan_pricing", "plan_campaigns", "payment_orders", "app_usage_events"];
+  const requiredTables = ["debt_records", "debt_installments", "debt_payments", "debt_payment_promises", "credit_card_records", "business_profiles", "business_profile_audit", "authorized_emails", "plan_entitlements", "admin_plan_grants", "admin_plan_grant_events", "plan_pricing", "plan_campaigns", "payment_orders", "app_usage_events"];
   const missing = [];
   for (const name of requiredTables) {
     if (!(await tableExists(client, name))) missing.push(name);
