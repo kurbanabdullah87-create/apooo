@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Plus, Play, Pause, Check, Copy, ChevronDown, Clock, Download, Search, X, CalendarCheck, Activity, Phone, MessageCircle, Share2, FileText, ClipboardCheck, Mail, LayoutGrid, LayoutList, MapPin } from "lucide-react";
+import { Plus, Play, Pause, Check, Copy, ChevronDown, Clock, Download, Search, X, CalendarCheck, Activity, Phone, MessageCircle, Share2, FileText, ClipboardCheck, Mail, LayoutGrid, LayoutList, MapPin, Star, Archive, ArchiveRestore, Bookmark, Tags } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { FormDrawer } from "@/components/app/forms/FormDrawer";
@@ -37,20 +37,32 @@ import { openWhatsApp } from "@/lib/templates";
 import { SwipeRow } from "@/components/app/SwipeRow";
 import { Skeleton } from "@/components/ui/skeleton";
 import { scanJobRequestEmails, type GmailJobRequest } from "@/lib/gmail-bank";
+import { buildSafeCsv } from "@/lib/csv";
 
 export const Route = createFileRoute("/_authenticated/isler")({
   head: () => pageHead("İşler", "İş planı, çalışma süreleri ve saha kayıtları."),
   component: Jobs,
 });
 
-const STATUSES = ["Teklif", "Bekliyor", "Devam Ediyor", "Tamamlandı", "Ertelendi"];
+const STATUSES = ["Teklif", "Bekliyor", "Devam Ediyor", "Tamamlandı", "Ertelendi", "İptal"];
 type ChecklistItem = { label: string; done: boolean };
+type SavedJobView = { id: string; name: string; search: string; status: string; customer: string; minimum: string; date: string; range: "" | "today" | "week" | "month" };
 function checklistFor(payload: Payload): ChecklistItem[] {
   try {
     const parsed: unknown = JSON.parse(String(payload.checklist_json ?? "[]"));
     if (!Array.isArray(parsed)) return [];
     return parsed.filter((item): item is ChecklistItem => typeof item === "object" && item !== null && typeof item.label === "string" && typeof item.done === "boolean");
   } catch { return []; }
+}
+function jobStatusClass(status: unknown) {
+  switch (String(status ?? "")) {
+    case "Tamamlandı": return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
+    case "Devam Ediyor": return "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300";
+    case "Teklif": return "border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300";
+    case "Ertelendi": return "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-200";
+    case "İptal": return "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300";
+    default: return "border-border bg-secondary text-muted-foreground";
+  }
 }
 
 function Jobs() {
@@ -62,6 +74,8 @@ function Jobs() {
   const payrollRows = useRecords("payroll");
   const expenses = useExpenses();
   const equipment = useRecords("equipment");
+  const settings = useRecords("settings");
+  const saveSettings = useSaveRecord("settings");
   const me = useMe();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -85,6 +99,65 @@ function Jobs() {
   const [emailConsent, setEmailConsent] = useState(false);
   const [emailBusy, setEmailBusy] = useState(false);
   const [emailRequests, setEmailRequests] = useState<GmailJobRequest[]>([]);
+  const [savedViews, setSavedViews] = useState<SavedJobView[]>([]);
+  const [savedViewName, setSavedViewName] = useState("");
+  const [selectedViewId, setSelectedViewId] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
+  const [recentJobIds, setRecentJobIds] = useState<string[]>([]);
+
+  const workspaceSettings = settings.data?.find((row) => row.owner_id === me.data?.id && row.payload.key === "job-workspace-v1");
+  useEffect(() => {
+    try {
+      const parsed: unknown = JSON.parse(String(workspaceSettings?.payload.saved_views_json ?? "[]"));
+      setSavedViews(Array.isArray(parsed) ? parsed.filter((item): item is SavedJobView => typeof item === "object" && item !== null && typeof (item as SavedJobView).id === "string" && typeof (item as SavedJobView).name === "string") : []);
+    } catch { setSavedViews([]); }
+  }, [workspaceSettings?.id, workspaceSettings?.payload.saved_views_json]);
+
+  useEffect(() => {
+    if (!me.data?.id) return;
+    try {
+      const key = `saha-recent-jobs:${me.data.id}`;
+      const parsed: unknown = JSON.parse(localStorage.getItem(key) ?? "[]");
+      setRecentJobIds(Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string").slice(0, 8) : []);
+    } catch { setRecentJobIds([]); }
+  }, [me.data?.id]);
+
+  function markJobViewed(id: string) {
+    if (!me.data?.id) return;
+    const next = [id, ...recentJobIds.filter((value) => value !== id)].slice(0, 8);
+    setRecentJobIds(next);
+    try { localStorage.setItem(`saha-recent-jobs:${me.data.id}`, JSON.stringify(next)); } catch { /* optional device preference */ }
+  }
+
+  async function persistSavedViews(next: SavedJobView[]) {
+    if (!me.data?.id) return;
+    await saveSettings.mutateAsync({ id: workspaceSettings?.id, owner_id: me.data.id, payload: { ...(workspaceSettings?.payload ?? {}), key: "job-workspace-v1", saved_views_json: JSON.stringify(next) } });
+    setSavedViews(next);
+  }
+
+  function saveCurrentView() {
+    const name = savedViewName.trim() || window.prompt("Bu filtre görünümüne bir ad verin:")?.trim();
+    if (!name) return;
+    if (savedViews.some((view) => view.name.toLocaleLowerCase("tr-TR") === name.toLocaleLowerCase("tr-TR"))) return void toast.error("Bu isimde kayıtlı bir görünüm zaten var.");
+    const next: SavedJobView = { id: crypto.randomUUID(), name: name.slice(0, 60), search: searchQuery, status: filter, customer: customerFilter, minimum: minimumAmount, date, range: quickRange };
+    void persistSavedViews([...savedViews, next]).then(() => { setSavedViewName(""); toast.success("Filtre görünümü kaydedildi."); }).catch((error) => toast.error(error instanceof Error ? error.message : "Görünüm kaydedilemedi."));
+  }
+
+  function downloadFilteredJobsCsv() {
+    const customerById = new Map((customers.data ?? []).map((customer) => [customer.id, customer]));
+    const content = buildSafeCsv([
+      ["İş", "Müşteri", "Telefon", "Tarih", "Saat", "Durum", "Öncelik", "Tutar (₺)", "Adres", "Not", "Etiket"],
+      ...rows.map((job) => {
+        const customer = customerById.get(String(job.payload.customer_id ?? ""));
+        const amount = Number(job.payload.price ?? 0) || hourlyCharge(elapsedSeconds(job.payload, now), Number(job.payload.hourly_rate ?? 0));
+        return [String(job.payload.title ?? ""), customer?.name ?? "", customer?.phone ?? "", String(job.payload.date ?? ""), String(job.payload.time ?? ""), String(job.payload.status ?? ""), String(job.payload.urgency ?? "normal"), amount.toFixed(2), String(job.payload.address ?? ""), String(job.payload.notes ?? ""), String(job.payload.label_tags ?? "")];
+      }),
+    ]);
+    const url = URL.createObjectURL(new Blob([content], { type: "text/csv;charset=utf-8" }));
+    const anchor = document.createElement("a"); anchor.href = url; anchor.download = `saha-isler-${todayISO()}.csv`; anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast.success(`${rows.length} filtrelenmiş iş CSV olarak indirildi.`);
+  }
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -96,6 +169,8 @@ function Jobs() {
 
   const edit = useCallback((j?: WorkRecord, p?: Payload) => {
     setEditing(j);
+    let lastCustomer = "";
+    try { lastCustomer = localStorage.getItem(`saha-last-customer:${me.data?.id ?? ""}`) ?? ""; } catch { /* optional convenience preference */ }
     setForm(
       j
         ? { ...j.payload, checklist_draft: checklistFor(j.payload).map((item) => item.label).join("\n"), owner_id: j.owner_id }
@@ -109,6 +184,7 @@ function Jobs() {
             vat_rate: 0,
             equipment_id: null,
             owner_id: me.data?.id,
+            customer_id: lastCustomer || undefined,
             ...p,
           },
     );
@@ -153,8 +229,37 @@ function Jobs() {
     } catch { /* optional cross-route quick action */ }
   }, [jobs.isLoading, jobs.data, edit]);
 
-  async function change(j: WorkRecord, p: Payload) {
-    await save.mutateAsync({ id: j.id, owner_id: j.owner_id, payload: p });
+  async function change(j: WorkRecord, p: Payload, nextOwnerId = j.owner_id) {
+    let edits: Array<{ at: string; actor: string; fields: string[] }> = [];
+    try {
+      const parsed: unknown = JSON.parse(String(j.payload.edit_history_json ?? "[]"));
+      if (Array.isArray(parsed)) edits = parsed.filter((entry): entry is { at: string; actor: string; fields: string[] } => typeof entry === "object" && entry !== null && typeof (entry as { at?: unknown }).at === "string" && typeof (entry as { actor?: unknown }).actor === "string" && Array.isArray((entry as { fields?: unknown }).fields));
+    } catch { /* rebuild malformed legacy audit metadata */ }
+    const changedFields = [...new Set([...Object.keys(j.payload), ...Object.keys(p)])].filter((key) => key !== "edit_history_json" && JSON.stringify(j.payload[key]) !== JSON.stringify(p[key]));
+    if (changedFields.length) p = { ...p, edit_history_json: JSON.stringify([...edits, { at: new Date().toISOString(), actor: me.data?.id ?? "current-user", fields: changedFields.slice(0, 30) }].slice(-30)) };
+    const previousStatus = String(j.payload.status ?? "Bekliyor");
+    const nextStatus = String(p.status ?? previousStatus);
+    if (previousStatus !== nextStatus) {
+      let history: Array<{ from: string; to: string; at: string }> = [];
+      try {
+        const parsed: unknown = JSON.parse(String(p.status_history_json ?? "[]"));
+        if (Array.isArray(parsed)) history = parsed.filter((entry): entry is { from: string; to: string; at: string } => typeof entry === "object" && entry !== null && typeof (entry as { from?: unknown }).from === "string" && typeof (entry as { to?: unknown }).to === "string" && typeof (entry as { at?: unknown }).at === "string");
+      } catch { /* recover a malformed old history as a fresh log */ }
+      p = { ...p, status_history_json: JSON.stringify([...history, { from: previousStatus, to: nextStatus, at: new Date().toISOString() }].slice(-30)) };
+    }
+    await save.mutateAsync({ id: j.id, owner_id: nextOwnerId, payload: p });
+  }
+
+  async function toggleFollow(job: WorkRecord) {
+    await change(job, { ...job.payload, followed: job.payload.followed !== true });
+    toast.success(job.payload.followed === true ? "Takip işareti kaldırıldı." : "İş takip listesine eklendi.");
+  }
+
+  async function archiveJob(job: WorkRecord) {
+    const reason = window.prompt("Arşiv nedeni (isteğe bağlı):", String(job.payload.archive_reason ?? ""));
+    if (reason === null) return;
+    await change(job, { ...job.payload, archived: true, archive_reason: reason.trim().slice(0, 300), archived_at: new Date().toISOString() });
+    toast.success("İş arşivlendi.");
   }
 
   async function bill(j: WorkRecord) {
@@ -322,12 +427,13 @@ function Jobs() {
     if (dateRange) return rowDate >= dateRange[0] && rowDate <= dateRange[1];
     return !date || rowDate === date;
   });
+  const visibleDateRows = dateRows.filter((job) => (job.payload.archived === true) === showArchived);
   const statusCounts = Object.fromEntries(["Tümü", ...STATUSES].map((status) => [
     status,
-    status === "Tümü" ? dateRows.length : dateRows.filter((job) => String(job.payload.status ?? "Bekliyor") === status).length,
+    status === "Tümü" ? visibleDateRows.length : visibleDateRows.filter((job) => String(job.payload.status ?? "Bekliyor") === status).length,
   ])) as Record<string, number>;
   const normalizedQuery = debouncedQuery.trim().toLocaleLowerCase("tr-TR");
-  const queryRows = dateRows.filter((job) => {
+  const queryRows = visibleDateRows.filter((job) => {
     const customer = customers.data?.find((item) => item.id === job.payload.customer_id);
     const amount = Number(job.payload.price ?? 0) || hourlyCharge(elapsedSeconds(job.payload, now), Number(job.payload.hourly_rate ?? 0));
     if (customerFilter && job.payload.customer_id !== customerFilter) return false;
@@ -335,7 +441,7 @@ function Jobs() {
     if (!normalizedQuery) return true;
     const machine = equipment.data?.find((item) => item.id === job.payload.equipment_id);
     const assigned = members.find((item) => item.id === job.owner_id);
-    const searchable = [job.payload.title, customer?.name, customer?.phone, job.payload.address, customer?.address, job.payload.notes, machine?.payload.name, assigned?.username]
+    const searchable = [job.payload.title, customer?.name, customer?.phone, job.payload.address, customer?.address, job.payload.notes, job.payload.label_tags, machine?.payload.name, assigned?.username]
       .map((value) => String(value ?? "").toLocaleLowerCase("tr-TR"));
     return searchable.some((value) => value.includes(normalizedQuery));
   }).sort((a, b) => jobPriorityScore(b.payload) - jobPriorityScore(a.payload) || String(a.payload.time ?? "").localeCompare(String(b.payload.time ?? "")));
@@ -392,6 +498,22 @@ function Jobs() {
         <Input aria-label="En düşük iş tutarı" type="number" min="0" step="100" value={minimumAmount} onChange={(event) => setMinimumAmount(event.target.value)} placeholder="En az tutar ₺" />
         <Button type="button" variant="outline" size="sm" onClick={() => { setFilter("Tümü"); setViewMode(viewMode === "list" ? "kanban" : "list"); }}><span className="flex items-center gap-2">{viewMode === "list" ? <LayoutGrid className="size-4"/> : <LayoutList className="size-4"/>}{viewMode === "list" ? "Kanban" : "Liste"}</span></Button>
       </div>
+      <section className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3">
+        <Bookmark className="size-4 text-primary" aria-hidden="true" />
+        <select aria-label="Kaydedilmiş iş görünümü" className="h-9 min-w-40 flex-1 rounded-lg border bg-background px-2 text-sm" value={selectedViewId} onChange={(event) => {
+          setSelectedViewId(event.target.value);
+          const selected = savedViews.find((view) => view.id === event.target.value);
+          if (!selected) return;
+          setSearchQuery(selected.search); setFilter(selected.status); setCustomerFilter(selected.customer); setMinimumAmount(selected.minimum); setDate(selected.date); setQuickRange(selected.range);
+        }}><option value="">Kayıtlı filtre seç…</option>{savedViews.map((view) => <option key={view.id} value={view.id}>{view.name}</option>)}</select>
+        <Input aria-label="Filtre görünümü adı" className="h-9 w-40" maxLength={60} value={savedViewName} onChange={(event) => setSavedViewName(event.target.value)} placeholder="Görünüm adı" />
+        <Button type="button" size="sm" variant="outline" onClick={saveCurrentView} disabled={saveSettings.isPending}>Görünümü kaydet</Button>
+        {savedViews.length > 0 && <Button type="button" size="sm" variant="ghost" onClick={() => { if (!selectedViewId) return void toast("Silmek için önce kayıtlı görünümü seçin."); void persistSavedViews(savedViews.filter((item) => item.id !== selectedViewId)).then(() => setSelectedViewId("")).catch(() => toast.error("Görünüm silinemedi.")); }}>Seçileni sil</Button>}
+        <Button type="button" size="sm" variant={showArchived ? "secondary" : "outline"} onClick={() => setShowArchived((value) => !value)}><Archive className="size-4"/>{showArchived ? "Arşiv" : "Aktif işler"}</Button>
+        <Button type="button" size="sm" variant="outline" onClick={downloadFilteredJobsCsv} disabled={rows.length === 0}><Download className="size-4"/>CSV ({rows.length})</Button>
+      </section>
+      {recentJobIds.length > 0 && <section className="flex flex-wrap items-center gap-2 text-xs"><span className="text-muted-foreground">Son açılanlar:</span>{recentJobIds.map((id) => { const job = (jobs.data ?? []).find((item) => item.id === id); return job ? <Button key={id} type="button" variant="ghost" size="sm" className="h-7 max-w-48 truncate" onClick={() => { setShowArchived(job.payload.archived === true); setDate(""); setQuickRange(""); setFilter("Tümü"); setSearchQuery(""); setCustomerFilter(""); setMinimumAmount(""); setExpanded(id); }}>{String(job.payload.title ?? "İş")}</Button> : null; })}</section>}
+      {rows.some((job) => job.payload.followed === true) && <section className="flex flex-wrap items-center gap-2 text-xs"><Star className="size-4 fill-amber-400 text-amber-500"/><span className="text-muted-foreground">Takipte:</span>{rows.filter((job) => job.payload.followed === true).map((job) => <Button key={job.id} type="button" variant="ghost" size="sm" className="h-7" onClick={() => setExpanded(job.id)}>{String(job.payload.title ?? "İş")}</Button>)}</section>}
       {(activeFilterCount > 0 || customerFilter || minimumAmount) && <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground"><span>{activeFilterCount} filtre aktif</span><Button type="button" variant="link" size="sm" className="h-7 px-1" onClick={() => { setSearchQuery(""); setDebouncedQuery(""); setFilter("Tümü"); setCustomerFilter(""); setMinimumAmount(""); setQuickRange(""); setDate(""); }}>Filtreleri temizle</Button></div>}
       {viewMode === "list" && <div className="flex gap-2 overflow-x-auto pb-1" role="group" aria-label="İş durumu filtresi">
         {["Tümü", ...STATUSES].map((status) => <Button key={status} type="button" size="sm" variant={filter === status ? "default" : "outline"} className="shrink-0" aria-pressed={filter === status} onClick={() => setFilter(status)}>{status}<span className="ml-1 rounded-full bg-background/20 px-1.5 text-[10px]">{statusCounts[status] ?? 0}</span></Button>)}
@@ -471,14 +593,14 @@ function Jobs() {
                   size="icon"
                   variant="ghost"
                   aria-label="İş detayları"
-                  onClick={() => setExpanded(expanded === j.id ? undefined : j.id)}
+                  onClick={() => { markJobViewed(j.id); setExpanded(expanded === j.id ? undefined : j.id); }}
                 >
                   <ChevronDown />
                 </Button>
               </div>
               {Boolean(p.equipment_id) && <MachineInfo equipment={equipment.data ?? []} id={String(p.equipment_id)} />}
               <div className="flex items-center justify-between">
-                <span className={p.status === "Tamamlandı" ? "text-success" : "text-warning"}>
+                <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${jobStatusClass(p.status)}`}>
                   {p.status}
                 </span>
                 <span className="num">
@@ -488,6 +610,7 @@ function Jobs() {
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-xs"><span className={`rounded-full px-2.5 py-1 font-semibold ${score >= 50 ? "bg-destructive/10 text-destructive" : score >= 25 ? "bg-amber-500/10 text-amber-800 dark:text-amber-200" : "bg-secondary text-muted-foreground"}`}>Öncelik {score}</span>{Number(p.planned_hours) > 0 && <span className="rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">Tahmin {Number(p.planned_hours)} sa · gerçekleşen {(seconds / 3600).toFixed(1)} sa{seconds > plannedSeconds ? ` · +${((seconds - plannedSeconds) / 3600).toFixed(1)} sa sapma` : ""}</span>}</div>
+              {String(p.label_tags ?? "").split(",").map((tag) => tag.trim()).filter(Boolean).map((tag) => <span key={tag} style={{ borderColor: String(p.label_color ?? "").match(/^#[\da-fA-F]{6}$/) ? String(p.label_color) : undefined, color: String(p.label_color ?? "").match(/^#[\da-fA-F]{6}$/) ? String(p.label_color) : undefined }} className="mr-1 inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/5 px-2 py-1 text-[11px] text-primary"><Tags className="size-3"/>{tag}</span>)}
               {promiseDaysLeft !== null && p.status !== "Tamamlandı" && promiseDaysLeft <= 2 && <p role="status" className={`rounded-lg border p-2 text-xs ${promiseDaysLeft < 0 ? "border-destructive/40 bg-destructive/10 text-destructive" : "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-200"}`}>{promiseDaysLeft < 0 ? `Teslim taahhüdü ${Math.abs(promiseDaysLeft)} gün gecikti.` : promiseDaysLeft === 0 ? "Müşteriye verilen teslim tarihi bugün." : "Müşteriye verilen teslim tarihine 1 gün kaldı."}{p.delay_reason ? ` Neden: ${String(p.delay_reason)}` : ""}</p>}
               {prerequisite && prerequisite.payload.status !== "Tamamlandı" && <p role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-800 dark:text-amber-200">Bağımlı iş bekliyor: önce “{String(prerequisite.payload.title)}” tamamlanmalı.</p>}
               {me.data?.isUsta && (
@@ -501,6 +624,8 @@ function Jobs() {
                   </p>
                   {customer?.phone && <div className="flex flex-wrap gap-2"><Button asChild variant="outline" size="sm"><a href={`tel:${customer.phone}`} aria-label={`${customer.name} müşterisini ara`}><Phone className="size-4"/>Ara</a></Button><Button variant="outline" size="sm" onClick={() => openWhatsApp(customer.phone!, `Merhaba ${customer.name}, ${String(p.title ?? "işiniz")} için iletişime geçiyorum.`)}><MessageCircle className="size-4"/>WhatsApp</Button></div>}
                   <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" onClick={() => void toggleFollow(j)}><Star className={`size-4 ${p.followed === true ? "fill-amber-400 text-amber-500" : ""}`}/>{p.followed === true ? "Takipte" : "Takibe al"}</Button>
+                    {p.archived === true ? <Button size="sm" variant="outline" onClick={() => void change(j, { ...p, archived: false, archived_at: null })}><ArchiveRestore className="size-4"/>Arşivden çıkar</Button> : <Button size="sm" variant="outline" onClick={() => void archiveJob(j)}><Archive className="size-4"/>Arşivle</Button>}
                     <Button
                       variant="secondary"
                       size="sm"
@@ -574,6 +699,10 @@ function Jobs() {
               {expanded === j.id && (
                 <div className="space-y-3 border-t pt-3">
                   <p className="text-sm break-words">{p.notes}</p>
+                  {p.archive_reason && <p className="rounded-lg bg-secondary p-2 text-xs">Arşiv nedeni: {String(p.archive_reason)}</p>}
+                  {p.cancel_reason && <p className="rounded-lg border border-destructive/20 bg-destructive/5 p-2 text-xs">İptal nedeni: {String(p.cancel_reason)}</p>}
+                  {(() => { try { const history: unknown = JSON.parse(String(p.status_history_json ?? "[]")); return Array.isArray(history) && history.length > 0 ? <section className="rounded-xl border bg-background p-3"><h3 className="mb-2 text-sm font-semibold">Durum geçmişi</h3><ol className="space-y-1 text-xs text-muted-foreground">{history.slice(-8).reverse().map((entry, index) => { const item = entry as { from?: string; to?: string; at?: string }; return <li key={`${item.at ?? "history"}-${index}`}>{item.from} → {item.to} · {item.at ? new Date(item.at).toLocaleString("tr-TR") : ""}</li>; })}</ol></section> : null; } catch { return null; } })()}
+                  {(() => { try { const history: unknown = JSON.parse(String(p.edit_history_json ?? "[]")); return Array.isArray(history) && history.length > 0 ? <details className="rounded-xl border bg-background p-3"><summary className="cursor-pointer text-sm font-semibold">Düzenleme geçmişi ({history.length})</summary><ol className="mt-2 space-y-2 text-xs text-muted-foreground">{history.slice(-8).reverse().map((entry, index) => { const item = entry as { at?: string; actor?: string; fields?: string[] }; return <li key={`${item.at ?? "edit"}-${index}`}>{item.at ? new Date(item.at).toLocaleString("tr-TR") : "Tarih yok"} · {item.fields?.join(", ")}{item.actor ? ` · kullanıcı ${item.actor.slice(0, 8)}` : ""}</li>; })}</ol></details> : null; } catch { return null; } })()}
                   <section className="space-y-3 rounded-xl border bg-background p-3"><div><h3 className="text-sm font-semibold">İş kârlılık analizi</h3><p className="text-[11px] text-muted-foreground">KDV hariç gelir − kayıtlı malzeme − bu işe bağlı gider − atanmış çalışanın ortalama kayıtlı saat maliyeti − ortalama gider payı.</p></div><div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">{[["Gelir",netJobRevenue], ["Malzeme",materialCost], ["İşe bağlı gider",directExpense], ["İşçilik",laborCost], ["Gider payı",overheadShare], ["Net katkı",jobProfit]].map(([label,value])=><div key={String(label)} className="rounded-lg bg-secondary/50 p-2"><p className="text-muted-foreground">{label}</p><p className={`num mt-1 font-semibold ${String(label)==="Net katkı" ? Number(value)<0 ? "text-destructive" : "text-emerald-700 dark:text-emerald-300" : ""}`}>{formatTL(Number(value))}</p></div>)}</div><div className="flex items-center justify-between gap-2">{jobMargin == null ? <p className="text-xs text-muted-foreground">Kârlılık için iş fiyatı girilmelidir.</p> : <p className={`text-sm font-bold ${jobMargin<20?"text-destructive":"text-emerald-700 dark:text-emerald-300"}`}>Kâr marjı %{jobMargin.toFixed(1)}{jobMargin<20?" · Bu iş zarar riski taşıyor":""}</p>}</div><div className="h-40"><ResponsiveContainer width="100%" height="100%"><BarChart data={[{name:"Tutar", Gelir:netJobRevenue, Maliyet:totalJobCost, Net:Math.max(0,jobProfit)}]}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="name"/><YAxis width={45} tickFormatter={(value:number)=>value>=1000?`${Math.round(value/1000)}b`:String(value)}/><Tooltip formatter={(value:number)=>formatTL(value)}/><Bar dataKey="Gelir" fill="#10b981" radius={[5,5,0,0]}/><Bar dataKey="Maliyet" fill="#f43f5e" radius={[5,5,0,0]}/></BarChart></ResponsiveContainer></div>{!hourlyLaborCost && !Number(p.estimated_labor_cost ?? 0) && <p className="text-[10px] text-amber-700 dark:text-amber-300">Bu çalışan için yevmiye maliyeti kaydı bulunamadı; işçilik maliyeti sıfır tahmin edildi. Eksik veride kâr olduğundan yüksek görünebilir.</p>}</section>
                   {checklistFor(p).length > 0 && <section className="space-y-2 rounded-xl border bg-background p-3"><h3 className="flex items-center gap-2 text-sm font-semibold"><ClipboardCheck className="size-4 text-primary"/>İş kontrol listesi</h3>{checklistFor(p).map((item, itemIndex) => <label key={`${j.id}-${itemIndex}`} className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" checked={item.done} disabled={!me.data?.isUsta || Boolean(p.billed)} onChange={(event) => { const updated = checklistFor(p).map((task, index) => index === itemIndex ? { ...task, done: event.target.checked } : task); void change(j, { ...p, checklist_json: JSON.stringify(updated) }); }}/><span className={item.done ? "text-muted-foreground line-through" : ""}>{item.label}</span></label>)}{p.checklist_required === true && checklistFor(p).some((item) => !item.done) && <p className="text-xs text-amber-700 dark:text-amber-300">Bütün adımlar işaretlenmeden iş kapatılamaz.</p>}</section>}
                   {me.data?.isUsta && (
@@ -587,12 +716,21 @@ function Jobs() {
                           const nextStatus = e.target.value;
                           if (nextStatus === "Tamamlandı") { void complete(j, seconds); return; }
                           if (nextStatus === "Devam Ediyor" && prerequisite && prerequisite.payload.status !== "Tamamlandı") { toast.error(`Önce “${String(prerequisite.payload.title)}” işini tamamlayın.`); return; }
-                          if (nextStatus === "Ertelendi") {
+          if (nextStatus === "Ertelendi") {
                             const reason = window.prompt("Erteleme nedenini yazın:", String(p.delay_reason ?? ""));
                             if (!reason?.trim()) { toast.error("Erteleme nedeni zorunludur."); return; }
                             void change(j, { ...p, status: nextStatus, delay_reason: reason.trim().slice(0, 500) });
                             return;
                           }
+          if (nextStatus === "İptal") {
+            const choices = ["Müşteri vazgeçti", "Uygun tarih bulunamadı", "Malzeme / ekipman yok", "Fiyat konusunda anlaşma sağlanamadı", "Diğer"];
+            const reason = window.prompt(`İptal nedeni seçin veya yazın:\n${choices.map((item, index) => `${index + 1}. ${item}`).join("\n")}`, String(p.cancel_reason ?? ""));
+            if (!reason?.trim()) { toast.error("İptal nedeni kaydedilmedi; durum değiştirilmedi."); return; }
+            const selected = /^\d+$/.test(reason.trim()) ? choices[Number(reason.trim()) - 1] : reason.trim();
+            if (!selected) { toast.error("Listeden geçerli bir neden seçin veya açıklama yazın."); return; }
+            void change(j, { ...p, status: nextStatus, cancel_reason: selected.slice(0, 300) });
+            return;
+          }
                           void change(j, { ...p, status: nextStatus });
                         }}
                       >
@@ -638,6 +776,11 @@ function Jobs() {
         busy={save.isPending}
         onSubmit={() => {
           if (!String(form.title ?? "").trim()) return void toast.error("İş adı gerekli");
+          if (!editing) {
+            const normalizedTitle = String(form.title).trim().toLocaleLowerCase("tr-TR");
+            const possibleDuplicate = (jobs.data ?? []).find((job) => String(job.payload.title ?? "").trim().toLocaleLowerCase("tr-TR") === normalizedTitle && String(job.payload.customer_id ?? "") === String(form.customer_id ?? "") && String(job.payload.date ?? "") === String(form.date ?? "") && job.payload.archived !== true);
+            if (possibleDuplicate && !window.confirm(`Aynı müşteri ve tarihte “${String(possibleDuplicate.payload.title)}” adlı bir iş zaten var. Yine de yeni kayıt oluşturulsun mu?`)) return;
+          }
           const v = validateJobForm(form, equipment.data ?? [], jobs.data ?? [], editing?.id);
           if (v.error) return void toast.error(v.error);
           v.warnings.forEach((w) => toast.warning(w));
@@ -649,13 +792,16 @@ function Jobs() {
           const previousChecklist = editing ? checklistFor(editing.payload) : [];
           const checklist = String(form.checklist_draft ?? "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(0, 50).map((label) => ({ label: label.slice(0, 160), done: previousChecklist.find((item) => item.label === label)?.done ?? false }));
           const { owner_id, checklist_draft: _checklistDraft, ...payload } = form;
-          save.mutate(
-            { id: editing?.id, owner_id: String(owner_id ?? me.data?.id), payload: { ...payload, estimated_profit_margin, checklist_json: JSON.stringify(checklist), checklist_required: checklist.length > 0 } },
-            { onSuccess: () => setOpen(false) },
-          );
+          const finalPayload = { ...payload, estimated_profit_margin, checklist_json: JSON.stringify(checklist), checklist_required: checklist.length > 0 };
+          if (editing) {
+            void change(editing, finalPayload, String(owner_id ?? editing.owner_id)).then(() => setOpen(false)).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "İş kaydedilemedi."));
+          } else {
+            save.mutate({ owner_id: String(owner_id ?? me.data?.id), payload: finalPayload }, { onSuccess: () => setOpen(false) });
+          }
         }}
       >
-        <JobFormBody form={form} onChange={setForm} customers={customers.data ?? []} members={members} equipment={equipment.data ?? []} jobs={jobs.data ?? []} selfId={editing?.id}>
+        <JobFormBody form={form} onChange={(next) => { setForm(next); if (me.data?.id && typeof next.customer_id === "string" && next.customer_id) { try { localStorage.setItem(`saha-last-customer:${me.data.id}`, next.customer_id); } catch { /* optional convenience preference */ } } }} customers={customers.data ?? []} members={members} equipment={equipment.data ?? []} jobs={jobs.data ?? []} selfId={editing?.id}>
+          <div className="space-y-2 rounded-xl border bg-background p-3"><Label htmlFor="job-label-tags">İş etiketleri</Label><div className="flex gap-2"><Input id="job-label-tags" maxLength={240} value={String(form.label_tags ?? "")} onChange={(event) => setForm({ ...form, label_tags: event.target.value })} placeholder="Örn. acil, bakım, garanti (virgülle ayırın)"/><input aria-label="İş etiket rengi" type="color" className="h-10 w-12 cursor-pointer rounded-md border bg-background p-1" value={/^#[\da-fA-F]{6}$/.test(String(form.label_color ?? "")) ? String(form.label_color) : "#16a085"} onChange={(event) => setForm({ ...form, label_color: event.target.value })}/></div><p className="text-xs text-muted-foreground">Etiketler aramada da eşleşir; rengi iş kartlarında görünür.</p></div>
           <LocationButton value={form} onChange={setForm} />
           <VoiceNoteButton onText={(t) => {
             const draft = parseVoiceJob(t, customers.data ?? []);
