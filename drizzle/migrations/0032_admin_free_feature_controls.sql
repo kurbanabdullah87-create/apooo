@@ -68,6 +68,8 @@ DROP POLICY IF EXISTS "free core work record read" ON public.work_records;
 DROP POLICY IF EXISTS "free core work record writes" ON public.work_records;
 DROP POLICY IF EXISTS "access scoped work record read" ON public.work_records;
 DROP POLICY IF EXISTS "access scoped work record writes" ON public.work_records;
+DROP POLICY IF EXISTS "admin feature scoped work record read" ON public.work_records;
+DROP POLICY IF EXISTS "admin feature scoped work record writes" ON public.work_records;
 CREATE POLICY "admin feature scoped work record read" ON public.work_records FOR SELECT TO authenticated
 USING (team_id=public.current_team() AND (
   (public.has_full_access() AND public.is_team_usta()) OR
