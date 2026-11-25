@@ -26,6 +26,7 @@ export function useMe() {
         email: user.email ?? "",
         profile,
         isAdmin: entitlement?.is_admin === true,
+        accessCheckError: accessError?.message ?? null,
         hasFullAccess,
         premiumExpiresAt: entitlement?.expires_at ?? null,
         isUsta: hasFullAccess || isWorkspaceOwner,
