@@ -34,7 +34,7 @@ function classifyBankMovement(row: { type?: string; description?: string; transa
 function Bank() {
   const me = useMe();
   if (me.isLoading) return <div className="rounded-3xl border bg-card p-8 text-center text-muted-foreground">Erişim kontrol ediliyor…</div>;
-  if (!me.data?.hasFullAccess) return <BankDemo />;
+  if (!me.data?.canUseFeature("banka")) return <BankDemo />;
   return <BankPremium />;
 }
 

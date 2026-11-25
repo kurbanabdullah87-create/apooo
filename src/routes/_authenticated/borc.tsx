@@ -49,7 +49,7 @@ const leftAmount = (i: Installment) => Math.max(0, Number(i.amount) - Number(i.p
 function DebtPage() {
   const me = useMe();
   if (me.isLoading) return <div className="rounded-3xl border bg-card p-8 text-center text-muted-foreground">Erişim kontrol ediliyor…</div>;
-  if (!me.data?.hasFullAccess) return <section className="space-y-4 rounded-3xl border bg-card p-6 shadow-sm"><p className="text-xs font-bold uppercase tracking-widest text-primary">DEMO · GERÇEK VERİ YOK</p><h1 className="text-2xl font-bold">Taksit ve hatırlatmalar</h1><p className="max-w-xl text-sm text-muted-foreground">Bu önizleme yalnızca örnek içerik gösterir; borç, taksit veya hatırlatma verilerinize erişmez. Bu özellik Premium planda kullanılabilir.</p><Button asChild><Link to="/premium">Premium planı incele</Link></Button></section>;
+  if (!me.data?.canUseFeature("taksitler")) return <section className="space-y-4 rounded-3xl border bg-card p-6 shadow-sm"><p className="text-xs font-bold uppercase tracking-widest text-primary">DEMO · GERÇEK VERİ YOK</p><h1 className="text-2xl font-bold">Taksit ve hatırlatmalar</h1><p className="max-w-xl text-sm text-muted-foreground">Bu önizleme yalnızca örnek içerik gösterir; borç, taksit veya hatırlatma verilerinize erişmez. Bu özellik hesabınıza açılmamış.</p><Button asChild><Link to="/premium">Plan ayrıntılarını görüntüle</Link></Button></section>;
   return <DebtPremium />;
 }
 

@@ -541,6 +541,9 @@ export type Database = {
       admin_list_user_plan_access: { Args: { _search?: string }; Returns: { user_id: string; email: string; display_name: string | null; username: string | null; email_confirmed: boolean; is_admin: boolean; is_authorized: boolean; has_premium: boolean; access_source: string; premium_expires_at: string | null; grant_reason: string | null; grant_status: string | null }[] }
       admin_set_user_premium: { Args: { _user_id: string; _action: string; _plan_code?: string; _days?: number; _reason?: string }; Returns: undefined }
       admin_list_plan_grant_events: { Args: { _limit?: number }; Returns: { email: string; actor_email: string; action: string; plan_code: string | null; days: number | null; reason: string; created_at: string }[] }
+      get_current_feature_access: { Args: never; Returns: Json }
+      admin_list_free_features: { Args: never; Returns: { feature_key: string; enabled: boolean; updated_at: string; updated_by_email: string | null }[] }
+      admin_set_free_feature: { Args: { _feature: string; _enabled: boolean }; Returns: undefined }
       get_plan_catalog: { Args: never; Returns: { plan_code: string; amount: number; currency: string; interval_months: number; features: string[] }[] }
       list_plan_campaigns: { Args: never; Returns: { id: string; title: string; description: string; discount_percent: number; applies_to: string; starts_at: string; ends_at: string; enabled: boolean }[] }
       save_plan_campaign: { Args: { _id: string | null; _title: string; _description: string; _discount_percent: number; _applies_to: string; _starts_at: string; _ends_at: string; _enabled: boolean }; Returns: string }

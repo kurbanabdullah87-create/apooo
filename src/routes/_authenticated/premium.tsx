@@ -25,34 +25,34 @@ import { supabase } from "@/integrations/supabase/client";
 import { pageHead } from "@/lib/work";
 
 export const Route = createFileRoute("/_authenticated/premium")({
-  head: () => pageHead("Planlar", "Saha Ã¼cretsiz ve Premium planlarÄ±nÄ± karÅŸÄ±laÅŸtÄ±rÄ±n."),
+  head: () => pageHead("Planlar", "Saha ücretsiz ve Premium planlarını karşılaştırın."),
   component: PremiumPage,
 });
 
-const freeModules = [
-  { label: "Panel", detail: "GÃ¼nlÃ¼k iÅŸ ve cari Ã¶zeti", icon: BriefcaseBusiness },
-  { label: "Ä°ÅŸler", detail: "Ä°ÅŸ oluÅŸturma ve cari hesaba aktarma", icon: CheckCircle2 },
-  { label: "Cari", detail: "MÃ¼ÅŸteri, borÃ§ ve tahsilat kaydÄ±", icon: Users },
-  { label: "Yevmiye", detail: "Ã‡alÄ±ÅŸma gÃ¼nleri ve Ã¼cret takibi", icon: CalendarDays },
-];
-
-const premiumModules = [
-  { label: "Banka hareketleri", detail: "Hesap kayÄ±tlarÄ± ve banka raporlarÄ±", icon: Banknote },
-  {
-    label: "Taksit ve kart planlarÄ±",
-    detail: "BorÃ§lar, Ã¶deme planlarÄ± ve hatÄ±rlatmalar",
-    icon: WalletCards,
-  },
-  { label: "Saha araÃ§larÄ±", detail: "Randevu, ekipman, bakÄ±m ve puantaj", icon: BriefcaseBusiness },
-  {
-    label: "Stok ve raporlama",
-    detail: "AlÄ±mlar, stok hareketleri ve geliÅŸmiÅŸ raporlar",
-    icon: ReceiptText,
-  },
+const featureModules = [
+  { key: "panel", label: "Panel", detail: "Günlük iş ve cari özeti", icon: BriefcaseBusiness },
+  { key: "isler", label: "İşler", detail: "İş oluşturma ve cari hesaba aktarma", icon: CheckCircle2 },
+  { key: "cari", label: "Cari", detail: "Müşteri, borç ve tahsilat kaydı", icon: Users },
+  { key: "yevmiye", label: "Yevmiye", detail: "Çalışma günleri ve ücret takibi", icon: CalendarDays },
+  { key: "giderler", label: "Giderler", detail: "Gider ve belge kayıtları", icon: ReceiptText },
+  { key: "ayarlar", label: "Ayarlar", detail: "İşletme ve uygulama ayarları", icon: BriefcaseBusiness },
+  { key: "banka", label: "Banka hareketleri", detail: "Hesap kayıtları ve dekont arşivi", icon: Banknote },
+  { key: "taksitler", label: "Taksit ve kart planları", detail: "Borçlar, ödeme planları ve hatırlatmalar", icon: WalletCards },
+  { key: "randevu", label: "Randevular", detail: "Takvim ve müşteri randevuları", icon: CalendarDays },
+  { key: "ekipman", label: "Ekipman", detail: "Ekipman ve bakım takibi", icon: BriefcaseBusiness },
+  { key: "stok", label: "Stok", detail: "Alım ve stok hareketleri", icon: ReceiptText },
+  { key: "puantaj", label: "Puantaj", detail: "Vardiya ve giriş çıkış kayıtları", icon: CalendarDays },
+  { key: "alim", label: "Alımlar", detail: "Satın alma ve tedarik kayıtları", icon: ReceiptText },
+  { key: "doviz", label: "Döviz", detail: "Kur görüntüleme ve hesaplama", icon: Banknote },
+  { key: "rapor", label: "Raporlar", detail: "Dönem ve iş raporları", icon: ReceiptText },
+  { key: "hava", label: "Hava durumu", detail: "Saha planlaması için hava bilgisi", icon: BriefcaseBusiness },
+  { key: "hesaplayici", label: "Hesaplayıcı", detail: "Saha ve ücret hesaplamaları", icon: CheckCircle2 },
 ];
 
 function PremiumPage() {
   const me = useMe();
+  const availableModules = featureModules.filter((module) => me.data?.canUseFeature(module.key) === true);
+  const restrictedModules = featureModules.filter((module) => me.data?.canUseFeature(module.key) !== true);
   const queryClient = useQueryClient();
   const [selectedPlan, setSelectedPlan] = useState("premium_monthly");
   const [transferError, setTransferError] = useState("");
@@ -72,11 +72,11 @@ function PremiumPage() {
     mutationFn: async () => {
       const { data, error } = await supabase.rpc("start_bank_transfer", { _plan_code: selectedPlan });
       if (error) throw error;
-      if (!data?.[0]) throw new Error("Havale talimatÄ± oluÅŸturulamadÄ±.");
+      if (!data?.[0]) throw new Error("Havale talimatı oluşturulamadı.");
       return data[0];
     },
     onSuccess: (data) => { setTransfer(data); setTransferError(""); void queryClient.invalidateQueries({ queryKey: ["my-bank-transfers"] }); },
-    onError: (error: Error) => setTransferError(error.message || "Havale talimatÄ± oluÅŸturulamadÄ±."),
+    onError: (error: Error) => setTransferError(error.message || "Havale talimatı oluşturulamadı."),
   });
   const submitTransfer = useMutation({
     mutationFn: async (requestId: string) => {
@@ -87,7 +87,7 @@ function PremiumPage() {
       setTransfer(null);
       await queryClient.invalidateQueries({ queryKey: ["my-bank-transfers"] });
     },
-    onError: (error: Error) => setTransferError(error.message || "Bildirim gÃ¶nderilemedi."),
+    onError: (error: Error) => setTransferError(error.message || "Bildirim gönderilemedi."),
   });
   const plans = useQuery({
     queryKey: ["plan-catalog"],
@@ -143,14 +143,14 @@ function PremiumPage() {
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div className="max-w-2xl">
             <span className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/[.09] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[.16em] text-primary">
-              <Sparkles className="size-3.5" /> Saha planlarÄ±
+              <Sparkles className="size-3.5" /> Saha planları
             </span>
             <h1 className="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">
-              Ä°ÅŸin bÃ¼yÃ¼dÃ¼kÃ§e, Saha da yanÄ±nda.
+              İşin büyüdükçe, Saha da yanında.
             </h1>
             <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
-              Temel iÅŸ akÄ±ÅŸÄ±nÄ± Ã¼cretsiz kullan. Banka ve geliÅŸmiÅŸ saha araÃ§larÄ±na ihtiyaÃ§ duyduÄŸunda
-              Premiumâ€™a geÃ§.
+              Temel iş akışını ücretsiz kullan. Banka ve gelişmiş saha araçlarına ihtiyaç duyduğunda
+              Premium’a geç.
             </p>
           </div>
           {me.data?.hasFullAccess ? (
@@ -160,15 +160,15 @@ function PremiumPage() {
           ) : (
             <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm">
               <p className="text-xs text-muted-foreground">Mevcut plan</p>
-              <p className="mt-1 font-semibold">Ãœcretsiz Â· temel araÃ§lar aÃ§Ä±k</p>
+              <p className="mt-1 font-semibold">Ücretsiz · temel araçlar açık</p>
             </div>
           )}
         </div>
         <div className="mt-7 grid gap-2 sm:grid-cols-3">
           {[
-            ["4 bÃ¶lÃ¼m", "Ã¼cretsiz kullanÄ±ma aÃ§Ä±k"],
-            ["TÃ¼m modÃ¼ller", "menÃ¼de gÃ¶rÃ¼nÃ¼r"],
-            ["Ä°stediÄŸin zaman", "planÄ±nÄ± yÃ¼kselt"],
+            [`${availableModules.length} bölüm`, "hesabında şu an açık"],
+            ["Tüm modüller", "menüde görünür"],
+            ["İstediğin zaman", "planını yükselt"],
           ].map(([value, label]) => (
             <div
               key={value}
@@ -181,22 +181,22 @@ function PremiumPage() {
         </div>
       </header>
 
-      <section className="grid gap-4 lg:grid-cols-2" aria-label="Plan Ã¶zellikleri">
+      <section className="grid gap-4 lg:grid-cols-2" aria-label="Plan özellikleri">
         <article className="rounded-3xl border border-emerald-400/20 bg-gradient-to-br from-emerald-400/[.07] via-card to-card p-5 sm:p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-[.15em] text-emerald-400">
-                Ãœcretsiz plan
+                Açık özellikler
               </p>
-              <h2 className="mt-2 text-xl font-bold">BaÅŸlamak iÃ§in gerekenler</h2>
+              <h2 className="mt-2 text-xl font-bold">Hesabında kullanılabilir</h2>
             </div>
             <span className="rounded-xl bg-emerald-400/10 p-2.5 text-emerald-400">
               <Check className="size-5" />
             </span>
           </div>
           <div className="mt-5 divide-y divide-white/[.07]">
-            {freeModules.map(({ label, detail, icon: Icon }) => (
-              <div key={label} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+            {availableModules.map(({ key, label, detail, icon: Icon }) => (
+              <div key={key} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
                 <span className="rounded-xl border border-emerald-400/15 bg-emerald-400/[.07] p-2 text-emerald-400">
                   <Icon className="size-4" />
                 </span>
@@ -208,27 +208,25 @@ function PremiumPage() {
               </div>
             ))}
           </div>
-          <p className="mt-5 rounded-2xl bg-black/15 px-3.5 py-3 text-xs leading-5 text-muted-foreground">
-            HÄ±zlÄ± ekleâ€™den mÃ¼ÅŸteri, tahsilat ve gider kaydÄ± oluÅŸturabilirsin. Ãœcretsiz kullanÄ±m iÃ§in
-            kart bilgisi gerekmez.
-          </p>
+          {!availableModules.length && <p className="py-3 text-xs text-muted-foreground">Şu an açık özellik bulunmuyor.</p>}
+          <p className="mt-5 rounded-2xl bg-black/15 px-3.5 py-3 text-xs leading-5 text-muted-foreground">Ücretsiz plan için kart bilgisi gerekmez. Yönetici, ücretsiz hesapların hangi modüllere erişeceğini ayarlayabilir.</p>
         </article>
 
         <article className="rounded-3xl border border-primary/25 bg-gradient-to-br from-primary/[.09] via-card to-card p-5 sm:p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-[.15em] text-primary">
-                Premium ile aÃ§Ä±lÄ±r
+                Diğer özellikler
               </p>
-              <h2 className="mt-2 text-xl font-bold">Daha geniÅŸ kontrol</h2>
+              <h2 className="mt-2 text-xl font-bold">Kilitli veya Premium</h2>
             </div>
             <span className="rounded-xl bg-primary/10 p-2.5 text-primary">
               <LockKeyhole className="size-5" />
             </span>
           </div>
           <div className="mt-5 divide-y divide-white/[.07]">
-            {premiumModules.map(({ label, detail, icon: Icon }) => (
-              <div key={label} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+            {restrictedModules.map(({ key, label, detail, icon: Icon }) => (
+              <div key={key} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
                 <span className="rounded-xl border border-primary/15 bg-primary/[.07] p-2 text-primary">
                   <Icon className="size-4" />
                 </span>
@@ -240,10 +238,8 @@ function PremiumPage() {
               </div>
             ))}
           </div>
-          <p className="mt-5 rounded-2xl border border-primary/15 bg-primary/[.045] px-3.5 py-3 text-xs leading-5 text-muted-foreground">
-            Kilitli bÃ¶lÃ¼mler uygulamada gÃ¶rÃ¼nÃ¼r. SeÃ§tiÄŸinde iÃ§erik ve Premiumâ€™a geÃ§iÅŸ bilgisi
-            gÃ¶sterilir.
-          </p>
+          {!restrictedModules.length && <p className="py-3 text-xs text-muted-foreground">Tüm özellikler hesabında açık.</p>}
+          <p className="mt-5 rounded-2xl border border-primary/15 bg-primary/[.045] px-3.5 py-3 text-xs leading-5 text-muted-foreground">Kilitli özellikler menüde görünür. Ücretsiz hesapların erişimini yönetici açabilir; diğer özellikler Premium planla kullanılabilir.</p>
         </article>
       </section>
 
@@ -251,19 +247,19 @@ function PremiumPage() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-[.16em] text-primary">
-              Plan karÅŸÄ±laÅŸtÄ±rmasÄ±
+              Plan karşılaştırması
             </p>
             <h2 id="plan-sec-heading" className="mt-1 text-2xl font-bold">
-              Sana uygun planÄ± seÃ§
+              Sana uygun planı seç
             </h2>
           </div>
           <p className="text-xs text-muted-foreground">
-            Fiyat ve kampanyalar gÃ¼ncel plan bilgisinden yÃ¼klenir.
+            Fiyat ve kampanyalar güncel plan bilgisinden yüklenir.
           </p>
         </div>
         {plans.isLoading && (
           <div className="animate-pulse rounded-3xl border bg-card p-6 text-sm text-muted-foreground">
-            Planlar yÃ¼kleniyorâ€¦
+            Planlar yükleniyor…
           </div>
         )}
         {plans.error && (
@@ -271,7 +267,7 @@ function PremiumPage() {
             role="alert"
             className="rounded-2xl border border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive"
           >
-            Plan bilgisi yÃ¼klenemedi. Yenileyip tekrar deneyin.
+            Plan bilgisi yüklenemedi. Yenileyip tekrar deneyin.
           </div>
         )}
         {plans.data && (
@@ -287,7 +283,7 @@ function PremiumPage() {
               const amount = campaign
                 ? Number(((plan.amount * (100 - campaign.discount_percent)) / 100).toFixed(2))
                 : plan.amount;
-              const interval = plan.plan_code === "premium_monthly" ? "ay" : "yÄ±l";
+              const interval = plan.plan_code === "premium_monthly" ? "ay" : "yıl";
               return (
                 <article
                   key={plan.plan_code}
@@ -303,10 +299,10 @@ function PremiumPage() {
                   )}
                   <p className="text-sm font-bold">
                     {plan.plan_code === "free"
-                      ? "Ãœcretsiz"
+                      ? "Ücretsiz"
                       : plan.plan_code === "premium_monthly"
-                        ? "Premium Â· AylÄ±k"
-                        : "Premium Â· YÄ±llÄ±k"}
+                        ? "Premium · Aylık"
+                        : "Premium · Yıllık"}
                   </p>
                   <div className="mt-4 min-h-[4.25rem]">
                     {premium ? (
@@ -315,12 +311,12 @@ function PremiumPage() {
                           {formatPrice(amount, plan.currency)}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          /{interval} Â· {plan.interval_months} ay eriÅŸim
+                          /{interval} · {plan.interval_months} ay erişim
                         </p>
                         {campaign && (
                           <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-400/10 px-2.5 py-1 text-[10px] font-bold text-amber-300">
                             <Sparkles className="size-3" />
-                            {campaign.title} Â· %{campaign.discount_percent}
+                            {campaign.title} · %{campaign.discount_percent}
                           </p>
                         )}
                       </>
@@ -329,7 +325,7 @@ function PremiumPage() {
                         <p className="text-3xl font-extrabold tracking-tight">
                           {formatPrice(0, plan.currency)}
                         </p>
-                        <p className="mt-1 text-xs text-muted-foreground">SÃ¼re sÄ±nÄ±rÄ± olmadan</p>
+                        <p className="mt-1 text-xs text-muted-foreground">Süre sınırı olmadan</p>
                       </>
                     )}
                   </div>
@@ -355,18 +351,18 @@ function PremiumPage() {
                     >
                       {selected ? (
                         <>
-                          <CheckCircle2 /> SeÃ§ildi
+                          <CheckCircle2 /> Seçildi
                         </>
                       ) : (
                         <>
-                          Bu planÄ± seÃ§ <ChevronRight />
+                          Bu planı seç <ChevronRight />
                         </>
                       )}
                     </Button>
                   ) : (
                     <div className="mt-5 flex h-10 items-center justify-center gap-2 rounded-xl border border-emerald-400/15 bg-emerald-400/[.05] text-xs font-semibold text-emerald-300">
                       <CheckCircle2 className="size-4" />
-                      Ãœcretsiz plan
+                      Ücretsiz plan
                     </div>
                   )}
                 </article>
@@ -397,15 +393,15 @@ function PremiumPage() {
         {myTransfers.isLoading ? <p className="mt-4 text-sm text-muted-foreground">Yükleniyor…</p> : myTransfers.error ? <p role="alert" className="mt-4 text-sm text-destructive">Havale durumları yüklenemedi.</p> : myTransfers.data?.length ? <div className="mt-4 space-y-2">{myTransfers.data.map((item) => <article key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"><div><p className="text-sm font-semibold">{item.plan_code === "premium_monthly" ? "Premium · Aylık" : "Premium · Yıllık"} · {formatPrice(Number(item.amount), item.currency)}</p><p className="mt-1 font-mono text-xs text-muted-foreground">{item.transfer_reference}</p><p className="mt-1 text-[11px] text-muted-foreground">{new Date(item.created_at).toLocaleString("tr-TR")}</p></div><span className="rounded-full border px-3 py-1 text-xs font-semibold">{item.status === "pending_review" ? "İncelemede" : item.status === "awaiting_transfer" ? "Havale bekleniyor" : item.status === "approved" ? "Onaylandı" : item.status === "rejected" ? "Reddedildi" : "İptal edildi"}</span></article>)}</div> : <p className="mt-4 rounded-xl border border-dashed p-4 text-center text-sm text-muted-foreground">Henüz havale talimatı oluşturmadın.</p>}</section>
 
       {campaigns.error && (
-        <p className="text-xs text-muted-foreground">Kampanya bilgileri ÅŸu an yÃ¼klenemedi.</p>
+        <p className="text-xs text-muted-foreground">Kampanya bilgileri şu an yüklenemedi.</p>
       )}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card/60 p-4">
         <p className="text-xs text-muted-foreground">
-          Planla ilgili sorularÄ±n mÄ± var? Plan Ã¶zellikleri hesabÄ±na giriÅŸ yaptÄ±ÄŸÄ±nda burada gÃ¶rÃ¼nÃ¼r.
+          Planla ilgili soruların mı var? Plan özellikleri hesabına giriş yaptığında burada görünür.
         </p>
         <Button asChild variant="outline" size="sm">
           <Link to="/yevmiye">
-            Uygulamaya dÃ¶n <ArrowRight />
+            Uygulamaya dön <ArrowRight />
           </Link>
         </Button>
       </div>

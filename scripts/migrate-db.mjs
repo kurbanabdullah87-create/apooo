@@ -430,9 +430,27 @@ try {
     } else {
       console.log("[db:migrate] Manual bank-transfer checkout and access controls are ready.");
     }
+
+    const [{ freeFeatureControlsReady }] = await tx`
+      SELECT to_regclass('public.free_feature_access') IS NOT NULL
+        AND to_regprocedure('public.get_current_feature_access()') IS NOT NULL
+        AND to_regprocedure('public.admin_list_free_features()') IS NOT NULL
+        AND to_regprocedure('public.admin_set_free_feature(text,boolean)') IS NOT NULL
+        AND to_regprocedure('public.require_enabled_module_write()') IS NOT NULL
+        AND to_regprocedure('public.require_enabled_work_record_write()') IS NOT NULL
+        AND EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='work_records' AND policyname='admin feature scoped work record writes')
+        AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid='public.work_records'::regclass AND tgname='require_enabled_work_record_write' AND NOT tgisinternal)
+        AND EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='bank_accounts' AND coalesce(qual,'') ILIKE '%has_module_access%')
+        AS "freeFeatureControlsReady"
+    `;
+    if (!freeFeatureControlsReady) {
+      await applyMigration(tx, "0032_admin_free_feature_controls.sql", "0032_admin_free_feature_controls");
+    } else {
+      console.log("[db:migrate] Admin free-feature controls are already secured.");
+    }
   });
 
-  const requiredTables = ["debt_records", "debt_installments", "debt_payments", "debt_payment_promises", "credit_card_records", "business_profiles", "business_profile_audit", "authorized_emails", "plan_entitlements", "admin_plan_grants", "admin_plan_grant_events", "plan_pricing", "plan_campaigns", "payment_orders", "payment_settings", "bank_transfer_requests", "app_usage_events"];
+  const requiredTables = ["debt_records", "debt_installments", "debt_payments", "debt_payment_promises", "credit_card_records", "business_profiles", "business_profile_audit", "authorized_emails", "plan_entitlements", "admin_plan_grants", "admin_plan_grant_events", "free_feature_access", "plan_pricing", "plan_campaigns", "payment_orders", "payment_settings", "bank_transfer_requests", "app_usage_events"];
   const missing = [];
   for (const name of requiredTables) {
     if (!(await tableExists(client, name))) missing.push(name);
