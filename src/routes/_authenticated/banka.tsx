@@ -66,6 +66,8 @@ function BankPremium() {
   const [counterparty, setCounterparty] = useState("");
   const [description, setDescription] = useState("");
   const [search, setSearch] = useState("");
+  const [directionFilter, setDirectionFilter] = useState<"all" | BankDirection>("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [vaultPassphrase, setVaultPassphrase] = useState("");
   const [vaultConfirm, setVaultConfirm] = useState("");
   const [rememberVault, setRememberVault] = useState(false);
@@ -117,8 +119,13 @@ function BankPremium() {
   const rows = useMemo(() => (records.data ?? []).filter((r) => month === "all" || monthKey(r.date) === month), [records.data, month]);
   const displayedRows = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("tr-TR");
-    return query ? rows.filter((row) => `${row.counterparty} ${row.description} ${row.transaction_reason ?? ""} ${row.counterparty_iban ?? ""} ${row.reference ?? ""}`.toLocaleLowerCase("tr-TR").includes(query)) : rows;
-  }, [rows, search]);
+    return rows.filter((row) => {
+      const matchesDirection = directionFilter === "all" || row.direction === directionFilter;
+      const matchesCategory = categoryFilter === "all" || classifyBankMovement(row) === categoryFilter;
+      const matchesSearch = !query || `${row.counterparty} ${row.description} ${row.transaction_reason ?? ""} ${row.counterparty_iban ?? ""} ${row.reference ?? ""}`.toLocaleLowerCase("tr-TR").includes(query);
+      return matchesDirection && matchesCategory && matchesSearch;
+    });
+  }, [rows, search, directionFilter, categoryFilter]);
   const incoming = rows.filter((r) => r.direction === "incoming").reduce((sum, r) => sum + r.amount, 0);
   const outgoing = rows.filter((r) => r.direction === "outgoing").reduce((sum, r) => sum + r.amount, 0);
   const outgoingRows = rows.filter((r) => r.direction === "outgoing");
@@ -624,10 +631,10 @@ function BankPremium() {
   }
 
   function downloadAccountingCsv() {
-    if (!rows.length) { toast.error("Dışa aktarılacak hareket bulunamadı."); return; }
+    if (!displayedRows.length) { toast.error("Dışa aktarılacak hareket bulunamadı."); return; }
     const escape = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
     const header = ["Tarih", "Saat", "Hesap", "Yön", "Kategori", "Karşı taraf", "Açıklama", "Tutar", "Para birimi", "Referans"];
-    const lines = rows.map((row) => {
+    const lines = displayedRows.map((row) => {
       const stamp = new Date(row.date);
       return [
         Number.isNaN(stamp.getTime()) ? row.date.slice(0, 10) : stamp.toLocaleDateString("sv-SE"),
@@ -645,7 +652,7 @@ function BankPremium() {
     link.download = `yevmiye-finans-muhasebe-aktarimi-${month === "all" ? "tum-zamanlar" : month}.csv`;
     link.click();
     URL.revokeObjectURL(url);
-    toast.success(`${rows.length} hareket muhasebe CSV dosyası olarak indirildi.`);
+    toast.success(`${displayedRows.length} filtrelenmiş hareket CSV dosyası olarak indirildi.`);
   }
 
   async function downloadSahaReceipt(row: (typeof rows)[number]) {
@@ -1100,7 +1107,7 @@ function BankPremium() {
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
           <p className="flex items-center gap-2 text-xs text-muted-foreground"><LockKeyhole className="size-3.5"/>PDF bu cihazda oluşturulur, Supabase’e yüklenmez.</p>
-      <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setSmsImportOpen((value) => !value)} disabled={accounts.isLoading || Boolean(accounts.error)}><MessageSquareText/>SMS’ten aktar</Button><Button variant="outline" onClick={downloadAccountingCsv} disabled={!rows.length || records.isLoading || accounts.isLoading || Boolean(accounts.error)}><Download/>Muhasebe CSV aktar</Button><Button variant="secondary" onClick={() => void downloadReport()} disabled={records.isLoading || accounts.isLoading || Boolean(accounts.error)}><Download/>Detaylı PDF raporunu indir</Button><Button onClick={() => setAdding((value) => !value)} disabled={accounts.isLoading || Boolean(accounts.error)}><Plus/>Hareket ekle</Button></div>
+      <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setSmsImportOpen((value) => !value)} disabled={accounts.isLoading || Boolean(accounts.error)}><MessageSquareText/>SMS’ten aktar</Button><Button variant="outline" onClick={downloadAccountingCsv} disabled={!displayedRows.length || records.isLoading || accounts.isLoading || Boolean(accounts.error)}><Download/>Görünenleri CSV indir</Button><Button variant="secondary" onClick={() => void downloadReport()} disabled={records.isLoading || accounts.isLoading || Boolean(accounts.error)}><Download/>Detaylı PDF raporunu indir</Button><Button onClick={() => setAdding((value) => !value)} disabled={accounts.isLoading || Boolean(accounts.error)}><Plus/>Hareket ekle</Button></div>
         </div>
       </div>
     </section>
@@ -1122,6 +1129,13 @@ function BankPremium() {
     </form>}
     {records.error && <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">Hareketler yüklenemedi. Bağlantını kontrol edip yeniden dene.</p>}
     <div className="space-y-3"><div className="flex items-center justify-between px-1"><div><h2 className="font-semibold">İşlemler</h2><p className="text-xs text-muted-foreground">{rows.length} kayıt · {monthLabel}</p></div><span className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">{displayedRows.length} gösteriliyor</span></div>
+    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Hareket türü filtresi">
+      {[{ value: "all", label: "Tümü" }, { value: "incoming", label: "Gelen" }, { value: "outgoing", label: "Giden" }].map((item) => <Button key={item.value} type="button" size="sm" variant={directionFilter === item.value ? "default" : "outline"} aria-pressed={directionFilter === item.value} onClick={() => setDirectionFilter(item.value as "all" | BankDirection)}>{item.label}</Button>)}
+      <select aria-label="İşlem kategorisine göre filtrele" className="h-9 max-w-full rounded-xl border bg-background px-3 text-xs" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+        <option value="all">Tüm kategoriler</option>
+        {["Market alışverişi", "Para transferi", "Fatura / kamu ödemesi", "ATM / nakit çekim", "Akaryakıt", "Kart alışverişi", "Diğer / açıklama yetersiz"].map((category) => <option key={category} value={category}>{category}</option>)}
+      </select>
+    </div>
     <div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/><Input aria-label="Hareketlerde ara" placeholder="Kişi veya açıklamada ara" value={search} onChange={(e) => setSearch(e.target.value)} className="h-11 rounded-xl pl-9"/></div>
     {displayedRows.map((row) => <article key={row.id} className="flex items-start justify-between gap-3 rounded-2xl border bg-card p-4 shadow-sm">
       <div className="flex min-w-0 gap-3"><div className={"mt-0.5 rounded-xl p-2 " + (row.direction === "incoming" ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600")}>{row.direction === "incoming" ? <ArrowDownLeft className="size-4"/> : <ArrowUpRight className="size-4"/>}</div><div className="min-w-0"><p className="truncate font-medium">{row.counterparty || (row.source === "open_banking" ? "Karşı taraf banka verisinde yok" : row.direction === "incoming" ? "Gelen para" : "Çıkan para")}</p><p className="mt-1 text-xs text-muted-foreground">{formatDate(row.date)} · {row.direction === "incoming" ? "Kimden" : "Kime"}{row.status && row.status !== "completed" ? ` · ${row.status}` : ""}{row.source === "open_banking" ? " · Bankadan eşitlendi" : row.source === "email_attachment" ? " · Ekstre dosyasından" : row.source === "email_auto" ? " · Gmail taraması" : ""}</p>{row.description && <p className="mt-2 break-words text-sm text-muted-foreground">{row.description}</p>}{row.reference && <p className="mt-1 truncate font-mono text-[10px] text-muted-foreground">Ref: {row.reference}</p>}</div></div>
