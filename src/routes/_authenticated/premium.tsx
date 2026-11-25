@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   BadgeCheck,
@@ -12,7 +12,11 @@ import {
   ChevronRight,
   CircleHelp,
   CreditCard,
+  FileCheck2,
+  LoaderCircle,
   LockKeyhole,
+  MapPin,
+  Phone,
   ReceiptText,
   ShieldCheck,
   Sparkles,
@@ -20,8 +24,10 @@ import {
   WalletCards,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useMe } from "@/hooks/use-me";
 import { supabase } from "@/integrations/supabase/client";
+import { getPaymentCheckoutAvailability, startIyzicoCheckout } from "@/lib/payment.functions";
 import { pageHead } from "@/lib/work";
 
 export const Route = createFileRoute("/_authenticated/premium")({
@@ -53,7 +59,36 @@ const premiumModules = [
 
 function PremiumPage() {
   const me = useMe();
+  const queryClient = useQueryClient();
   const [selectedPlan, setSelectedPlan] = useState("premium_monthly");
+  const [buyer, setBuyer] = useState({
+    fullName: "",
+    identityNumber: "",
+    phone: "",
+    address: "",
+    city: "",
+  });
+  const [buyerConsent, setBuyerConsent] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
+  const [checkoutPending, setCheckoutPending] = useState(false);
+  const [paymentReturned, setPaymentReturned] = useState(false);
+  const [returnedOrderId, setReturnedOrderId] = useState("");
+  const availability = useQuery({
+    queryKey: ["payment-checkout-availability"],
+    queryFn: () => getPaymentCheckoutAvailability(),
+  });
+  const paymentOrders = useQuery({
+    queryKey: ["payment-orders"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("payment_orders")
+        .select("id,plan_code,amount,currency,status,created_at,paid_at")
+        .order("created_at", { ascending: false })
+        .limit(5);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
   const plans = useQuery({
     queryKey: ["plan-catalog"],
     queryFn: async () => {
@@ -100,6 +135,42 @@ function PremiumPage() {
         ),
       )
     : 0;
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment") !== "returned") return;
+    setPaymentReturned(true);
+    setReturnedOrderId(params.get("orderId") ?? "");
+    void queryClient.invalidateQueries({ queryKey: ["me"] });
+    void queryClient.invalidateQueries({ queryKey: ["payment-orders"] });
+    const url = new URL(window.location.href);
+    url.searchParams.delete("payment");
+    url.searchParams.delete("orderId");
+    window.history.replaceState({}, "", url.toString());
+  }, [queryClient]);
+
+  const returnedOrder = paymentOrders.data?.find((order) => order.id === returnedOrderId);
+  const paymentResult = returnedOrder?.status ?? (paymentReturned ? "checking" : "");
+
+  const beginCheckout = async () => {
+    setCheckoutError("");
+    setCheckoutPending(true);
+    try {
+      const result = await startIyzicoCheckout({
+        data: {
+          ...buyer,
+          planCode: selectedPlan as "premium_monthly" | "premium_annual",
+          consent: buyerConsent,
+        },
+      });
+      window.location.assign(result.checkoutUrl);
+    } catch (error) {
+      setCheckoutError(
+        error instanceof Error ? error.message : "Ödeme oturumu başlatılamadı. Tekrar deneyin.",
+      );
+      setCheckoutPending(false);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 pb-10 sm:space-y-8">
@@ -355,8 +426,8 @@ function PremiumPage() {
                   </p>
                   <h2 className="mt-1 text-xl font-bold">Sipariş özeti</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Planını gözden geçir; ödeme sağlayıcısı etkinleştiğinde güvenli biçimde devam
-                    et.
+                    Planını seç, fatura bilgilerini tamamla ve iyzico’nun güvenli ödeme ekranında
+                    ödemeyi bitir.
                   </p>
                 </div>
               </div>
@@ -458,14 +529,160 @@ function PremiumPage() {
                   </span>
                 </div>
               </div>
-              <Button className="mt-6 h-12 w-full" size="lg" disabled>
-                <LockKeyhole /> Güvenli ödemeye geç
-              </Button>
-              <div className="mt-4 rounded-2xl border border-amber-400/15 bg-amber-400/[.045] p-3.5">
-                <p className="text-xs font-semibold text-foreground">Ödeme henüz etkin değil</p>
-                <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
-                  Ödeme kuruluşu bağlantısı ve sunucu doğrulaması tamamlanınca bu düğme açılır. Şu
-                  anda ücret çekilmez, Premium erişimi başlatılmaz.
+              <div className="mt-6 rounded-2xl border bg-background/35 p-4 sm:p-5">
+                <div className="flex items-start gap-3">
+                  <span className="rounded-xl bg-primary/10 p-2.5 text-primary">
+                    <FileCheck2 className="size-4" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold">Fatura bilgileri</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      iyzico ödeme formunun istediği alanlar güvenli oturumu başlatmak için
+                      kullanılır; Saha kart numaranızı almaz.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <label className="space-y-1.5 text-xs font-medium sm:col-span-2">
+                    Ad soyad
+                    <Input
+                      autoComplete="name"
+                      value={buyer.fullName}
+                      onChange={(event) => setBuyer({ ...buyer, fullName: event.target.value })}
+                      placeholder="Fatura üzerindeki ad soyad"
+                      maxLength={120}
+                    />
+                  </label>
+                  <label className="space-y-1.5 text-xs font-medium">
+                    T.C. kimlik numarası
+                    <Input
+                      inputMode="numeric"
+                      autoComplete="off"
+                      value={buyer.identityNumber}
+                      onChange={(event) =>
+                        setBuyer({
+                          ...buyer,
+                          identityNumber: event.target.value.replace(/\D/g, "").slice(0, 11),
+                        })
+                      }
+                      placeholder="11 haneli numara"
+                      maxLength={11}
+                    />
+                  </label>
+                  <label className="space-y-1.5 text-xs font-medium">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Phone className="size-3.5 text-muted-foreground" />
+                      Cep telefonu
+                    </span>
+                    <Input
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      value={buyer.phone}
+                      onChange={(event) => setBuyer({ ...buyer, phone: event.target.value })}
+                      placeholder="05xx xxx xx xx"
+                      maxLength={24}
+                    />
+                  </label>
+                  <label className="space-y-1.5 text-xs font-medium sm:col-span-2">
+                    Fatura adresi
+                    <Input
+                      autoComplete="street-address"
+                      value={buyer.address}
+                      onChange={(event) => setBuyer({ ...buyer, address: event.target.value })}
+                      placeholder="Mahalle, cadde/sokak, bina ve daire no"
+                      maxLength={400}
+                    />
+                  </label>
+                  <label className="space-y-1.5 text-xs font-medium">
+                    <span className="inline-flex items-center gap-1.5">
+                      <MapPin className="size-3.5 text-muted-foreground" />
+                      İl
+                    </span>
+                    <Input
+                      autoComplete="address-level1"
+                      value={buyer.city}
+                      onChange={(event) => setBuyer({ ...buyer, city: event.target.value })}
+                      placeholder="Örn. İstanbul"
+                      maxLength={80}
+                    />
+                  </label>
+                  <div className="flex items-end text-xs text-muted-foreground">Ülke: Türkiye</div>
+                </div>
+                <label className="mt-4 flex cursor-pointer items-start gap-2.5 rounded-xl border border-border/70 bg-background/45 p-3 text-[11px] leading-5 text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={buyerConsent}
+                    onChange={(event) => setBuyerConsent(event.target.checked)}
+                    className="mt-1 size-4 accent-primary"
+                  />
+                  <span>
+                    Ödeme oturumunun oluşturulması ve yasal faturalama amacıyla bu bilgilerin
+                    iyzico’ya aktarılmasını kabul ediyorum. Kart bilgilerim Saha’da saklanmaz.{" "}
+                    <Link
+                      to="/gizlilik"
+                      className="font-semibold text-primary underline underline-offset-2"
+                    >
+                      Gizlilik ve KVKK metni
+                    </Link>
+                  </span>
+                </label>
+                {checkoutError && (
+                  <p
+                    role="alert"
+                    className="mt-3 rounded-xl border border-destructive/25 bg-destructive/5 p-3 text-xs leading-5 text-destructive"
+                  >
+                    {checkoutError}
+                  </p>
+                )}
+                <Button
+                  className="mt-4 h-12 w-full"
+                  size="lg"
+                  disabled={
+                    checkoutPending ||
+                    !availability.data?.configured ||
+                    !buyerConsent ||
+                    !buyer.fullName.trim() ||
+                    buyer.identityNumber.length !== 11 ||
+                    !buyer.phone.trim() ||
+                    buyer.address.trim().length < 10 ||
+                    buyer.city.trim().length < 2
+                  }
+                  onClick={() => void beginCheckout()}
+                >
+                  {checkoutPending ? (
+                    <>
+                      <LoaderCircle className="animate-spin" /> Güvenli oturum hazırlanıyor…
+                    </>
+                  ) : (
+                    <>
+                      <LockKeyhole /> iyzico ile güvenli ödemeye geç
+                    </>
+                  )}
+                </Button>
+                {!availability.isLoading && !availability.data?.configured && (
+                  <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[.05] p-3.5">
+                    <p className="text-xs font-semibold text-amber-200">
+                      Ödeme bağlantısı sunucuda henüz yapılandırılmamış
+                    </p>
+                    <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
+                      Canlı ödeme için iyzico iş yeri hesabı onaylanmalı; Vercel sunucu ayarlarına{" "}
+                      <code>IYZICO_API_KEY</code>, <code>IYZICO_SECRET_KEY</code>,{" "}
+                      <code>IYZICO_ENV=production</code> ve <code>APP_BASE_URL</code> eklenmeli.
+                      Anahtarları bu sayfaya yazmayın.
+                    </p>
+                  </div>
+                )}
+                {availability.data?.configured && availability.data.mode === "sandbox" && (
+                  <p className="mt-3 rounded-xl border border-sky-400/20 bg-sky-400/[.05] p-3 text-[11px] leading-5 text-sky-200">
+                    Test modu açık: gerçek tahsilat yapılmaz. Canlı tahsilat için iyzico canlı
+                    anahtarları ve production modu gerekir.
+                  </p>
+                )}
+                <p className="mt-3 text-[10px] leading-4 text-muted-foreground">
+                  Aylık plan 1 ay, yıllık plan 12 ay Premium erişim verir. Bu tek seferlik ödemedir;
+                  otomatik yenileme yapılmaz. Süre bitince yeni bir siparişle tekrar satın
+                  alabilirsiniz.
                 </p>
               </div>
               <p className="mt-auto flex items-start gap-2 pt-5 text-[10px] leading-4 text-muted-foreground">
@@ -476,6 +693,110 @@ function PremiumPage() {
           </div>
         </section>
       )}
+
+      {paymentReturned && (
+        <section
+          role="status"
+          className={`rounded-2xl border p-4 ${paymentResult === "paid" ? "border-emerald-400/25 bg-emerald-400/[.06]" : paymentResult === "review" || paymentResult === "checking" || paymentResult === "pending" ? "border-amber-400/25 bg-amber-400/[.06]" : "border-destructive/25 bg-destructive/[.05]"}`}
+        >
+          <p className="text-sm font-bold">
+            {paymentResult === "paid"
+              ? "Ödeme doğrulandı · Premium etkin"
+              : paymentResult === "review" ||
+                  paymentResult === "checking" ||
+                  paymentResult === "pending"
+                ? "Ödeme kontrol ediliyor"
+                : "Ödeme tamamlanamadı"}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            {paymentResult === "paid"
+              ? "iyzico işlemi doğrulandı ve Premium süren hesabınıza eklendi."
+              : paymentResult === "review" ||
+                  paymentResult === "checking" ||
+                  paymentResult === "pending"
+                ? "Ödeme sağlayıcısından dönüş alındı. Siparişiniz hesabınızın kayıtlarıyla eşleştirilip doğrulanana kadar Premium açılmaz; birkaç saniye sonra işlem geçmişini yenileyin."
+                : "Ödeme reddedildi veya doğrulanamadı. Ücret çekilmediyse bilgileri kontrol edip tekrar deneyebilirsiniz."}
+          </p>
+        </section>
+      )}
+
+      <section
+        className="rounded-3xl border bg-card/70 p-5 sm:p-6"
+        aria-labelledby="payment-history-heading"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[.15em] text-primary">
+              Hesap geçmişi
+            </p>
+            <h2 id="payment-history-heading" className="mt-1 text-xl font-bold">
+              Son ödeme işlemleri
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Sipariş oluşturma ve doğrulama durumlarını buradan izleyin.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => void paymentOrders.refetch()}>
+            Yenile
+          </Button>
+        </div>
+        {paymentOrders.isLoading ? (
+          <p className="mt-5 animate-pulse text-sm text-muted-foreground">
+            Ödeme geçmişi yükleniyor…
+          </p>
+        ) : paymentOrders.data?.length ? (
+          <div className="mt-4 divide-y divide-border/70">
+            {paymentOrders.data.map((order) => (
+              <div
+                key={order.id}
+                className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+              >
+                <div>
+                  <p className="text-sm font-semibold">
+                    {order.plan_code === "premium_annual" ? "Premium · Yıllık" : "Premium · Aylık"}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {new Intl.DateTimeFormat("tr-TR", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    }).format(new Date(order.created_at))}{" "}
+                    · Sipariş {order.id.slice(0, 8)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-bold">
+                    {formatPrice(Number(order.amount), order.currency)}
+                  </span>
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${order.status === "paid" ? "bg-emerald-400/10 text-emerald-300" : order.status === "review" ? "bg-amber-400/10 text-amber-200" : order.status === "failed" ? "bg-destructive/10 text-destructive" : "bg-secondary text-muted-foreground"}`}
+                  >
+                    {order.status === "paid"
+                      ? "Ödendi"
+                      : order.status === "review"
+                        ? "İncelemede"
+                        : order.status === "failed"
+                          ? "Başarısız"
+                          : "Bekliyor"}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-5 rounded-2xl border border-dashed p-5 text-center">
+            <ReceiptText className="mx-auto size-5 text-muted-foreground" />
+            <p className="mt-2 text-sm font-semibold">Henüz ödeme siparişi yok</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Başlattığınız ödeme oturumları bu alanda görünür.
+            </p>
+          </div>
+        )}
+        {paymentOrders.error && (
+          <p role="alert" className="mt-3 text-xs text-destructive">
+            Ödeme geçmişi yüklenemedi. Veritabanı migrasyonunun uygulanmış olduğunu kontrol edin.
+          </p>
+        )}
+      </section>
 
       {campaigns.error && (
         <p className="text-xs text-muted-foreground">Kampanya bilgileri şu an yüklenemedi.</p>

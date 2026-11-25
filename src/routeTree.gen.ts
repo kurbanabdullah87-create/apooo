@@ -35,6 +35,7 @@ import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AuthResetPasswordRouteImport } from './routes/auth.reset-password'
 import { Route as AuthenticatedCariIndexRouteImport } from './routes/_authenticated/cari.index'
 import { Route as AuthenticatedCariIdRouteImport } from './routes/_authenticated/cari.$id'
+import { Route as ApiPaymentsIyzicoCallbackRouteImport } from './routes/api.payments.iyzico-callback'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -166,6 +167,12 @@ const AuthenticatedCariIdRoute = AuthenticatedCariIdRouteImport.update({
   path: '/cari/$id',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPaymentsIyzicoCallbackRoute =
+  ApiPaymentsIyzicoCallbackRouteImport.update({
+    id: '/api/payments/iyzico-callback',
+    path: '/api/payments/iyzico-callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -192,6 +199,7 @@ export interface FileRoutesByFullPath {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
   '/cari/$id': typeof AuthenticatedCariIdRoute
+  '/api/payments/iyzico-callback': typeof ApiPaymentsIyzicoCallbackRoute
   '/cari/': typeof AuthenticatedCariIndexRoute
 }
 export interface FileRoutesByTo {
@@ -219,6 +227,7 @@ export interface FileRoutesByTo {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
   '/cari/$id': typeof AuthenticatedCariIdRoute
+  '/api/payments/iyzico-callback': typeof ApiPaymentsIyzicoCallbackRoute
   '/cari': typeof AuthenticatedCariIndexRoute
 }
 export interface FileRoutesById {
@@ -248,6 +257,7 @@ export interface FileRoutesById {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
   '/_authenticated/cari/$id': typeof AuthenticatedCariIdRoute
+  '/api/payments/iyzico-callback': typeof ApiPaymentsIyzicoCallbackRoute
   '/_authenticated/cari/': typeof AuthenticatedCariIndexRoute
 }
 export interface FileRouteTypes {
@@ -277,6 +287,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/auth/reset-password'
     | '/cari/$id'
+    | '/api/payments/iyzico-callback'
     | '/cari/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -304,6 +315,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/auth/reset-password'
     | '/cari/$id'
+    | '/api/payments/iyzico-callback'
     | '/cari'
   id:
     | '__root__'
@@ -332,6 +344,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/auth/reset-password'
     | '/_authenticated/cari/$id'
+    | '/api/payments/iyzico-callback'
     | '/_authenticated/cari/'
   fileRoutesById: FileRoutesById
 }
@@ -342,6 +355,7 @@ export interface RootRouteChildren {
   GizlilikRoute: typeof GizlilikRoute
   KullanimSartlariRoute: typeof KullanimSartlariRoute
   SssRoute: typeof SssRoute
+  ApiPaymentsIyzicoCallbackRoute: typeof ApiPaymentsIyzicoCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -528,6 +542,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCariIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/payments/iyzico-callback': {
+      id: '/api/payments/iyzico-callback'
+      path: '/api/payments/iyzico-callback'
+      fullPath: '/api/payments/iyzico-callback'
+      preLoaderRoute: typeof ApiPaymentsIyzicoCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -595,6 +616,7 @@ const rootRouteChildren: RootRouteChildren = {
   GizlilikRoute: GizlilikRoute,
   KullanimSartlariRoute: KullanimSartlariRoute,
   SssRoute: SssRoute,
+  ApiPaymentsIyzicoCallbackRoute: ApiPaymentsIyzicoCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

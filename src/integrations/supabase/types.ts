@@ -14,6 +14,12 @@ export type Database = {
   }
   public: {
     Tables: {
+      payment_orders: {
+        Row: { id: string; user_id: string; plan_code: string; amount: number; currency: string; status: string; provider: string; provider_conversation_id: string; provider_token: string | null; provider_payment_id: string | null; created_at: string; updated_at: string; paid_at: string | null }
+        Insert: { id?: string; user_id: string; plan_code: string; amount: number; currency?: string; status?: string; provider?: string; provider_conversation_id: string; provider_token?: string | null; provider_payment_id?: string | null; created_at?: string; updated_at?: string; paid_at?: string | null }
+        Update: { id?: string; user_id?: string; plan_code?: string; amount?: number; currency?: string; status?: string; provider?: string; provider_conversation_id?: string; provider_token?: string | null; provider_payment_id?: string | null; created_at?: string; updated_at?: string; paid_at?: string | null }
+        Relationships: []
+      }
       credit_card_records: {
         Row: { id: string; team_id: string; owner_id: string; record_kind: string; card_id: string | null; name: string; payload: Json; created_at: string; updated_at: string }
         Insert: { id?: string; team_id?: string; owner_id?: string; record_kind: string; card_id?: string | null; name: string; payload?: Json; created_at?: string; updated_at?: string }
@@ -530,6 +536,7 @@ export type Database = {
       save_plan_campaign: { Args: { _id: string | null; _title: string; _description: string; _discount_percent: number; _applies_to: string; _starts_at: string; _ends_at: string; _enabled: boolean }; Returns: string }
       delete_plan_campaign: { Args: { _id: string }; Returns: undefined }
       set_plan_price: { Args: { _plan_code: string; _amount: number }; Returns: undefined }
+      complete_iyzico_plan_order: { Args: { _order_id: string; _payment_id: string; _verified_amount: number; _verified_currency: string }; Returns: undefined }
       get_current_access: { Args: never; Returns: { is_admin: boolean; is_premium: boolean; expires_at: string | null }[] }
       list_authorized_emails: { Args: never; Returns: { email: string; created_at: string }[] }
       set_authorized_email: { Args: { _email: string; _enabled: boolean }; Returns: undefined }

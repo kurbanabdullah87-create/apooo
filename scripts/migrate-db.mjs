@@ -31,6 +31,21 @@ async function applyMigration(tx, file, label) {
 
 try {
   await client.begin(async (tx) => {
+    const [{ paymentOrdersReady }] = await tx`
+      SELECT to_regclass('public.payment_orders') IS NOT NULL
+        AND to_regprocedure('public.complete_iyzico_plan_order(uuid,text,numeric,text)') IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM pg_policies
+          WHERE schemaname='public' AND tablename='payment_orders'
+            AND policyname='users read own payment orders' AND cmd='SELECT'
+        ) AS "paymentOrdersReady"
+    `;
+    if (!paymentOrdersReady) {
+      await applyMigration(tx, "0029_iyzico_checkout.sql", "0029_iyzico_checkout");
+    } else {
+      console.log("[db:migrate] iyzico checkout orders and access controls are ready.");
+    }
+
     const debtTables = await Promise.all([
       tableExists(tx, "debt_records"),
       tableExists(tx, "debt_installments"),
@@ -379,7 +394,7 @@ try {
     }
   });
 
-  const requiredTables = ["debt_records", "debt_installments", "debt_payments", "debt_payment_promises", "credit_card_records", "business_profiles", "business_profile_audit", "authorized_emails", "plan_entitlements", "plan_pricing", "plan_campaigns", "app_usage_events"];
+  const requiredTables = ["debt_records", "debt_installments", "debt_payments", "debt_payment_promises", "credit_card_records", "business_profiles", "business_profile_audit", "authorized_emails", "plan_entitlements", "plan_pricing", "plan_campaigns", "payment_orders", "app_usage_events"];
   const missing = [];
   for (const name of requiredTables) {
     if (!(await tableExists(client, name))) missing.push(name);
