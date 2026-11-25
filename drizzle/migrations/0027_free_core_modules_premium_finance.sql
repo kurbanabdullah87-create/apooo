@@ -1,7 +1,5 @@
 -- Free workspace owners can use the operational app. Bank and installment data
 -- stay subscription-gated at the database layer as well as in the UI.
-BEGIN;
-
 CREATE OR REPLACE FUNCTION public.is_team_usta()
 RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
@@ -64,6 +62,8 @@ GRANT EXECUTE ON FUNCTION public.archive_business_profile(uuid) TO authenticated
 
 DROP POLICY IF EXISTS "access scoped work record read" ON public.work_records;
 DROP POLICY IF EXISTS "access scoped work record writes" ON public.work_records;
+DROP POLICY IF EXISTS "owner operational work record read" ON public.work_records;
+DROP POLICY IF EXISTS "owner operational work record writes" ON public.work_records;
 CREATE POLICY "owner operational work record read" ON public.work_records FOR SELECT TO authenticated
 USING (team_id = public.current_team() AND (
   public.is_team_usta()
@@ -168,4 +168,3 @@ REVOKE ALL ON FUNCTION public.get_plan_catalog() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_plan_catalog() TO authenticated;
 
 NOTIFY pgrst, 'reload schema';
-COMMIT;
