@@ -89,6 +89,8 @@ function BankPremium() {
   const [gmailBusy, setGmailBusy] = useState(false);
   const [gmailRows, setGmailRows] = useState<ImportedBankMovement[]>([]);
   const [gmailScannedCount, setGmailScannedCount] = useState(0);
+  const [gmailAttachmentCount, setGmailAttachmentCount] = useState(0);
+  const [gmailSkippedAttachmentCount, setGmailSkippedAttachmentCount] = useState(0);
   const statementInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -100,6 +102,8 @@ function BankPremium() {
       setStatementFile(null);
       setGmailRows([]);
       setGmailScannedCount(0);
+      setGmailAttachmentCount(0);
+      setGmailSkippedAttachmentCount(0);
       setSelectedMovementId(null);
       setSmsText("");
       setAdding(false);
@@ -950,8 +954,10 @@ function BankPremium() {
     try {
       const result = await scanBankEmails();
       setGmailScannedCount(result.scanned);
+      setGmailAttachmentCount(result.attachmentsScanned);
+      setGmailSkippedAttachmentCount(result.attachmentsSkipped);
       setGmailRows(result.rows);
-      if (!result.rows.length) toast.info(`${result.scanned} eşleşen e-posta tarandı; güvenilir biçimde işlem alanı çıkarılamadı. Kayıt eklenmedi.`);
+      if (!result.rows.length) toast.info(`${result.scanned} ileti incelendi, ${result.attachmentsScanned} PDF eki açıldı; okunabilir işlem satırı bulunamadı. Tarama görüntüsü PDF’ler veya desteklenmeyen ekler ayrıca sayılır. Hiçbir kayıt eklenmedi.`);
       else toast.success(`${result.rows.length} olası hareket bulundu. Kaydetmeden önce tabloyu kontrol et.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Gmail taraması tamamlanamadı.");
@@ -973,6 +979,8 @@ function BankPremium() {
       toast.success(`${result.importedCount} hareket kaydedildi; tüm zamanlar işlemlerine ve PDF özetine eklendi. ${result.duplicateCount} tekrar veya geçersiz kayıt atlandı.`);
       setGmailRows([]);
       setGmailScannedCount(0);
+      setGmailAttachmentCount(0);
+      setGmailSkippedAttachmentCount(0);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Gmail hareketleri kaydedilemedi.");
     } finally {
@@ -1075,14 +1083,15 @@ function BankPremium() {
       <p className="text-[11px] leading-relaxed text-muted-foreground">Bu yöntem Gmail’e bağlanmaz: ekstre dosyasını sen seçersin; dosya ve işlemler bu cihazdaki kasaya şifreli kaydedilir, sunucuya yüklenmez.</p>
     </section>
     <section className="space-y-4 rounded-3xl border border-sky-500/20 bg-card p-4 shadow-sm sm:p-5">
-      <div className="flex items-start gap-3"><div className="rounded-2xl bg-sky-500/10 p-3 text-sky-700 dark:text-sky-300"><Mail className="size-5"/></div><div className="min-w-0 flex-1"><p className="text-xs font-bold uppercase tracking-wider text-sky-700 dark:text-sky-300">İsteğe bağlı Google bağlantısı</p><h2 className="mt-1 text-lg font-semibold">Gmail’deki banka bildirimlerini tara</h2><p className="mt-1 text-sm leading-relaxed text-muted-foreground">Yalnızca sen başlatınca, son 1 yıldaki işlem/harcama/transfer konulu en fazla 100 ileti aranır. E-posta metni ve Google erişim belirteci tarayıcıda geçici işlenir; sunucuya gönderilmez veya kaydedilmez. Bulunan alanlar önce önizlenir; sen kaydedince bu cihazdaki şifreli kasaya eklenir.</p></div></div>
+      <div className="flex items-start gap-3"><div className="rounded-2xl bg-sky-500/10 p-3 text-sky-700 dark:text-sky-300"><Mail className="size-5"/></div><div className="min-w-0 flex-1"><p className="text-xs font-bold uppercase tracking-wider text-sky-700 dark:text-sky-300">İsteğe bağlı Google bağlantısı</p><h2 className="mt-1 text-lg font-semibold">Gmail’deki banka bildirimlerini tara</h2><p className="mt-1 text-sm leading-relaxed text-muted-foreground">Yalnızca sen başlatınca son 1 yıldaki en fazla 100 eşleşen ileti incelenir. Banka e-postalarının metniyle birlikte PDF ekstre ekleri de bu cihazda geçici açılıp okunur; ileti, PDF içeriği ve Google erişim belirteci sunucuya gönderilmez veya kaydedilmez. Bulunan alanları ayrıntılı önizlemede gözden geçirip istersen şifreli kasana kaydedersin.</p></div></div>
       <div className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.05] p-3 text-xs leading-relaxed text-muted-foreground"><strong className="text-foreground">Google izninin kapsamı:</strong> `gmail.readonly` teknik olarak Gmail iletilerini okuma yetkisi verir; yalnızca banka iletilerini arama sınırı uygulamanın Gmail sorgusudur, Google izninin kendisi değildir. Bu uygulama e-posta göndermez, değiştirmez veya silmez. Erişimi Google Hesabı → Güvenlik → Üçüncü taraf uygulama bağlantılarından kaldırabilirsin.</div>
-      <label className="flex cursor-pointer items-start gap-3 rounded-xl border bg-background/60 p-3 text-sm leading-relaxed"><input type="checkbox" checked={gmailConsent} onChange={(event) => { setGmailConsent(event.target.checked); if (!event.target.checked) { setGmailRows([]); setGmailScannedCount(0); } }} className="mt-1 size-4 shrink-0 accent-primary"/><span><strong>Gmail taramasına açıkça izin veriyorum.</strong> Bu cihazda eşleşen e-posta metinlerinin geçici okunmasını ve yalnızca bulduğum hareket alanlarının, kaydetmem halinde, şifreli kasama eklenmesini kabul ediyorum.</span></label>
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border bg-background/60 p-3 text-sm leading-relaxed"><input type="checkbox" checked={gmailConsent} onChange={(event) => { setGmailConsent(event.target.checked); if (!event.target.checked) { setGmailRows([]); setGmailScannedCount(0); setGmailAttachmentCount(0); setGmailSkippedAttachmentCount(0); } }} className="mt-1 size-4 shrink-0 accent-primary"/><span><strong>Gmail taramasına açıkça izin veriyorum.</strong> Eşleşen e-posta metinlerinin ve PDF ekstre eklerinin bu cihazda geçici okunmasını; yalnızca seçtiğim hareket alanlarının, kaydetmem halinde, şifreli kasama eklenmesini kabul ediyorum.</span></label>
       <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs text-muted-foreground">İzin her tarama başlatışında Google penceresinde ayrıca onaylanır. Arka planda veya uygulama kapalıyken tarama yapılmaz.</p><Button type="button" onClick={() => void scanGmailForMovements()} disabled={!gmailConsent || gmailBusy || importBusy || !activeAccount}><Mail className="size-4"/>{gmailBusy ? "Gmail taranıyor…" : "Google ile onayla ve tara"}</Button></div>
-      {gmailRows.length > 0 && <div className="space-y-3 rounded-2xl border bg-background/60 p-3 sm:p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-semibold">{gmailRows.length} olası hareket · {gmailScannedCount} ileti incelendi</p><p className="text-xs text-muted-foreground">E-posta biçimleri bankalara göre değişir. Tarih, yön, tutar, alıcı ve açıklamayı kontrol et; hatalıysa kaydetme, elle yeni hareket ekle.</p></div><span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs text-amber-700 dark:text-amber-300">Önizleme · henüz kaydedilmedi</span></div>
-        <div className="max-h-72 overflow-auto rounded-xl border"><table className="w-full min-w-[620px] text-left text-xs"><thead className="sticky top-0 bg-muted text-muted-foreground"><tr><th className="p-2">Tarih</th><th className="p-2">Yön</th><th className="p-2">Karşı taraf</th><th className="p-2">Açıklama</th><th className="p-2 text-right">Tutar</th></tr></thead><tbody>{gmailRows.slice(0, 100).map((row, index) => <tr key={`${row.reference}-${index}`} className="border-t"><td className="whitespace-nowrap p-2">{formatDate(row.date)}</td><td className="p-2">{row.direction === "incoming" ? "Gelen" : "Giden"}</td><td className="max-w-40 truncate p-2">{row.counterparty || "E-postada belirtilmemiş"}</td><td className="max-w-56 truncate p-2">{row.description || "—"}</td><td className="whitespace-nowrap p-2 text-right font-semibold">{formatTL(row.amount)}</td></tr>)}</tbody></table></div>
+      {gmailRows.length > 0 && <div className="space-y-3 rounded-2xl border bg-background/60 p-3 sm:p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-semibold">{gmailRows.length} olası hareket · {gmailScannedCount} ileti · {gmailAttachmentCount} PDF eki okundu</p><p className="text-xs text-muted-foreground">Önizlemede işlem tarihi, yön, gönderen/alıcı, işlem nedeni, tam açıklama, tutar, işlem sonrası bakiye, karşı taraf IBAN’ı ve referansı ayrı ayrı gösterilir. Alanlar belgede yoksa boş kalır, tahmin edilmez.</p></div><span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs text-amber-700 dark:text-amber-300">Önizleme · henüz kaydedilmedi</span></div>
+        {gmailSkippedAttachmentCount > 0 && <p className="rounded-lg border border-amber-500/20 bg-amber-500/[.04] p-2 text-xs text-muted-foreground">{gmailSkippedAttachmentCount} PDF eki okunamadı veya 8 MB sınırını aştı. Taranmış görüntü PDF’leri bu sürümde OCR ile okunmaz; dosyayı CSV/Excel/OFX olarak dışa aktarıp ekstre içe aktarmayı kullan.</p>}
+        <div className="max-h-[26rem] overflow-auto rounded-xl border"><table className="w-full min-w-[1120px] text-left text-xs"><thead className="sticky top-0 bg-muted text-muted-foreground"><tr><th className="p-2">Tarih / saat</th><th className="p-2">Yön</th><th className="p-2">Banka</th><th className="p-2">Gönderen / alıcı</th><th className="p-2">İşlem nedeni</th><th className="p-2">Açıklamanın tamamı</th><th className="p-2 text-right">Tutar</th><th className="p-2 text-right">İşlem sonrası bakiye</th><th className="p-2">Karşı taraf IBAN’ı</th><th className="p-2">Referans</th></tr></thead><tbody>{gmailRows.slice(0, 100).map((row, index) => <tr key={`${row.reference ?? row.raw_source_snippet}-${row.date}-${index}`} className="border-t align-top"><td className="whitespace-nowrap p-2">{formatDate(row.date)}</td><td className="whitespace-nowrap p-2">{row.direction === "incoming" ? "Gelen" : "Giden"}</td><td className="p-2">{row.bank_name || activeAccount?.bank_name || "—"}</td><td className="max-w-48 whitespace-normal break-words p-2">{row.counterparty || "E-postada belirtilmemiş"}</td><td className="max-w-48 whitespace-normal break-words p-2">{row.transaction_reason || "—"}</td><td className="max-w-72 whitespace-normal break-words p-2">{row.description || "—"}</td><td className="whitespace-nowrap p-2 text-right font-semibold">{formatTL(row.amount)}</td><td className="whitespace-nowrap p-2 text-right">{row.balance_after === undefined ? "—" : formatTL(row.balance_after)}</td><td className="whitespace-nowrap p-2 font-mono">{row.counterparty_iban || "—"}</td><td className="whitespace-nowrap p-2 font-mono">{row.reference || "—"}</td></tr>)}</tbody></table></div>
         {gmailRows.length > 100 && <p className="text-xs text-muted-foreground">Önizlemede ilk 100 kayıt gösteriliyor; eşleşenlerin tamamı kaydedilecek.</p>}
-        <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="ghost" onClick={() => { setGmailRows([]); setGmailScannedCount(0); }}>Vazgeç</Button><Button type="button" onClick={() => void saveGmailImport()} disabled={importBusy || gmailRows.length === 0}>{importBusy ? <RefreshCw className="size-4 animate-spin"/> : <LockKeyhole className="size-4"/>}Kontrol ettim · şifreli kaydet</Button></div>
+        <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="ghost" onClick={() => { setGmailRows([]); setGmailScannedCount(0); setGmailAttachmentCount(0); setGmailSkippedAttachmentCount(0); }}>Vazgeç</Button><Button type="button" onClick={() => void saveGmailImport()} disabled={importBusy || gmailRows.length === 0}>{importBusy ? <RefreshCw className="size-4 animate-spin"/> : <LockKeyhole className="size-4"/>}Kontrol ettim · şifreli kaydet</Button></div>
       </div>}
     </section>
     <section className="relative overflow-hidden rounded-2xl border bg-card p-4 shadow-sm sm:p-5">

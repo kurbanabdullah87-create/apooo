@@ -187,8 +187,22 @@ export async function parseBankStatementFile(file: File): Promise<ImportedBankMo
   const outgoingWords = /\b(giden|odeme|harcama|eft cikis|fast cikis|havale cikis|borc|cekilen)\b/i;
   const incomingWords = /\b(gelen|tahsil|para giris|eft giris|fast giris|havale giris|alacak|yatirilan)\b/i;
   const rows: ImportedBankMovement[] = [];
+  const transactionLines: Array<{ page: number; y: number; text: string }> = [];
   for (const group of grouped) {
-    const line = group.parts.map((part) => part.text).join(" ").replace(/\s+/g, " ").trim();
+    const text = group.parts.map((part) => part.text).join(" ").replace(/\s+/g, " ").trim();
+    if (datePattern.test(text)) {
+      transactionLines.push({ page: group.page, y: group.y, text });
+      continue;
+    }
+    const previous = transactionLines[transactionLines.length - 1];
+    const normalizedText = normalize(text);
+    if (previous && previous.page === group.page && previous.y - group.y <= 36 && previous.y >= group.y &&
+      !/^(sayfa|page|toplam|genel toplam|bakiye devri|hesap ozeti)/.test(normalizedText)) {
+      previous.text = `${previous.text} ${text}`.replace(/\s+/g, " ").trim();
+    }
+  }
+  for (const group of transactionLines) {
+    const line = group.text;
     const dateMatch = datePattern.exec(line);
     if (!dateMatch) continue;
     const date = parseDate(dateMatch[1] ?? "", dateMatch[2] ?? "");

@@ -511,8 +511,12 @@ export async function importEmailBankMovements(ownerId: string, accountId: strin
       direction: row.direction, amount: row.amount, date: row.date,
       counterparty: row.counterparty.slice(0, 120), description: row.description.slice(0, 500),
       ...(reference ? { reference: reference.slice(0, 120) } : {}),
+      ...(row.balance_after !== undefined && Number.isFinite(row.balance_after) ? { balance_after: row.balance_after } : {}),
+      ...(row.counterparty_iban ? { counterparty_iban: row.counterparty_iban.slice(0, 64) } : {}),
       ...(row.transaction_reason ? { transaction_reason: row.transaction_reason.slice(0, 300) } : {}),
-      bank_name: account.bank_name, status: "completed", source: "email_auto", created_at: now,
+      ...(row.bank_name ? { bank_name: row.bank_name.slice(0, 120) } : { bank_name: account.bank_name }),
+      ...(row.raw_source_snippet ? { raw_source_snippet: row.raw_source_snippet.slice(0, 1000) } : {}),
+      status: "completed", source: "email_auto", created_at: now,
     });
     importedCount++;
   }
