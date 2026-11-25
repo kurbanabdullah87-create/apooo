@@ -14,11 +14,11 @@ export const Route = createFileRoute("/auth")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Giriş — Saha" },
-      { name: "description", content: "Saha hesabınıza güvenli şekilde giriş yapın." },
+      { title: "Giriş — Yevmiye & Finans" },
+      { name: "description", content: "Yevmiye & Finans hesabınıza güvenli şekilde giriş yapın." },
       { name: "robots", content: "noindex,nofollow" },
-      { property: "og:title", content: "Giriş — Saha" },
-      { property: "og:description", content: "Saha hesabınıza güvenli şekilde giriş yapın." },
+      { property: "og:title", content: "Giriş — Yevmiye & Finans" },
+      { property: "og:description", content: "Yevmiye & Finans hesabınıza güvenli şekilde giriş yapın." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -207,8 +207,8 @@ function AuthPage() {
         <aside className="relative hidden flex-col justify-between overflow-hidden px-12 py-10 lg:flex xl:px-20 xl:py-12">
           <div aria-hidden="true" className="absolute inset-8 rounded-[3rem] border border-white/[0.055]" />
           <div className="relative flex items-center gap-3">
-            <img src="/brand-mark.svg" alt="Saha uygulama logosu" className="size-12 rounded-full" />
-            <div><p className="text-lg font-bold tracking-tight">Saha</p><p className="text-xs text-muted-foreground">Operasyon &amp; Finans</p></div>
+            <img src="/brand-mark.svg" alt="Yevmiye & Finans logosu" className="size-12 rounded-2xl" />
+            <div><p className="text-lg font-bold tracking-tight">Yevmiye &amp; Finans</p><p className="text-xs text-muted-foreground">İş ve finans yönetimi</p></div>
           </div>
           <div className="relative max-w-xl py-12">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/[0.08] px-3.5 py-2 text-xs font-semibold text-primary"><span className="size-1.5 rounded-full bg-primary"/>YEVMİYE & FİNANS · İŞ VE HESAP TAKİBİ</div>
@@ -226,7 +226,7 @@ function AuthPage() {
         <div className="flex min-h-dvh items-start justify-center px-6 py-12 sm:px-8 sm:py-16">
           <section className="auth-card relative w-full max-w-[380px] overflow-visible border-0 p-0">
             <div className="relative mb-7 flex flex-col items-start gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between lg:hidden">
-            <div className="flex items-center gap-3"><img src="/brand-mark.svg" alt="Saha uygulama logosu" className="size-12 rounded-full"/><div><p className="text-lg font-bold tracking-tight">Saha</p><p className="text-xs text-muted-foreground">Operasyon &amp; Finans</p></div></div>
+            <div className="flex items-center gap-3"><img src="/brand-mark.svg" alt="Yevmiye & Finans logosu" className="size-12 rounded-2xl"/><div><p className="text-lg font-bold tracking-tight">Yevmiye &amp; Finans</p><p className="text-xs text-muted-foreground">İş ve finans yönetimi</p></div></div>
               <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-2.5 py-1.5 text-[10px] font-medium text-emerald-300"><ShieldCheck className="size-3.5"/>Güvenli oturum</span>
             </div>
             <div className="relative mb-8 hidden items-center justify-end lg:flex"><span className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-2.5 py-1.5 text-[10px] font-medium text-emerald-300"><ShieldCheck className="size-3.5"/>Güvenli oturum</span></div>

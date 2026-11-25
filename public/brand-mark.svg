@@ -1,8 +1,38 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none" role="img" aria-labelledby="title">
-  <title id="title">Saha uygulama simgesi</title>
-  <circle cx="64" cy="64" r="62" fill="#4fd1b5"/>
-  <path d="M26 77h76v9a6 6 0 0 1-6 6H32a6 6 0 0 1-6-6v-9Z" fill="#09201d"/>
-  <path d="M35 75c2-22 13-36 29-36s27 14 29 36H35Z" fill="#fff"/>
-  <path d="M52 41v19m24-19v19M31 74h66" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M26 80v7a6 6 0 0 0 6 6h64a6 6 0 0 0 6-6v-7" stroke="#09201d" stroke-width="4" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Yevmiye &amp; Finans logosu</title>
+  <desc id="desc">Yevmiye defteri ve finans hareketlerini temsil eden koyu yeşil, mint ve altın renkli amblem.</desc>
+  <defs>
+    <linearGradient id="background" x1="12" y1="8" x2="116" y2="124" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#173C3A"/>
+      <stop offset="1" stop-color="#08171A"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="38" y1="21" x2="91" y2="109" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FBFFF9"/>
+      <stop offset="1" stop-color="#DDEFE8"/>
+    </linearGradient>
+    <linearGradient id="coin" x1="86" y1="84" x2="117" y2="116" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFE3A1"/>
+      <stop offset="1" stop-color="#ECA84D"/>
+    </linearGradient>
+    <filter id="shadow" x="20" y="15" width="94" height="106" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dy="3"/>
+      <feComponentTransfer><feFuncA type="linear" slope=".2"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="2" y="2" width="124" height="124" rx="34" fill="url(#background)"/>
+  <path d="M13 36V30c0-9.389 7.611-17 17-17h12" stroke="#66D7B5" stroke-opacity=".32" stroke-width="2" stroke-linecap="round"/>
+  <g filter="url(#shadow)">
+    <path d="M34 21h40l19 19v58c0 5.523-4.477 10-10 10H35c-5.523 0-10-4.477-10-10V31c0-5.523 3.477-10 9-10Z" fill="url(#paper)"/>
+    <path d="M74 22v12c0 3.314 2.686 6 6 6h12L74 22Z" fill="#9CE4C9"/>
+    <path d="M39 48h27M39 55h19" stroke="#8DB6A8" stroke-width="3" stroke-linecap="round"/>
+    <text x="37" y="78" fill="#123832" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="800" letter-spacing="-.8">Y&amp;F</text>
+    <path d="M40 94h8V85h-8v9Zm13 0h8V78h-8v16Zm13 0h8V70h-8v24Z" fill="#21A77E"/>
+    <path d="m39 98 18-13 12-9 10-6" stroke="#0E604D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="m74 70 6-1-1 6" stroke="#0E604D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <circle cx="100" cy="99" r="17" fill="#06251F" fill-opacity=".5"/>
+  <circle cx="98" cy="96" r="15" fill="url(#coin)" stroke="#FFF1CE" stroke-width="1.5"/>
+  <path d="M97 87v18m5-17h-7.5a3.5 3.5 0 0 0 0 7h6a3.5 3.5 0 0 1 0 7H92" stroke="#70491F" stroke-width="2.3" stroke-linecap="round"/>
 </svg>
