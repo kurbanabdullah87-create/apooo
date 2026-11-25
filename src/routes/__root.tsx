@@ -17,6 +17,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { initializeOffline } from "@/lib/pwa";
 import { clearQueriesForIdentityChange } from "@/lib/auth-cache";
+import { markUserActivity } from "@/lib/auth-activity";
 
 function NotFoundComponent() {
   return (
@@ -121,6 +122,7 @@ function RootComponent() {
       }
       const nextUserId = session?.user.id ?? null;
       if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED" && event !== "TOKEN_REFRESHED") return;
+      if (event === "SIGNED_IN" && nextUserId) markUserActivity(nextUserId);
       clearQueriesForIdentityChange(queryClient, currentUserId, nextUserId, event);
       currentUserId = nextUserId;
       router.invalidate();

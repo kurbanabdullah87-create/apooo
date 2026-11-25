@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { getRememberMe } from "@/integrations/supabase/rememberedAuthStorage";
+import { markUserActivity } from "@/lib/auth-activity";
 
 export const Route = createFileRoute("/auth/callback")({
   ssr: false,
@@ -42,6 +43,7 @@ function AuthCallback() {
 
         const { data, error } = await supabase.auth.getUser();
         if (error || !data.user) throw new Error("Giriş doğrulanamadı");
+        markUserActivity(data.user.id);
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
           .select("display_name, username")
