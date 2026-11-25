@@ -10,6 +10,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { getRememberMe, setRememberMe } from "@/integrations/supabase/rememberedAuthStorage";
 import { normalizeUsername, USERNAME_RE, usernameToEmail } from "@/lib/username";
 
+const AUTH_ORIGIN = "https://sahav2full.vercel.app";
+
 export const Route = createFileRoute("/auth")({
   ssr: false,
   head: () => ({
@@ -51,6 +53,7 @@ function AuthPage() {
   const [remember, setRemember] = useState(getRememberMe);
   const [busy, setBusy] = useState(false);
   const [confirmationSent, setConfirmationSent] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
 
   useEffect(() => {
     // OAuth can return through browser back/forward cache or an external auth
@@ -76,12 +79,14 @@ function AuthPage() {
       if (!/^\S+@\S+\.\S+$/.test(address)) { toast.error("E-posta adresini kontrol et."); return; }
       setBusy(true);
       try {
-        const { error } = await supabase.auth.resetPasswordForEmail(address, { redirectTo: `${window.location.origin}/auth/reset-password` });
+        // Use the canonical origin so Supabase's PKCE verifier and the recovery
+        // callback remain on the same browser origin even when a Vercel alias is used.
+        const { error } = await supabase.auth.resetPasswordForEmail(address, { redirectTo: `${AUTH_ORIGIN}/auth/reset-password` });
         if (error) throw error;
-        toast.success("Eğer bu adres kayıtlıysa, şifre yenileme bağlantısı gönderildi.");
-        setResetMode(false);
-      } catch {
-        toast.success("Eğer bu adres kayıtlıysa, şifre yenileme bağlantısı gönderildi.");
+        setResetEmailSent(true);
+      } catch (error) {
+        console.error("Password reset request failed", error);
+        toast.error("Bağlantı gönderilemedi. Biraz sonra tekrar dene; sorun sürerse destekle iletişime geç.");
       } finally {
         setBusy(false);
       }
@@ -216,7 +221,8 @@ function AuthPage() {
               </div>
             ) : (
               <>
-                <div className="relative mb-7"><h1 className="font-display text-3xl font-bold tracking-tight sm:text-[2rem]">{resetMode ? "Şifreni yenile" : mode === "login" ? "Tekrar hoş geldin" : "Hesap oluştur"}</h1><p className="mt-2 text-sm leading-6 text-muted-foreground">{resetMode ? "Kayıtlı e-posta adresine güvenli bir bağlantı göndereceğiz." : mode === "login" ? "Hesabına giriş yap, işlerine kaldığın yerden devam et." : "Hesabını oluştur, işlerini tek yerden yönet."}</p></div>
+                <div className="relative mb-7"><h1 className="font-display text-3xl font-bold tracking-tight sm:text-[2rem]">{resetMode ? "Şifreni yenile" : mode === "login" ? "Tekrar hoş geldin" : "Hesap oluştur"}</h1><p className="mt-2 text-sm leading-6 text-muted-foreground">{resetMode ? "E-postana gelen güvenli bağlantıyı açtıktan sonra yeni şifreni belirleyeceksin." : mode === "login" ? "Hesabına giriş yap, işlerine kaldığın yerden devam et." : "Hesabını oluştur, işlerini tek yerden yönet."}</p></div>
+                {resetMode && resetEmailSent && <div role="status" className="mb-4 rounded-2xl border border-primary/25 bg-primary/[0.07] p-4 text-sm"><p className="font-semibold text-foreground">E-posta kutunu kontrol et</p><p className="mt-1 leading-relaxed text-muted-foreground">Eğer bu adres kayıtlıysa şifre yenileme bağlantısını gönderdik. Gelen Kutusu’nda görünmezse Spam klasörüne bak. Bağlantıyı aynı cihaz ve tarayıcıda aç; yeni parola bu uygulamada açılan ekranda sorulacak.</p><button type="button" className="mt-3 text-xs font-semibold text-primary underline-offset-4 hover:underline" onClick={() => setResetEmailSent(false)}>E-posta adresini değiştir veya yeniden iste</button></div>}
 
                 {!resetMode && <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                   <Button type="button" variant="outline" className="h-12 w-full min-w-0 rounded-xl border-white/10 bg-white/[0.045] text-[13px] leading-tight transition hover:border-white/20 hover:bg-white/[0.08] sm:text-sm" onClick={() => void continueWith("google")} disabled={busy}><GoogleMark/><span>Google ile devam et</span></Button>
@@ -237,7 +243,7 @@ function AuthPage() {
                 </form>
                 {!resetMode && <div className="mt-4"><InstallButton/></div>}
 
-                {resetMode ? <button type="button" onClick={() => setResetMode(false)} className="mt-4 w-full text-center text-sm font-medium text-primary hover:underline">Giriş ekranına dön</button> : <>
+                {resetMode ? <button type="button" onClick={() => { setResetMode(false); setResetEmailSent(false); }} className="mt-4 w-full text-center text-sm font-medium text-primary hover:underline">Giriş ekranına dön</button> : <>
                   {mode === "login" && <button type="button" onClick={() => setLegacy((value) => !value)} className="mt-4 w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">{legacy ? "E-posta ile girişe dön" : "Eski kullanıcı adıyla açılmış hesabım var"}</button>}
                   <div className="mt-7 border-t border-white/[0.08] pt-5 text-center"><span className="text-sm text-muted-foreground">{mode === "login" ? "İlk kez mi kullanıyorsun?" : "Zaten hesabın var mı?"}</span><button type="button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setLegacy(false); setResetMode(false); setPassword(""); }} className="ml-1.5 text-sm font-semibold text-primary hover:underline">{mode === "login" ? "Hesap oluştur" : "Giriş yap"}</button></div>
                   <p className="mt-5 text-center text-xs leading-relaxed text-muted-foreground">Şifreni bu uygulama dışında kimseyle paylaşma. Google ve Apple girişi kendi sağlayıcı ekranlarında gerçekleşir.</p>
