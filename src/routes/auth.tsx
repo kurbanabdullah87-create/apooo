@@ -10,8 +10,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { getRememberMe, setRememberMe } from "@/integrations/supabase/rememberedAuthStorage";
 import { normalizeUsername, USERNAME_RE, usernameToEmail } from "@/lib/username";
 
-const AUTH_ORIGIN = "https://sahav2full.vercel.app";
-
 export const Route = createFileRoute("/auth")({
   ssr: false,
   head: () => ({
@@ -72,6 +70,27 @@ function AuthPage() {
     };
   }, []);
 
+  useEffect(() => {
+    // Supabase returns auth failures in the query string or URL fragment.
+    // Explain expired one-time links distinctly from a bad password, then
+    // remove the provider's error payload so refresh/back cannot replay it.
+    const params = new URLSearchParams(
+      `${window.location.search.replace(/^\?/, "")}&${window.location.hash.replace(/^#/, "")}`,
+    );
+    const errorCode = params.get("error_code") ?? params.get("error");
+    if (!errorCode && !params.has("error_description")) return;
+
+    const detail = (params.get("error_description") ?? "").toLocaleLowerCase("en-US");
+    if (errorCode === "otp_expired" || /link is invalid or has expired/.test(detail)) {
+      toast.error("Bu e-posta bağlantısının süresi dolmuş veya daha önce kullanılmış. Yeni bağlantı iste; Google ile giriş için bu bağlantıya gerek yok.");
+    } else if (errorCode === "access_denied") {
+      toast.error("Google girişi tamamlanmadı. Tekrar deneyebilir veya e-posta ile giriş yapabilirsin.");
+    } else {
+      toast.error("Giriş bağlantısı doğrulanamadı. Yeni bir bağlantı isteyip tekrar deneyin.");
+    }
+    window.history.replaceState(window.history.state, "", window.location.pathname);
+  }, []);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const address = email.trim().toLowerCase();
@@ -79,9 +98,9 @@ function AuthPage() {
       if (!/^\S+@\S+\.\S+$/.test(address)) { toast.error("E-posta adresini kontrol et."); return; }
       setBusy(true);
       try {
-        // Use the canonical origin so Supabase's PKCE verifier and the recovery
-        // callback remain on the same browser origin even when a Vercel alias is used.
-        const { error } = await supabase.auth.resetPasswordForEmail(address, { redirectTo: `${AUTH_ORIGIN}/auth/reset-password` });
+        // Keep the callback on the exact origin where PKCE started. Browser
+        // storage is origin-scoped, so forcing a Vercel alias here loses the verifier.
+        const { error } = await supabase.auth.resetPasswordForEmail(address, { redirectTo: `${window.location.origin}/auth/reset-password` });
         if (error) throw error;
         setResetEmailSent(true);
       } catch (error) {
