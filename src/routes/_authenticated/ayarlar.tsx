@@ -109,7 +109,7 @@ function Settings() {
                 {k === "iban" ? <IbanInput id={k} value={String(form[k] ?? "")} onChange={(value) => setForm({ ...form, [k]: value })}/> : <Input id={k} value={String(form[k] ?? "")} onChange={(e) => setForm({ ...form, [k]: e.target.value })} />}
               </div>
             ))}
-            <BusinessProfilesSettings />
+            {me.data?.hasFullAccess ? <BusinessProfilesSettings /> : <p className="rounded-xl border border-primary/20 bg-primary/[.04] p-3 text-xs text-muted-foreground">Birden fazla usta/işletme profili Premium planında açılır.</p>}
             <Label htmlFor="target">Aylık ciro hedefi (TL)</Label>
             <Input
               id="target"
@@ -133,7 +133,7 @@ function Settings() {
               onSave={() => save.mutate({ id: settingsRecord?.id, payload: form })}
             saving={save.isPending}
           />
-          <section className="space-y-3 border-t pt-5">
+          {me.data?.hasFullAccess && <section className="space-y-3 border-t pt-5">
             <h2 className="font-semibold">Çırak / eleman hesabı</h2>
             <form
               className="space-y-3"
@@ -181,7 +181,7 @@ function Settings() {
                 Hesap oluştur
               </Button>
             </form>
-          </section>
+          </section>}
           <section className="space-y-3 border-t pt-5">
             <h2 className="font-semibold">Mesaj şablonları</h2>
             {templates.data?.map((t) => (
