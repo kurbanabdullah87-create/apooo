@@ -135,6 +135,7 @@ function PremiumPage() {
         ),
       )
     : 0;
+  const monthlyPlan = sortedPlans.find((plan) => plan.plan_code === "premium_monthly");
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 pb-10 sm:space-y-8">
@@ -149,8 +150,8 @@ function PremiumPage() {
               İşin büyüdükçe, Saha da yanında.
             </h1>
             <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
-              Temel iş akışını ücretsiz kullan. Banka ve gelişmiş saha araçlarına ihtiyaç duyduğunda
-              Premium’a geç.
+              İşlerini, tahsilatını ve saha ekibini tek yerden yönet. Temel araçlarla ücretsiz başla;
+              işin büyüdüğünde Premium özellikleri aç.
             </p>
           </div>
           {me.data?.hasFullAccess ? (
@@ -284,6 +285,24 @@ function PremiumPage() {
                 ? Number(((plan.amount * (100 - campaign.discount_percent)) / 100).toFixed(2))
                 : plan.amount;
               const interval = plan.plan_code === "premium_monthly" ? "ay" : "yıl";
+              const monthlyCampaign = activeCampaigns("premium_monthly").sort(
+                (a, b) => b.discount_percent - a.discount_percent,
+              )[0];
+              const monthlyAmount = monthlyPlan
+                ? Number(
+                    ((monthlyPlan.amount * (100 - (monthlyCampaign?.discount_percent ?? 0))) / 100).toFixed(2),
+                  )
+                : 0;
+              const annualReference =
+                plan.plan_code === "premium_annual" &&
+                monthlyPlan?.currency === plan.currency &&
+                plan.interval_months > 0
+                  ? monthlyAmount * plan.interval_months
+                  : 0;
+              const annualSavings = Math.max(0, annualReference - amount);
+              const annualSavingsPercent = annualReference
+                ? Math.round((annualSavings / annualReference) * 100)
+                : 0;
               return (
                 <article
                   key={plan.plan_code}
@@ -294,7 +313,7 @@ function PremiumPage() {
                   )}
                   {plan.plan_code === "premium_annual" && (
                     <span className="absolute right-4 top-4 rounded-full bg-primary/10 px-2.5 py-1 text-[9px] font-extrabold tracking-[.12em] text-primary">
-                      YILLIK
+                      {annualSavingsPercent > 0 ? `%${annualSavingsPercent} AVANTAJ` : "YILLIK"}
                     </span>
                   )}
                   <p className="text-sm font-bold">
@@ -313,6 +332,16 @@ function PremiumPage() {
                         <p className="mt-1 text-xs text-muted-foreground">
                           /{interval} · {plan.interval_months} ay erişim
                         </p>
+                        {plan.plan_code === "premium_annual" && (
+                          <p className="mt-2 text-xs font-medium text-primary">
+                            Aylık karşılığı {formatPrice(amount / Math.max(1, plan.interval_months), plan.currency)}
+                            {annualSavings > 0 && (
+                              <span className="ml-1 text-muted-foreground">
+                                · {formatPrice(annualSavings, plan.currency)} daha avantajlı
+                              </span>
+                            )}
+                          </p>
+                        )}
                         {campaign && (
                           <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-400/10 px-2.5 py-1 text-[10px] font-bold text-amber-300">
                             <Sparkles className="size-3" />
@@ -375,7 +404,15 @@ function PremiumPage() {
       {plans.data && (
         <section className="overflow-hidden rounded-3xl border border-primary/20 bg-card shadow-xl shadow-black/10">
           <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[1fr_.85fr]">
-            <div><div className="flex items-start gap-3"><span className="rounded-2xl bg-primary/10 p-3 text-primary"><Banknote className="size-5" /></span><div><p className="text-xs font-bold uppercase tracking-[.14em] text-primary">IBAN&#8217;a havale</p><h2 className="mt-1 text-xl font-bold">Premium siparişini oluştur</h2><p className="mt-1 text-sm text-muted-foreground">T.C. kimlik numarası, kart bilgisi, telefon veya adres istemiyoruz. Ücret, sen havaleyi hesabında doğruladıktan sonra Premium açılır.</p></div></div>
+            <div><div className="flex items-start gap-3"><span className="rounded-2xl bg-primary/10 p-3 text-primary"><Banknote className="size-5" /></span><div><p className="text-xs font-bold uppercase tracking-[.14em] text-primary">IBAN&#8217;a havale</p><h2 className="mt-1 text-xl font-bold">Premium siparişini oluştur</h2><p className="mt-1 text-sm text-muted-foreground">Kart bilgisi veya kişisel ödeme bilgisi istemiyoruz. Premium, havale hesabında doğrulandıktan sonra etkinleşir.</p></div></div>
+              <ol className="mt-5 grid gap-2 sm:grid-cols-3" aria-label="Havale ile Premium satın alma adımları">
+                {[["01", "Planını seç"], ["02", "Bankandan havale yap"], ["03", "Kodla bildir, onayı bekle"]].map(([step, label]) => (
+                  <li key={step} className="rounded-xl border bg-background/45 p-3">
+                    <span className="text-[10px] font-extrabold tracking-[.14em] text-primary">{step}</span>
+                    <p className="mt-1 text-xs font-semibold leading-5">{label}</p>
+                  </li>
+                ))}
+              </ol>
               <div className="mt-5 rounded-2xl border bg-background/45 p-4"><p className="text-xs text-muted-foreground">Hesap</p><p className="mt-1 text-sm font-semibold">{me.data?.email || "Oturum bilgisi yükleniyor"}</p><p className="mt-4 text-xs text-muted-foreground">Seçilen plan</p><p className="mt-1 text-sm font-semibold">{selectedPlan === "premium_annual" ? "Premium · Yıllık" : "Premium · Aylık"}</p><p className="mt-4 text-xs leading-5 text-muted-foreground">Siparişi başlattığında sunucu güncel fiyatı ve varsa kampanyayı hesaplar. Havale açıklamasına ödeme kodunu yaz.</p></div>
             </div>
             <aside className="flex flex-col rounded-2xl border bg-gradient-to-br from-primary/[.08] to-transparent p-5"><p className="text-xs font-bold uppercase tracking-[.14em] text-muted-foreground">Seçili planın tutarı</p><p className="mt-2 text-3xl font-extrabold">{checkoutPlan ? formatPrice(checkoutAmount, checkoutPlan.currency) : "—"}</p>{checkoutCampaign && <p className="mt-2 text-xs font-semibold text-emerald-300">{checkoutCampaign.title} · %{checkoutCampaign.discount_percent} indirim</p>}
