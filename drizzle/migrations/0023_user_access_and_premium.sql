@@ -226,6 +226,8 @@ DROP POLICY IF EXISTS "team master or own apprentice read" ON public.work_record
 DROP POLICY IF EXISTS "master operational writes" ON public.work_records;
 DROP POLICY IF EXISTS "own exchange-rate snapshot read" ON public.work_records;
 DROP POLICY IF EXISTS "own exchange-rate snapshot insert" ON public.work_records;
+DROP POLICY IF EXISTS "access scoped work record read" ON public.work_records;
+DROP POLICY IF EXISTS "access scoped work record writes" ON public.work_records;
 CREATE POLICY "access scoped work record read" ON public.work_records FOR SELECT TO authenticated
 USING (team_id = public.current_team() AND (
   (public.has_full_access() AND public.is_team_usta()) OR
@@ -246,6 +248,10 @@ DROP POLICY IF EXISTS "users manage only their bank accounts" ON public.bank_acc
 DROP POLICY IF EXISTS "users manage only their bank movements" ON public.bank_transactions;
 DROP POLICY IF EXISTS "users manage only their bank connections" ON public.bank_connections;
 DROP POLICY IF EXISTS "users manage only their bank documents" ON public.bank_documents;
+DROP POLICY IF EXISTS "premium owner manages bank accounts" ON public.bank_accounts;
+DROP POLICY IF EXISTS "premium owner manages bank movements" ON public.bank_transactions;
+DROP POLICY IF EXISTS "premium owner manages bank connections" ON public.bank_connections;
+DROP POLICY IF EXISTS "premium owner manages bank documents" ON public.bank_documents;
 CREATE POLICY "premium owner manages bank accounts" ON public.bank_accounts FOR ALL TO authenticated
 USING (public.has_full_access() AND owner_id = auth.uid() AND team_id = public.current_team())
 WITH CHECK (public.has_full_access() AND owner_id = auth.uid() AND team_id = public.current_team());
@@ -270,6 +276,10 @@ DROP POLICY IF EXISTS "bank document owner upload" ON storage.objects;
 DROP POLICY IF EXISTS "bank document owner read" ON storage.objects;
 DROP POLICY IF EXISTS "bank document owner delete" ON storage.objects;
 DROP POLICY IF EXISTS "bank document owner update" ON storage.objects;
+DROP POLICY IF EXISTS "premium bank document upload" ON storage.objects;
+DROP POLICY IF EXISTS "premium bank document read" ON storage.objects;
+DROP POLICY IF EXISTS "premium bank document delete" ON storage.objects;
+DROP POLICY IF EXISTS "premium bank document update" ON storage.objects;
 CREATE POLICY "premium bank document upload" ON storage.objects FOR INSERT TO authenticated
 WITH CHECK (bucket_id='bank-private' AND (storage.foldername(name))[1]=auth.uid()::text AND public.has_full_access());
 CREATE POLICY "premium bank document read" ON storage.objects FOR SELECT TO authenticated
