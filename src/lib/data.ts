@@ -94,7 +94,7 @@ const KEY: Record<Table, string> = {
   message_templates: "templates",
 };
 
-export function useUpsert(table: Table) {
+export function useUpsert(table: Table, options: { insertOnly?: boolean } = {}) {
   const qc = useQueryClient();
   const profile = useBusinessProfile();
   return useMutation({
@@ -102,7 +102,8 @@ export function useUpsert(table: Table) {
     mutationFn: async (row: Record<string, unknown>) => {
       const { id, ...rest } = row;
       if ((table === "transactions" || table === "expenses") && profile.isUsta && (!profile.activeProfileId || profile.activeProfile?.is_archived)) throw new Error("Finans kaydı için etkin bir usta profili seçin.");
-      await persistWrite(table, id ? "update" : "insert", { ...rest, ...(!id && profile.isUsta && profile.activeProfileId && (table === "transactions" || table === "expenses") ? { profile_id: profile.activeProfileId } : {}), id: id ?? crypto.randomUUID() });
+      const action = options.insertOnly || !id ? "insert" : "update";
+      await persistWrite(table, action, { ...rest, ...(action === "insert" && profile.isUsta && profile.activeProfileId && (table === "transactions" || table === "expenses") ? { profile_id: profile.activeProfileId } : {}), id: id ?? crypto.randomUUID() });
     },
     onSuccess: () => {
       haptic();

@@ -26,7 +26,8 @@ export function ExpenseForm({ open, onOpenChange }: { open: boolean; onOpenChang
     if (!openNow) setReceiptPath(null);
     onOpenChange(openNow);
   }
-  const upsert = useUpsert("expenses");
+  // Keep the client-generated ID for the receipt upload, but create a new row.
+  const upsert = useUpsert("expenses", { insertOnly: true });
 
   useEffect(() => {
     if (open) {
