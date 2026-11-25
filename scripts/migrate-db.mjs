@@ -119,7 +119,7 @@ try {
       appliedDebtPromiseMigration = true;
     }
 
-    const [{ debtPromiseReady }] = await tx`
+    let [{ debtPromiseReady }] = await tx`
       SELECT
         to_regprocedure('public.create_debt_payment_promise(uuid,uuid,numeric,date,text)') IS NOT NULL
         AND to_regprocedure('public.cancel_debt_payment_promise(uuid)') IS NOT NULL
@@ -159,7 +159,24 @@ try {
     `;
     if (!debtPromiseReady) {
       if (appliedDebtPromiseMigration) throw new Error("Debt payment-promise migration verification failed after apply.");
-      throw new Error("Debt payment-promise schema is partially present or its access controls are incomplete; refusing an automatic production repair.");
+      await applyMigration(tx, "0028_repair_debt_payment_promises.sql", "0028_repair_debt_payment_promises");
+      [{ debtPromiseReady }] = await tx`
+        SELECT
+          to_regprocedure('public.create_debt_payment_promise(uuid,uuid,numeric,date,text)') IS NOT NULL
+          AND to_regprocedure('public.cancel_debt_payment_promise(uuid)') IS NOT NULL
+          AND EXISTS (SELECT 1 FROM pg_class WHERE oid=to_regclass('public.debt_payment_promises') AND relrowsecurity AND relforcerowsecurity)
+          AND (SELECT count(*)=1 FROM pg_policies WHERE schemaname='public' AND tablename='debt_payment_promises' AND policyname='usta reads own payment promises' AND cmd='SELECT')
+          AND NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='debt_payment_promises' AND cmd IN ('INSERT','UPDATE','DELETE','ALL'))
+          AND has_table_privilege('authenticated','public.debt_payment_promises','SELECT')
+          AND NOT has_table_privilege('authenticated','public.debt_payment_promises','INSERT')
+          AND NOT has_table_privilege('authenticated','public.debt_payment_promises','UPDATE')
+          AND NOT has_table_privilege('authenticated','public.debt_payment_promises','DELETE')
+          AND EXISTS (SELECT 1 FROM pg_proc WHERE oid=to_regprocedure('public.create_debt_payment_promise(uuid,uuid,numeric,date,text)') AND prosecdef)
+          AND EXISTS (SELECT 1 FROM pg_proc WHERE oid=to_regprocedure('public.cancel_debt_payment_promise(uuid)') AND prosecdef)
+          AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid='public.debt_payments'::regclass AND tgname='track_debt_payment_promise_after_insert' AND NOT tgisinternal)
+          AS "debtPromiseReady"
+      `;
+      if (!debtPromiseReady) throw new Error("Debt payment-promise safeguards remain incomplete after the data-preserving repair.");
     } else {
       console.log("[db:migrate] Debt payment promises are already secured.");
     }
