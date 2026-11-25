@@ -4,7 +4,9 @@ import { extractStatementDetails, parseBankStatementFile } from "@/lib/bank-stat
 const GOOGLE_GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
 // Public OAuth client ID from the user's Google Cloud web client; client IDs are not secrets.
 const GOOGLE_GMAIL_CLIENT_ID = "1002878230023-94i9kq71q7npqv1iniqbnvj5sich6p41.apps.googleusercontent.com";
-const GMAIL_SEARCH = 'newer_than:365d {subject:işlem subject:harcama subject:transfer subject:FAST subject:EFT subject:ödeme subject:hesap subject:hareket subject:ekstre subject:dekont subject:transaction subject:statement filename:pdf}';
+// Only inspect the user's own sent statement emails. Avoid broad terms such as
+// "payment", "transfer", or any PDF attachment, which can match unrelated mail.
+const GMAIL_SEARCH = 'newer_than:365d from:me {subject:"hesap hareketi" subject:"hesap hareketleri" subject:"hesap hareketlerim" subject:"hesap hareketlerini" subject:"hesap ekstresi" subject:"hesap dökümü" subject:"hesap dokumu"}';
 
 type GoogleTokenResponse = { access_token?: string; error?: string; error_description?: string };
 type GoogleTokenClient = { requestAccessToken: (options?: { prompt?: string }) => void };
