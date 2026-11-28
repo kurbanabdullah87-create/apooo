@@ -1,0 +1,13 @@
+# Project Handoff
+- Ürün: Saha operasyon/finans PWA; React+TypeScript, TanStack Start/Router, Tailwind/shadcn; Supabase Auth/Postgres/RLS/Storage; Vercel production, GitHub otomatik dağıtım.
+- Repo: GitHub `kurbanabdullah87-create/apooo`, `main`; son yerel HEAD `7b8fd29` (Gmail sorgu daraltma). Her oturum başında HEAD/deploy durumunu doğrula.
+- Mimari: Supabase Auth; tablolar RLS ile; iş/finans kayıtları profil kapsamlı. `scripts/migrate-db.mjs` deploy prebuild’de DB şeması doğrular/uygular.
+- Alanlar: Panel, İşler, Cari, Yevmiye/Gider, Banka, Borç, Ekipman, Randevu, Stok/Alım, Puantaj, Rapor, Döviz, Ayarlar; admin modül/plan kontrolleri mevcut.
+- Banka gizliliği: hassas kasa cihazda şifreli IndexedDB; ekstre ve raporlar istemcide işlenir; Gmail OAuth `gmail.readonly`, kullanıcı başlatır, erişim token’ı bellekte.
+- Gmail ekleri: PDF metni PDF.js ile yerelde ayrıştırılır, hareket önizleme ve ayrıntılı PDF/CSV var; tam kaynak satırı, tür/kanal/yer/ücret/valör vb. alanlar korunur. Görüntü PDF için OCR yok; gerçek dekontla banka-özel kalibrasyon açık iş.
+- Google OAuth Gmail kapsamı hassas/kısıtlı; Google doğrulama/erişim onayı sonucu teyit edilmedi. İzin reddi kodla aşılamaz.
+- Gider kaydetme hatası: önceden oluşturulmuş fiş UUID’si yeni kaydı yanlışlıkla UPDATE ediyordu; `useUpsert(...,{insertOnly:true})` ile çözüldü.
+- İlgili commit `5aee6f8`; Vercel build/deploy Ready, DB migration doğrulaması loglarda başarılı. Sonraki HEAD `7b8fd29` için yayın ayrıca doğrulanmalı.
+- 0023 erişim migration’ı retry-safe yapıldı; üretim deploy loglarında başarıyla uygulandığı görüldü. Vercel hata ayrıntıları `npx vercel inspect <deployment> --logs` ile okunur.
+- Yerel durum son kontrol: `src/routes/_authenticated/panel.tsx` kullanıcı değişikliği vardı; üzerine yazma/geri alma. Önceki eski HANDOFF’daki `e45b071`/0032 bekleme notu güncelliğini yitirdi.
+- Yayına gönderim kullanıcı tarafından önceden yetkilendirildi; yine de sadece hedef commit’i push et ve gerçek Vercel durumunu kontrol et. RLS/üretim DB yıkıcı değişiklikleri ayrıca ele al.

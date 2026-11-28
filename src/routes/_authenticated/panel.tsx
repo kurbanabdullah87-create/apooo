@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useMemo, useRef } from "react";
-import { AlertTriangle, MapPin, MessageCircle, Wallet, HardHat, WalletCards, TrendingUp, TrendingDown, UserPlus, Camera, QrCode, RefreshCw, ArrowUpRight, Clock3, FileText, Info, CalendarDays, Eye, EyeOff, Sparkles, ArrowRight } from "lucide-react";
+import { AlertTriangle, MapPin, MessageCircle, Wallet, HardHat, WalletCards, TrendingUp, TrendingDown, UserPlus, Camera, QrCode, RefreshCw, ArrowUpRight, Clock3, FileText, Info, CalendarDays, Eye, EyeOff } from "lucide-react";
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
